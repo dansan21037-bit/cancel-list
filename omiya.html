@@ -499,7 +499,7 @@ async function loadFromDrive() {
     query += ` and '${folderId}' in parents`;
 
     const searchResp = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,modifiedTime)`,
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,modifiedTime)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (!searchResp.ok) {
@@ -513,7 +513,7 @@ async function loadFromDrive() {
     if (searchData.files && searchData.files.length > 0) {
       driveFileId = searchData.files[0].id;
       const fileResp = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media&supportsAllDrives=true`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (!fileResp.ok) throw new Error('ファイル読み込み失敗: ' + fileResp.status);
@@ -542,7 +542,7 @@ async function saveToDrive() {
     const content = JSON.stringify(records);
     if (driveFileId) {
       const resp = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media&supportsAllDrives=true`,
         {
           method: 'PATCH',
           headers: {
@@ -559,7 +559,7 @@ async function saveToDrive() {
 
       // Step 1: Create empty file with metadata
       const createResp = await fetch(
-        'https://www.googleapis.com/drive/v3/files',
+        'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true',
         {
           method: 'POST',
           headers: {
@@ -579,7 +579,7 @@ async function saveToDrive() {
 
       // Step 2: Upload content to the created file
       const uploadResp = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media&supportsAllDrives=true`,
         {
           method: 'PATCH',
           headers: {
