@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>無断キャンセルリスト 大宮</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: white; padding: 20px 24px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .header-icon { font-size: 32px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .header-sub { font-size: 13px; color: #a0aec0; margin-top: 2px; }
+  .header-right { margin-left: auto; display: flex; gap: 10px; }
+
+  /* Stats Bar */
+  .stats-bar {
+    display: flex; gap: 12px; padding: 16px 24px; background: white;
+    border-bottom: 1px solid #e2e8f0; flex-wrap: wrap;
+  }
+  .stat-card {
+    display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+    border-radius: 10px; font-size: 14px; font-weight: 600; min-width: 130px;
+  }
+  .stat-card.total { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+  .stat-card.orange-card { background: #fffaf0; color: #c05621; border: 1px solid #fbd38d; }
+  .stat-card.red-card { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+  .stat-num { font-size: 24px; font-weight: 800; }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex; gap: 10px; padding: 14px 24px; background: white;
+    border-bottom: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 220px; max-width: 400px; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #718096; font-size: 16px; }
+  .search-input {
+    width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #e2e8f0;
+    border-radius: 8px; font-size: 14px; outline: none; font-family: inherit;
+    transition: border 0.2s;
+  }
+  .search-input:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+
+  .btn {
+    padding: 9px 16px; border: none; border-radius: 8px; font-size: 14px;
+    font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn-primary { background: #4299e1; color: white; }
+  .btn-primary:hover { background: #3182ce; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(66,153,225,0.4); }
+  .btn-success { background: #48bb78; color: white; }
+  .btn-success:hover { background: #38a169; }
+  .btn-outline { background: white; color: #4a5568; border: 1px solid #e2e8f0; }
+  .btn-outline:hover { background: #f7fafc; border-color: #cbd5e0; }
+  .btn-danger { background: #fc8181; color: white; }
+  .btn-danger:hover { background: #f56565; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* Legend */
+  .legend { display: flex; gap: 14px; align-items: center; font-size: 13px; color: #4a5568; padding-left: 4px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+
+  /* Table Container */
+  .table-wrap { padding: 16px 24px; }
+  .table-container { background: white; border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead tr { background: #f7fafc; }
+  th {
+    padding: 12px 14px; text-align: left; font-weight: 700; color: #4a5568;
+    font-size: 13px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+    user-select: none; cursor: pointer;
+  }
+  th:hover { color: #2d3748; }
+  th .sort-icon { font-size: 11px; opacity: 0.5; margin-left: 4px; }
+  th.sorted .sort-icon { opacity: 1; color: #4299e1; }
+
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #f7fafc !important; }
+  td { padding: 11px 14px; vertical-align: middle; }
+
+  /* Row colors */
+  tr.row-orange { background: #fffaf0; }
+  tr.row-red { background: #fff5f5; }
+
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; font-weight: 800; font-size: 13px;
+  }
+  .badge-1 { background: #e2e8f0; color: #4a5568; }
+  .badge-2 { background: #fbd38d; color: #744210; }
+  .badge-3 { background: #fc8181; color: #822727; }
+
+  .name-cell { font-weight: 600; }
+  .phone-cell { font-family: monospace; color: #2b6cb0; font-size: 13px; }
+  .date-cell { white-space: nowrap; color: #4a5568; }
+  .note-cell { color: #718096; font-size: 13px; max-width: 260px; }
+  .actions-cell { display: flex; gap: 5px; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: #a0aec0; }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; }
+
+  /* Count summary */
+  .table-footer {
+    padding: 10px 14px; background: #f7fafc; border-top: 1px solid #e2e8f0;
+    font-size: 13px; color: #718096; display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 100; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn { from { opacity:0; transform: translateY(-20px) scale(0.97); } to { opacity:1; transform: none; } }
+  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: #1a202c; }
+  .form-group { margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 5px; }
+  input, select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 14px; font-family: inherit; outline: none; transition: border 0.2s;
+    background: white;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #2d3748; color: white;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 200;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3); opacity: 0; transform: translateY(10px);
+    transition: all 0.3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.success { background: #276749; }
+  .toast.error { background: #9b2c2c; }
+
+  /* Warning badge for repeat offenders */
+  .repeat-warning { font-size: 12px; color: #c05621; background: #fefcbf; padding: 2px 6px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px; }
+
+  /* Auth & Settings */
+  .auth-bar {
+    display: flex; align-items: center; gap: 10px; padding: 8px 24px;
+    background: #edf2f7; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #4a5568;
+  }
+  .auth-bar .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .auth-bar .status-dot.online { background: #48bb78; }
+  .auth-bar .status-dot.offline { background: #a0aec0; }
+  .auth-bar .sync-info { flex: 1; }
+  .btn-google { background: #4285f4; color: white; }
+  .btn-google:hover { background: #3367d6; }
+  .btn-settings { background: #718096; color: white; }
+  .btn-settings:hover { background: #4a5568; }
+  .settings-modal { max-width: 480px; }
+  .settings-modal .form-group { margin-bottom: 16px; }
+  .settings-modal .help-text { font-size: 12px; color: #718096; margin-top: 4px; line-height: 1.5; }
+  .settings-modal .step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
+  .settings-modal .step-num { display: inline-block; background: #4299e1; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
+
+  @media (max-width: 600px) {
+    .header h1 { font-size: 18px; }
+    .toolbar { gap: 8px; }
+    .form-row { grid-template-columns: 1fr; }
+    td, th { padding: 9px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🚫</div>
+  <div>
+    <h1>無断キャンセルリスト　大宮</h1>
+    <div class="header-sub">予約の無断キャンセル管理システム</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">
+      📥 Excel出力
+    </button>
+    <button class="btn btn-outline" onclick="openSettingsModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">
+      ⚙️ 設定
+    </button>
+  </div>
+</div>
+
+<div class="auth-bar" id="authBar">
+  <span class="status-dot offline" id="statusDot"></span>
+  <span class="sync-info" id="syncInfo">Google Drive: 未接続</span>
+  <button class="btn btn-sm btn-google" id="authBtn" onclick="handleAuth()">Googleサインイン</button>
+  <button class="btn btn-sm btn-outline" id="syncBtn" onclick="syncFromDrive()" style="display:none">🔄 同期</button>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-card total">
+    <div>
+      <div class="stat-num" id="stat-total">0</div>
+      <div>総件数</div>
+    </div>
+  </div>
+  <div class="stat-card orange-card">
+    <div>
+      <div class="stat-num" id="stat-orange">0</div>
+      <div>🟠 2回 (要注意)</div>
+    </div>
+  </div>
+  <div class="stat-card red-card">
+    <div>
+      <div class="stat-num" id="stat-red">0</div>
+      <div>🔴 3回以上 (要対応)</div>
+    </div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" class="search-input" id="searchInput" placeholder="名前・電話番号・日付で検索..." oninput="render()">
+  </div>
+  <button class="btn btn-primary" onclick="openAddModal()">＋ 新規追加</button>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#fbd38d"></div>2回キャンセル</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fc8181"></div>3回以上</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="table-container">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('count')" id="th-count"># <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('date')" id="th-date">日付 <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('time')" id="th-time">時間 <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('name')" id="th-name">氏名 <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('phone')" id="th-phone">電話番号 <span class="sort-icon">↕</span></th>
+            <th>メール</th>
+            <th>備考</th>
+            <th style="text-align:center">回数</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div class="icon">📋</div>
+      <p>該当するデータがありません</p>
+    </div>
+    <div class="table-footer">
+      <span id="rowCount">0件</span>
+      <span style="color:#4299e1; font-weight:600;">大宮院</span>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">新規追加</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>日付 *</label>
+        <input type="date" id="f-date" required>
+      </div>
+      <div class="form-group">
+        <label>予約時間 *</label>
+        <select id="f-time">
+          <option value="">選択してください</option>
+          <option>08:00</option><option>08:30</option><option>09:00</option>
+          <option>09:30</option><option>10:00</option><option>10:30</option>
+          <option>11:00</option><option>11:30</option><option>12:00</option>
+          <option>12:30</option><option>13:00</option><option>13:30</option>
+          <option>14:00</option><option>14:30</option><option>15:00</option>
+          <option>15:30</option><option>16:00</option><option>16:30</option>
+          <option>17:00</option><option>17:30</option><option>18:00</option>
+          <option>18:30</option><option>19:00</option><option>19:30</option>
+          <option>20:00</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>氏名 *</label>
+        <input type="text" id="f-name" placeholder="山田 太郎">
+      </div>
+      <div class="form-group">
+        <label>電話番号 *</label>
+        <input type="tel" id="f-phone" placeholder="09012345678">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>メールアドレス</label>
+      <input type="email" id="f-email" placeholder="example@email.com">
+    </div>
+    <div class="form-group">
+      <label>備考</label>
+      <textarea id="f-note" placeholder="電話対応の記録など..."></textarea>
+    </div>
+    <div id="repeatWarning" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:10px 14px; font-size:13px; color:#856404; margin-bottom:4px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveRecord()" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Settings Modal -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal settings-modal">
+    <h2>⚙️ Google Drive 設定</h2>
+    <div class="step">
+      <span class="step-num">1</span>
+      <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> でプロジェクトを作成
+    </div>
+    <div class="step">
+      <span class="step-num">2</span>
+      「APIとサービス」→「ライブラリ」で <strong>Google Drive API</strong> を有効化
+    </div>
+    <div class="step">
+      <span class="step-num">3</span>
+      「APIとサービス」→「認証情報」→「OAuth 2.0 クライアントID」を作成（種類：ウェブアプリケーション）
+    </div>
+    <div class="step">
+      <span class="step-num">4</span>
+      「承認済みのJavaScript生成元」に <strong id="currentOrigin"></strong> を追加
+    </div>
+    <div class="form-group" style="margin-top:16px">
+      <label>OAuth クライアントID</label>
+      <input type="text" id="clientIdInput" placeholder="xxxx.apps.googleusercontent.com">
+      <div class="help-text">Google Cloud ConsoleからコピーしたクライアントIDを貼り付けてください</div>
+    </div>
+    <div class="form-group">
+      <label>共有フォルダID（任意）</label>
+      <input type="text" id="folderIdInput" placeholder="Google DriveのフォルダIDを入力">
+      <div class="help-text">スタッフ間でデータを共有する場合、共有フォルダのIDを入力してください。フォルダのURLの末尾部分がIDです。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeSettingsModal()">閉じる</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Initial data from spreadsheet ──────────────────────────────────────
+const INITIAL_DATA = [
+  {"date":"2025-10-12","time":"19:00","name":"村田明俊","phone":"08011688934","email":"","note":"19：05・19：15電話 応答なし"},
+  {"date":"2025-10-14","time":"10:00","name":"田中千展","phone":"09018401300","email":"","note":""},
+  {"date":"2025-10-20","time":"12:30","name":"細谷舞香","phone":"09078153396","email":"","note":"12：35・12：45電話留守電"},
+  {"date":"2025-10-23","time":"13:00","name":"小林勇気","phone":"08052384557","email":"","note":"13：05・13：15電話留守電"},
+  {"date":"2025-10-28","time":"13:00","name":"今川尊子","phone":"009080528427","email":"","note":"13：05・13：15電話留守電"},
+  {"date":"2025-11-06","time":"18:30","name":"栗原幸子","phone":"009022358165","email":"","note":"18：35・18：45電話留守電"},
+  {"date":"2025-11-09","time":"15:00","name":"日野王央","phone":"0486257686","email":"","note":"15：05・15：15電話応答なし"},
+  {"date":"2025-11-10","time":"10:00","name":"磯亮介","phone":"09065255177","email":"","note":"10：08・10：13・10：16電話応答なし"},
+  {"date":"2025-11-12","time":"10:00","name":"蛭田七虹","phone":"08067272723","email":"","note":"10：05・10：10・10：15・10：20電話応答なし"},
+  {"date":"2025-11-15","time":"18:00","name":"佐藤恵輔","phone":"08012779845","email":"","note":"18：10・18：15電話応答なし"},
+  {"date":"2025-11-17","time":"13:30","name":"松下イゴール","phone":"09027691104","email":"","note":"13：35・13：45電話応答なし"},
+  {"date":"2025-11-18","time":"12:00","name":"岡部　唯","phone":"08034062036","email":"","note":"12：05・12：15電話留守電"},
+  {"date":"2025-11-23","time":"13:00","name":"木元真太郎","phone":"07026146191","email":"","note":"13：05・13：10・13：15電話留守電"},
+  {"date":"2025-11-23","time":"17:00","name":"綿貫弘美","phone":"09080328293","email":"","note":"17：05・17：15電話"},
+  {"date":"2025-11-24","time":"10:00","name":"八巻昌子","phone":"09045234991","email":"","note":"10：05・10：10・10：15電話留守電"},
+  {"date":"2025-12-02","time":"15:00","name":"吉野延子","phone":"09017970926","email":"","note":"15：05・15：15電話応答なし"},
+  {"date":"2025-12-21","time":"13:30","name":"高田","phone":"09027346318","email":"","note":"13：35・13：45電話応答なし"},
+  {"date":"2025-12-23","time":"17:00","name":"田原繭子","phone":"08079348388","email":"","note":"17：03・17：07　電話応答なし"},
+  {"date":"2026-01-13","time":"13:00","name":"藤倉さおり","phone":"09089452514","email":"","note":"13：05・13：15応答なし留守電"},
+  {"date":"2026-01-21","time":"10:30","name":"幸田市子","phone":"06029776257","email":"","note":"10：35　使われていない電話番号　来た"},
+  {"date":"2026-01-21","time":"16:00","name":"塚越一江","phone":"09085135632","email":"","note":"16：05・16：15電話留守電"},
+  {"date":"2026-01-23","time":"10:00","name":"高久一馬","phone":"09018121732","email":"","note":"10：03・10：05　留守電"},
+  {"date":"2026-01-24","time":"18:30","name":"コスてア","phone":"09032113505","email":"","note":""},
+  {"date":"2026-01-26","time":"11:00","name":"原子恵実","phone":"08022869296","email":"","note":"11：05・11：15電話 応答なし"},
+  {"date":"2026-02-18","time":"15:00","name":"大友 朱里","phone":"09043188504","email":"","note":""}
+];
+
+// ── Config ───────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'cancel_list_omiya';
+const DRIVE_FILE_NAME = 'cancel_list_omiya.json';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive';
+const DEFAULT_FOLDER_ID = '1nUz5LIufhedp6BN1YLk0cVdrXf95G55e';
+
+// ── State ───────────────────────────────────────────────────────────────
+let records = [];
+let editId = null;
+let sortKey = 'date';
+let sortDir = -1;
+let accessToken = null;
+let driveFileId = null;
+let tokenClient = null;
+let isSignedIn = false;
+
+// ── Google Drive Auth ───────────────────────────────────────────────────
+function initGIS() {
+  const clientId = localStorage.getItem('google_client_id');
+  if (!clientId) return;
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: DRIVE_SCOPES,
+      callback: handleTokenResponse,
+    });
+  } catch(e) {
+    console.error('GIS init error:', e);
+  }
+}
+
+function handleTokenResponse(resp) {
+  if (resp.error) {
+    showToast('サインインに失敗しました: ' + resp.error, 'error');
+    return;
+  }
+  accessToken = resp.access_token;
+  isSignedIn = true;
+  updateAuthUI();
+  loadFromDrive();
+}
+
+function handleAuth() {
+  if (isSignedIn) {
+    signOut();
+  } else {
+    const clientId = localStorage.getItem('google_client_id');
+    if (!clientId) {
+      showToast('先にClient IDを設定してください', 'error');
+      openSettingsModal();
+      return;
+    }
+    if (!tokenClient) initGIS();
+    if (tokenClient) {
+      tokenClient.requestAccessToken();
+    } else {
+      showToast('Google APIの読み込みを待っています...', 'error');
+    }
+  }
+}
+
+function signOut() {
+  if (accessToken) {
+    try { google.accounts.oauth2.revoke(accessToken); } catch(e) {}
+  }
+  accessToken = null;
+  isSignedIn = false;
+  driveFileId = null;
+  tokenClient = null;
+  updateAuthUI();
+  showToast('サインアウトしました', '');
+}
+
+function updateAuthUI() {
+  const dot = document.getElementById('statusDot');
+  const info = document.getElementById('syncInfo');
+  const btn = document.getElementById('authBtn');
+  const syncBtn = document.getElementById('syncBtn');
+
+  if (isSignedIn) {
+    dot.className = 'status-dot online';
+    info.textContent = 'Google Drive: 接続中';
+    btn.textContent = 'サインアウト';
+    btn.className = 'btn btn-sm btn-outline';
+    syncBtn.style.display = '';
+  } else {
+    dot.className = 'status-dot offline';
+    info.textContent = 'Google Drive: 未接続';
+    btn.textContent = 'Googleサインイン';
+    btn.className = 'btn btn-sm btn-google';
+    syncBtn.style.display = 'none';
+  }
+}
+
+// ── Google Drive Operations ─────────────────────────────────────────────
+async function loadFromDrive() {
+  if (!accessToken) return;
+  try {
+    document.getElementById('syncInfo').textContent = 'Google Drive: 読み込み中...';
+    const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
+    let query = `name='${DRIVE_FILE_NAME}' and trashed=false`;
+    query += ` and '${folderId}' in parents`;
+
+    const searchResp = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,modifiedTime)`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!searchResp.ok) throw new Error('検索に失敗: ' + searchResp.status);
+    const searchData = await searchResp.json();
+
+    if (searchData.files && searchData.files.length > 0) {
+      driveFileId = searchData.files[0].id;
+      const fileResp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!fileResp.ok) throw new Error('ファイル読み込み失敗: ' + fileResp.status);
+      const data = await fileResp.json();
+      records = data;
+      saveDataLocal();
+      render();
+      const mod = searchData.files[0].modifiedTime;
+      const modDate = mod ? new Date(mod).toLocaleString('ja-JP') : '';
+      document.getElementById('syncInfo').textContent = `Google Drive: 同期済み (${modDate})`;
+      showToast('Google Driveからデータを読み込みました', 'success');
+    } else {
+      await saveToDrive();
+      document.getElementById('syncInfo').textContent = 'Google Drive: 新規作成しました';
+      showToast('Google Driveにデータファイルを作成しました', 'success');
+    }
+  } catch(e) {
+    document.getElementById('syncInfo').textContent = 'Google Drive: エラー';
+    showToast('Drive読み込みエラー: ' + e.message, 'error');
+  }
+}
+
+async function saveToDrive() {
+  if (!accessToken) return;
+  try {
+    const content = JSON.stringify(records);
+    if (driveFileId) {
+      const resp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: content,
+        }
+      );
+      if (!resp.ok) throw new Error('更新失敗: ' + resp.status);
+    } else {
+      const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
+      const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [folderId] };
+
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', new Blob([content], { type: 'application/json' }));
+
+      const resp = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form,
+        }
+      );
+      if (!resp.ok) throw new Error('作成失敗: ' + resp.status);
+      const data = await resp.json();
+      driveFileId = data.id;
+    }
+    document.getElementById('syncInfo').textContent = `Google Drive: 同期済み (${new Date().toLocaleString('ja-JP')})`;
+  } catch(e) {
+    showToast('Drive保存エラー: ' + e.message, 'error');
+  }
+}
+
+function syncFromDrive() {
+  if (!isSignedIn) return;
+  loadFromDrive();
+}
+
+// ── Local Storage ───────────────────────────────────────────────────────
+function loadData() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    records = saved ? JSON.parse(saved) : INITIAL_DATA.map((r, i) => ({...r, id: i+1}));
+  } catch(e) {
+    records = INITIAL_DATA.map((r, i) => ({...r, id: i+1}));
+  }
+}
+
+function saveDataLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function saveData() {
+  saveDataLocal();
+  if (isSignedIn) saveToDrive();
+}
+
+// ── Settings Modal ──────────────────────────────────────────────────────
+function openSettingsModal() {
+  document.getElementById('clientIdInput').value = localStorage.getItem('google_client_id') || '';
+  document.getElementById('folderIdInput').value = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
+  document.getElementById('currentOrigin').textContent = window.location.origin || window.location.href.replace(/\/[^\/]*$/, '');
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettingsModal() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveSettings() {
+  const clientId = document.getElementById('clientIdInput').value.trim();
+  const folderId = document.getElementById('folderIdInput').value.trim();
+  if (clientId) {
+    localStorage.setItem('google_client_id', clientId);
+  } else {
+    localStorage.removeItem('google_client_id');
+  }
+  if (folderId) {
+    localStorage.setItem('google_folder_id', folderId);
+  } else {
+    localStorage.removeItem('google_folder_id');
+  }
+  tokenClient = null;
+  if (clientId) initGIS();
+  closeSettingsModal();
+  showToast('設定を保存しました', 'success');
+}
+
+// ── Cancel count per phone number ───────────────────────────────────────
+function getCancelCount(phone) {
+  return records.filter(r => r.phone === phone).length;
+}
+
+function getPersonCounts() {
+  const counts = {};
+  records.forEach(r => {
+    counts[r.phone] = (counts[r.phone] || 0) + 1;
+  });
+  return counts;
+}
+
+// ── Render ──────────────────────────────────────────────────────────────
+function render() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const counts = getPersonCounts();
+
+  let filtered = records.filter(r => {
+    if (!q) return true;
+    return r.name.toLowerCase().includes(q) ||
+           r.phone.includes(q) ||
+           r.date.includes(q) ||
+           (r.note && r.note.toLowerCase().includes(q));
+  });
+
+  filtered.sort((a, b) => {
+    let va = sortKey === 'count' ? (counts[a.phone] || 1) : (a[sortKey] || '');
+    let vb = sortKey === 'count' ? (counts[b.phone] || 1) : (b[sortKey] || '');
+    if (va < vb) return sortDir;
+    if (va > vb) return -sortDir;
+    return 0;
+  });
+
+  const tbody = document.getElementById('tableBody');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    document.getElementById('emptyState').style.display = 'block';
+  } else {
+    document.getElementById('emptyState').style.display = 'none';
+    tbody.innerHTML = filtered.map((r, idx) => {
+      const cnt = counts[r.phone] || 1;
+      const rowClass = cnt >= 3 ? 'row-red' : cnt === 2 ? 'row-orange' : '';
+      const badgeClass = cnt >= 3 ? 'badge-3' : cnt === 2 ? 'badge-2' : 'badge-1';
+      const dateDisp = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
+      return `<tr class="${rowClass}">
+        <td style="color:#a0aec0;font-size:12px">${idx+1}</td>
+        <td class="date-cell">${dateDisp}</td>
+        <td>${r.time}</td>
+        <td class="name-cell">${esc(r.name)}</td>
+        <td class="phone-cell">${esc(r.phone)}</td>
+        <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
+        <td class="note-cell">${esc(r.note)}</td>
+        <td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>
+        <td><div class="actions-cell">
+          <button class="btn btn-outline btn-sm" onclick="openEditModal(${r.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRecord(${r.id})">🗑️</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  const allCounts = getPersonCounts();
+  const orangePhones = Object.values(allCounts).filter(v => v === 2).length;
+  const redPhones = Object.values(allCounts).filter(v => v >= 3).length;
+  document.getElementById('stat-total').textContent = records.length;
+  document.getElementById('stat-orange').textContent = orangePhones;
+  document.getElementById('stat-red').textContent = redPhones;
+  document.getElementById('rowCount').textContent = `${filtered.length}件 / 全${records.length}件`;
+}
+
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Sort ─────────────────────────────────────────────────────────────────
+function sortBy(key) {
+  if (sortKey === key) sortDir = -sortDir;
+  else { sortKey = key; sortDir = -1; }
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  const th = document.getElementById('th-' + key);
+  if (th) th.classList.add('sorted');
+  render();
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────
+function openAddModal() {
+  editId = null;
+  document.getElementById('modalTitle').textContent = '新規追加';
+  document.getElementById('saveBtn').textContent = '追加する';
+  clearForm();
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('f-date').focus();
+}
+
+function openEditModal(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  editId = id;
+  document.getElementById('modalTitle').textContent = '編集';
+  document.getElementById('saveBtn').textContent = '更新する';
+  document.getElementById('f-date').value = r.date;
+  document.getElementById('f-time').value = r.time;
+  document.getElementById('f-name').value = r.name;
+  document.getElementById('f-phone').value = r.phone;
+  document.getElementById('f-email').value = r.email;
+  document.getElementById('f-note').value = r.note;
+  document.getElementById('repeatWarning').style.display = 'none';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  editId = null;
+}
+
+function clearForm() {
+  ['f-date','f-time','f-name','f-phone','f-email','f-note'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = el.tagName === 'SELECT' ? '' : '';
+  });
+  document.getElementById('repeatWarning').style.display = 'none';
+}
+
+document.getElementById('f-phone').addEventListener('input', function() {
+  const phone = this.value.trim();
+  if (!phone) { document.getElementById('repeatWarning').style.display = 'none'; return; }
+  const existing = records.filter(r => r.phone === phone && r.id !== editId);
+  const warn = document.getElementById('repeatWarning');
+  if (existing.length > 0) {
+    const names = [...new Set(existing.map(r => r.name))].join('、');
+    warn.style.display = 'block';
+    warn.innerHTML = `⚠️ この電話番号は既に <strong>${existing.length}件</strong> 登録されています（${names}）。追加後は合計 <strong>${existing.length + 1}回</strong> になります。`;
+  } else {
+    warn.style.display = 'none';
+  }
+});
+
+function saveRecord() {
+  const date = document.getElementById('f-date').value;
+  const time = document.getElementById('f-time').value;
+  const name = document.getElementById('f-name').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+
+  if (!date || !name || !phone) { showToast('日付・氏名・電話番号は必須です', 'error'); return; }
+
+  if (editId) {
+    const idx = records.findIndex(r => r.id === editId);
+    if (idx >= 0) records[idx] = { ...records[idx], date, time, name, phone, email, note };
+    showToast('更新しました ✓', 'success');
+  } else {
+    const newId = records.length > 0 ? Math.max(...records.map(r => r.id)) + 1 : 1;
+    records.push({ id: newId, date, time, name, phone, email, note });
+    showToast('追加しました ✓', 'success');
+  }
+
+  saveData();
+  closeModal();
+  render();
+}
+
+function deleteRecord(id) {
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm(`「${r.name}」（${r.date}）を削除しますか？`)) return;
+  records = records.filter(x => x.id !== id);
+  saveData();
+  render();
+  showToast('削除しました', '');
+}
+
+// ── Export Excel ──────────────────────────────────────────────────────────
+function exportExcel() {
+  const counts = getPersonCounts();
+  const wb = XLSX.utils.book_new();
+  const header = ['日付', '予約時間', '氏名', '電話番号', 'メールアドレス', '備考', 'キャンセル回数'];
+  const rows = records.map(r => [
+    r.date, r.time, r.name, r.phone, r.email, r.note, counts[r.phone] || 1
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [14, 10, 14, 14, 22, 30, 10].map(w => ({wch: w}));
+  XLSX.utils.book_append_sheet(wb, ws, '無断キャンセルリスト');
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `無断キャンセルリスト大宮_${today}.xlsx`);
+  showToast('Excelファイルを出力しました 📥', 'success');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// ── Event Listeners ──────────────────────────────────────────────────────
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettingsModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeSettingsModal(); }
+  if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open')) {
+    if (e.target.tagName !== 'TEXTAREA') saveRecord();
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadData();
+sortBy('date');
+
+// Try to init GIS after library loads
+function tryInitGIS() {
+  if (typeof google !== 'undefined' && google.accounts) {
+    initGIS();
+  } else {
+    setTimeout(tryInitGIS, 500);
+  }
+}
+tryInitGIS();
+</script>
+</body>
+</html>
