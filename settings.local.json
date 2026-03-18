@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /tmp)",
+      "Bash(node -e \":*)",
+      "Bash(sed 's/川口/市原/g; s/kawaguchi/ichihara/g; s/0f3460/8B4513/g; s/163e16/5C2D00/g; s/0f600f/7B3F00/g; s/a0c8a0/d4b896/g; s/48bb78/c8964e/g; s/38a169/a0722a/g; s/276749/5c3d11/g; s/川口院/市原院/g' \"C:/Users/toppi/Desktop/claudecode/無断キャンセルリスト川口.html\")",
+      "Read(//tmp/**)",
+      "Read(//c//**)",
+      "Bash(ls /tmp/ichihara*)",
+      "Bash(node:*)",
+      "Bash(cp /tmp/ichihara_final.html \"C:/Users/toppi/Desktop/claudecode/無断キャンセルリスト市原.html\")"
+    ]
+  }
+}
