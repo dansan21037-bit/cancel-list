@@ -502,8 +502,13 @@ async function loadFromDrive() {
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,modifiedTime)`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    if (!searchResp.ok) throw new Error('検索に失敗: ' + searchResp.status);
+    if (!searchResp.ok) {
+      const errText = await searchResp.text();
+      console.error('Drive Search Error:', searchResp.status, errText);
+      throw new Error('検索に失敗: ' + searchResp.status + ' ' + errText);
+    }
     const searchData = await searchResp.json();
+    console.log('Drive search result:', JSON.stringify(searchData));
 
     if (searchData.files && searchData.files.length > 0) {
       driveFileId = searchData.files[0].id;
@@ -572,7 +577,11 @@ async function saveToDrive() {
           body: body,
         }
       );
-      if (!resp.ok) throw new Error('作成失敗: ' + resp.status);
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.error('Drive API Error:', resp.status, errText);
+        throw new Error('作成失敗: ' + resp.status + ' ' + errText);
+      }
       const data = await resp.json();
       driveFileId = data.id;
     }
