@@ -566,15 +566,22 @@ function closeSettingsModal() {
   document.getElementById('settingsModal').classList.remove('open');
 }
 
+function extractFolderId(input) {
+  if (!input) return '';
+  const match = input.match(/folders\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : input;
+}
+
 function saveSettings() {
   const clientId = document.getElementById('clientIdInput').value.trim();
-  const folderId = document.getElementById('folderIdInput').value.trim();
+  const rawFolder = document.getElementById('folderIdInput').value.trim();
+  const folderId = extractFolderId(rawFolder);
   if (clientId) {
     localStorage.setItem('google_client_id', clientId);
   } else {
     localStorage.removeItem('google_client_id');
   }
-  if (folderId) {
+  if (folderId && folderId !== DEFAULT_FOLDER_ID) {
     localStorage.setItem('google_folder_id', folderId);
   } else {
     localStorage.removeItem('google_folder_id');
