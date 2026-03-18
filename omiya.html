@@ -557,33 +557,43 @@ async function saveToDrive() {
       const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
       const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [folderId] };
 
-      const boundary = 'cancel_list_boundary';
-      const body = '--' + boundary + '\r\n' +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        JSON.stringify(metadata) + '\r\n' +
-        '--' + boundary + '\r\n' +
-        'Content-Type: application/json\r\n\r\n' +
-        content + '\r\n' +
-        '--' + boundary + '--';
-
-      const resp = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      // Step 1: Create empty file with metadata
+      const createResp = await fetch(
+        'https://www.googleapis.com/drive/v3/files',
         {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'multipart/related; boundary=' + boundary,
+            'Content-Type': 'application/json',
           },
-          body: body,
+          body: JSON.stringify(metadata),
         }
       );
-      if (!resp.ok) {
-        const errText = await resp.text();
-        console.error('Drive API Error:', resp.status, errText);
-        throw new Error('作成失敗: ' + resp.status + ' ' + errText);
+      if (!createResp.ok) {
+        const errText = await createResp.text();
+        alert('ファイル作成エラー: ' + createResp.status + '\n' + errText);
+        throw new Error('メタデータ作成失敗: ' + createResp.status);
       }
-      const data = await resp.json();
-      driveFileId = data.id;
+      const created = await createResp.json();
+      driveFileId = created.id;
+
+      // Step 2: Upload content to the created file
+      const uploadResp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: content,
+        }
+      );
+      if (!uploadResp.ok) {
+        const errText = await uploadResp.text();
+        alert('コンテンツ保存エラー: ' + uploadResp.status + '\n' + errText);
+        throw new Error('コンテンツ更新失敗: ' + uploadResp.status);
+      }
     }
     document.getElementById('syncInfo').textContent = `Google Drive: 同期済み (${new Date().toLocaleString('ja-JP')})`;
   } catch(e) {
