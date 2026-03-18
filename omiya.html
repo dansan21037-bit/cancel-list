@@ -555,10 +555,10 @@ async function saveToDrive() {
       if (!resp.ok) throw new Error('更新失敗: ' + resp.status);
     } else {
       const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
-      const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [folderId] };
 
-      // Step 1: Create empty file with metadata
-      const createResp = await fetch(
+      // まずフォルダ指定ありで試行、失敗したらフォルダなしで試行
+      let metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [folderId] };
+      let createResp = await fetch(
         'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true',
         {
           method: 'POST',
@@ -570,9 +570,24 @@ async function saveToDrive() {
         }
       );
       if (!createResp.ok) {
+        console.warn('フォルダ指定で失敗、マイドライブに作成します');
+        metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+        createResp = await fetch(
+          'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(metadata),
+          }
+        );
+      }
+      if (!createResp.ok) {
         const errText = await createResp.text();
         alert('ファイル作成エラー: ' + createResp.status + '\n' + errText);
-        throw new Error('メタデータ作成失敗: ' + createResp.status);
+        throw new Error('作成失敗: ' + createResp.status);
       }
       const created = await createResp.json();
       driveFileId = created.id;
