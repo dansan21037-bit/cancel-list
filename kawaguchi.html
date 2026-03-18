@@ -515,16 +515,24 @@ async function saveToDrive() {
       const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
       const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [folderId] };
 
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', new Blob([content], { type: 'application/json' }));
+      const boundary = 'cancel_list_boundary';
+      const body = '--' + boundary + '\r\n' +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) + '\r\n' +
+        '--' + boundary + '\r\n' +
+        'Content-Type: application/json\r\n\r\n' +
+        content + '\r\n' +
+        '--' + boundary + '--';
 
       const resp = await fetch(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
         {
           method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: form,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'multipart/related; boundary=' + boundary,
+          },
+          body: body,
         }
       );
       if (!resp.ok) throw new Error('作成失敗: ' + resp.status);
