@@ -581,7 +581,7 @@ async function autoFetchEmails() {
   isFetching = true;
   fetchCancelled = false;
   try {
-    const lastFetch = localStorage.getItem('lastFetchTime_kawaguchi') || '2025/10/01';
+    const lastFetch = localStorage.getItem('lastFetchTime_kawaguchi') || '2025/06/01';
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + lastFetch;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + lastFetch;
     const [resMsg, canMsg] = await Promise.all([
@@ -609,7 +609,7 @@ async function fetchEmails() {
   fetchCancelled = false;
   showLoading('メールを検索中...');
   try {
-    const lastFetch = localStorage.getItem('lastFetchTime_kawaguchi') || '2025/10/01';
+    const lastFetch = localStorage.getItem('lastFetchTime_kawaguchi') || '2025/06/01';
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + lastFetch;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + lastFetch;
     const resMsg = await fetchGmailMessages(q1, false, 20);
