@@ -507,19 +507,33 @@ async function fetchEmails() {
   if (!accessToken) { showToast('先にGoogleサインインしてください', 'error'); return; }
   showLoading('予約メールを検索中...');
   try {
-    const resMessages = await fetchGmailMessages('subject:オンライン予約が入りました 1980');
+    // 前回取得日時以降のメールのみ検索（初回は2025/10/01から）
+    const lastFetch = localStorage.getItem('lastFetchTime_omiya') || '2025/10/01';
+    const afterQuery = ` after:${lastFetch}`;
+
+    const resMessages = await fetchGmailMessages('subject:オンライン予約が入りました 1980' + afterQuery);
     let newRes = 0;
     for (const msg of resMessages) {
       const parsed = parseReservationEmail(msg.body);
-      if (parsed && parsed.menu && parsed.menu.includes('1980') && !reservations.find(r => r.id === parsed.id)) { reservations.push(parsed); newRes++; }
+      if (parsed && parsed.menu && parsed.menu.includes('1980')) {
+        parsed.gmailMsgId = msg.id;
+        if (!reservations.find(r => r.id === parsed.id)) { reservations.push(parsed); newRes++; }
+      }
     }
     showLoading('キャンセルメールを検索中...');
-    const canMessages = await fetchGmailMessages('subject:オンライン予約がキャンセルされました 1980');
+    const canMessages = await fetchGmailMessages('subject:オンライン予約がキャンセルされました 1980' + afterQuery);
     let newCan = 0;
     for (const msg of canMessages) {
       const parsed = parseCancellationEmail(msg.body);
-      if (parsed && parsed.menu && parsed.menu.includes('1980') && !cancellations.find(r => r.id === parsed.id)) { cancellations.push(parsed); newCan++; }
+      if (parsed && parsed.menu && parsed.menu.includes('1980')) {
+        parsed.gmailMsgId = msg.id;
+        if (!cancellations.find(r => r.id === parsed.id)) { cancellations.push(parsed); newCan++; }
+      }
     }
+
+    // 取得日時を保存（次回はこの日付以降のみ検索）
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
+    localStorage.setItem('lastFetchTime_omiya', todayStr);
     reservations.sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
     cancellations.sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
     saveData(); render(); hideLoading();
