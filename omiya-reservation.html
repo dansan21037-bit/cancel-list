@@ -243,6 +243,7 @@
       <th>メール</th>
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-icon">↕</span></th>
+      <th>操作</th>
     </tr></thead><tbody id="tbody-reservations"></tbody></table>
   </div>
   <div class="empty-state" id="empty-reservations" style="display:none"><div class="icon">📋</div><p>予約データがありません<br><small>「📩 メール取得」でGmailから読み込めます</small></p></div>
@@ -262,6 +263,7 @@
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">キャンセル日時 <span class="sort-icon">↕</span></th>
       <th style="text-align:center">回数</th>
+      <th>操作</th>
     </tr></thead><tbody id="tbody-cancellations"></tbody></table>
   </div>
   <div class="empty-state" id="empty-cancellations" style="display:none"><div class="icon">✉️</div><p>キャンセルデータがありません<br><small>「📩 メール取得」でGmailから読み込めます</small></p></div>
@@ -314,6 +316,27 @@
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveRecord()" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 予約/キャンセル編集モーダル -->
+<div class="modal-backdrop" id="emailModal">
+  <div class="modal">
+    <h2 id="emailModalTitle">編集</h2>
+    <div class="form-row">
+      <div class="form-group"><label>予約日時</label><input type="text" id="ef-datetime" placeholder="2026-03-21 14:00"></div>
+      <div class="form-group"><label>メニュー</label><input type="text" id="ef-menu"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>氏名 *</label><input type="text" id="ef-name"></div>
+      <div class="form-group"><label>電話番号</label><input type="tel" id="ef-phone"></div>
+    </div>
+    <div class="form-group"><label>メールアドレス</label><input type="email" id="ef-email"></div>
+    <div class="form-group"><label>コメント</label><textarea id="ef-comment"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeEmailModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveEmailRecord()">更新する</button>
     </div>
   </div>
 </div>
@@ -769,6 +792,10 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td class="comment-cell">${esc(r.comment)}</td>
       <td class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
       ${badgeCol}
+      <td><div class="actions-cell">
+        <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️</button>
+      </div></td>
     </tr>`;
     }).join('');
   }
@@ -832,6 +859,65 @@ function sortBy(key) {
   if (sortKey === key) sortDir = -sortDir;
   else { sortKey = key; sortDir = -1; }
   render();
+}
+
+// ── Email Record Edit/Delete ─────────────────────────────────────────────
+let editEmailTab = null;
+let editEmailId = null;
+
+function openEditEmailModal(tabId, id) {
+  const data = tabId === 'reservations' ? reservations : cancellations;
+  const r = data.find(x => x.id === id);
+  if (!r) return;
+  editEmailTab = tabId;
+  editEmailId = id;
+  document.getElementById('emailModalTitle').textContent = tabId === 'reservations' ? '予約情報を編集' : 'キャンセル情報を編集';
+  document.getElementById('ef-datetime').value = r.datetime || '';
+  document.getElementById('ef-menu').value = r.menu || '';
+  document.getElementById('ef-name').value = r.name || '';
+  document.getElementById('ef-phone').value = r.phone || '';
+  document.getElementById('ef-email').value = r.email || '';
+  document.getElementById('ef-comment').value = r.comment || '';
+  document.getElementById('emailModal').classList.add('open');
+}
+
+function closeEmailModal() {
+  document.getElementById('emailModal').classList.remove('open');
+  editEmailTab = null;
+  editEmailId = null;
+}
+
+function saveEmailRecord() {
+  if (!editEmailTab || !editEmailId) return;
+  const data = editEmailTab === 'reservations' ? reservations : cancellations;
+  const idx = data.findIndex(x => x.id === editEmailId);
+  if (idx < 0) return;
+  data[idx].datetime = document.getElementById('ef-datetime').value.trim();
+  data[idx].menu = document.getElementById('ef-menu').value.trim();
+  data[idx].name = document.getElementById('ef-name').value.trim();
+  data[idx].phone = document.getElementById('ef-phone').value.trim();
+  data[idx].email = document.getElementById('ef-email').value.trim();
+  data[idx].comment = document.getElementById('ef-comment').value.trim();
+  saveData();
+  closeEmailModal();
+  render();
+  showToast('更新しました ✓', 'success');
+}
+
+function deleteEmailRecord(tabId, id) {
+  const data = tabId === 'reservations' ? reservations : cancellations;
+  const r = data.find(x => x.id === id);
+  if (!r) return;
+  const label = tabId === 'reservations' ? '予約' : 'キャンセル';
+  if (!confirm(`「${r.name}」（${r.datetime}）の${label}データを削除しますか？`)) return;
+  if (tabId === 'reservations') {
+    reservations = reservations.filter(x => x.id !== id);
+  } else {
+    cancellations = cancellations.filter(x => x.id !== id);
+  }
+  saveData();
+  render();
+  showToast('削除しました', '');
 }
 
 // ── Noshow CRUD ─────────────────────────────────────────────────────────
@@ -945,11 +1031,62 @@ function hideLoading() { document.getElementById('loadingOverlay').classList.rem
 
 // ── Events ──────────────────────────────────────────────────────────────
 document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+document.getElementById('emailModal').addEventListener('click', function(e) { if (e.target === this) closeEmailModal(); });
 document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) closeSettingsModal(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeSettingsModal(); }
+  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); }
   if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveRecord();
 });
+
+// ── Auto Sync ───────────────────────────────────────────────────────────
+let autoSyncInterval = null;
+const AUTO_SYNC_MINUTES = 3;
+
+function startAutoSync() {
+  if (autoSyncInterval) clearInterval(autoSyncInterval);
+  autoSyncInterval = setInterval(() => {
+    if (isSignedIn && accessToken) {
+      autoLoadFromDrive();
+    }
+  }, AUTO_SYNC_MINUTES * 60 * 1000);
+}
+
+async function autoLoadFromDrive() {
+  if (!accessToken || !driveFileId) return;
+  try {
+    const fileResp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime&supportsAllDrives=true`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!fileResp.ok) return;
+    const fileMeta = await fileResp.json();
+    const remoteTime = new Date(fileMeta.modifiedTime).getTime();
+    const localTime = parseInt(localStorage.getItem('lastSyncTime_omiya') || '0');
+    if (remoteTime > localTime) {
+      const dataResp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media&supportsAllDrives=true`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!dataResp.ok) return;
+      const data = await dataResp.json();
+      reservations = data.reservations || [];
+      cancellations = data.cancellations || [];
+      noshows = data.noshows || [];
+      saveDataLocal();
+      localStorage.setItem('lastSyncTime_omiya', String(Date.now()));
+      render();
+      const mod = new Date(fileMeta.modifiedTime).toLocaleString('ja-JP');
+      document.getElementById('syncInfo').textContent = `Google Drive: 自動同期済み (${mod})`;
+    }
+  } catch(e) { /* サイレント失敗 */ }
+}
+
+// saveToDrive成功時にローカルタイムスタンプを記録
+const origSaveToDrive = saveToDrive;
+saveToDrive = async function() {
+  await origSaveToDrive();
+  localStorage.setItem('lastSyncTime_omiya', String(Date.now()));
+};
 
 // ── Init ────────────────────────────────────────────────────────────────
 loadData();
@@ -960,6 +1097,7 @@ function tryInitGIS() {
   else setTimeout(tryInitGIS, 500);
 }
 tryInitGIS();
+startAutoSync();
 </script>
 </body>
 </html>
