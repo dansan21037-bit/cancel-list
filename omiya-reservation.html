@@ -959,7 +959,7 @@ function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 function sortBy(key) {
   if (sortKey === key) sortDir = -sortDir;
-  else { sortKey = key; sortDir = -1; }
+  else { sortKey = key; sortDir = 1; }
   render();
 }
 
