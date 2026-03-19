@@ -634,7 +634,6 @@ async function fetchEmails() {
 
 async function fetchGmailMessages(query) {
   const messages = [];
-  // ページネーションなし、最大500件まで
   let url = `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=500`;
   const listResp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!listResp.ok) {
@@ -644,7 +643,6 @@ async function fetchGmailMessages(query) {
   }
   const listData = await listResp.json();
   if (!listData.messages) return messages;
-  // 取得済みメールIDのSetで高速チェック
   const existingIds = new Set([
     ...reservations.map(r => r.gmailMsgId).filter(Boolean),
     ...cancellations.map(r => r.gmailMsgId).filter(Boolean)
@@ -652,14 +650,21 @@ async function fetchGmailMessages(query) {
   const toFetch = listData.messages.filter(m => !existingIds.has(m.id));
   const total = toFetch.length;
   if (total === 0) return messages;
-  for (let i = 0; i < total; i++) {
-    const m = toFetch[i];
-    showLoading(`メール本文を取得中... (${i + 1}/${total}件)`);
-    const msgResp = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
-      { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!msgResp.ok) continue;
-    const msgData = await msgResp.json();
-    messages.push({ id: m.id, body: getMessageBody(msgData) });
+  // 5件ずつ並列取得（API負荷を抑えつつ高速化）
+  const BATCH = 5;
+  for (let i = 0; i < total; i += BATCH) {
+    const chunk = toFetch.slice(i, i + BATCH);
+    showLoading(`メール取得中... (${Math.min(i + BATCH, total)}/${total}件)`);
+    const results = await Promise.all(chunk.map(async m => {
+      try {
+        const resp = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
+          { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return { id: m.id, body: getMessageBody(data) };
+      } catch { return null; }
+    }));
+    for (const r of results) { if (r) messages.push(r); }
   }
   return messages;
 }
