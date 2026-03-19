@@ -858,8 +858,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
     return true;
   });
   filtered.sort((a, b) => {
-    let va = a[sortKey] || '', vb = b[sortKey] || '';
-    if (va < vb) return sortDir; if (va > vb) return -sortDir; return 0;
+    const va = a[sortKey] || '', vb = b[sortKey] || '';
+    return va < vb ? 1 * sortDir : va > vb ? -1 * sortDir : 0;
   });
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
@@ -917,9 +917,9 @@ function renderNoshowTable(q, dateFrom, dateTo) {
     return true;
   });
   filtered.sort((a, b) => {
-    let va = sortKey === 'count' ? (counts[a.phone]||1) : (a[sortKey]||'');
-    let vb = sortKey === 'count' ? (counts[b.phone]||1) : (b[sortKey]||'');
-    if (va < vb) return sortDir; if (va > vb) return -sortDir; return 0;
+    const va = sortKey === 'count' ? (counts[a.phone]||1) : (a[sortKey]||'');
+    const vb = sortKey === 'count' ? (counts[b.phone]||1) : (b[sortKey]||'');
+    return va < vb ? 1 * sortDir : va > vb ? -1 * sortDir : 0;
   });
   const tbody = document.getElementById('tbody-noshow');
   const empty = document.getElementById('empty-noshow');
