@@ -543,29 +543,33 @@ async function fetchEmails() {
 
 async function fetchGmailMessages(query) {
   const messages = [];
-  let pageToken = '';
-  do {
-    let url = `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=100`;
-    if (pageToken) url += `&pageToken=${pageToken}`;
-    const listResp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!listResp.ok) {
-      if (listResp.status === 403 || listResp.status === 401)
-        throw new Error('Gmail APIへのアクセス権限がありません。Cloud ConsoleでGmail APIを有効にしてください。');
-      throw new Error('メール検索失敗: ' + listResp.status);
-    }
-    const listData = await listResp.json();
-    if (!listData.messages) break;
-    showLoading(`メール本文を取得中... (${messages.length + 1}/${messages.length + listData.messages.length}件)`);
-    for (const m of listData.messages) {
-      if (reservations.find(r => r.gmailMsgId === m.id) || cancellations.find(r => r.gmailMsgId === m.id)) continue;
-      const msgResp = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
-        { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!msgResp.ok) continue;
-      const msgData = await msgResp.json();
-      messages.push({ id: m.id, body: getMessageBody(msgData) });
-    }
-    pageToken = listData.nextPageToken || '';
-  } while (pageToken);
+  // ページネーションなし、最大500件まで
+  let url = `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=500`;
+  const listResp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!listResp.ok) {
+    if (listResp.status === 403 || listResp.status === 401)
+      throw new Error('Gmail APIへのアクセス権限がありません。Cloud ConsoleでGmail APIを有効にしてください。');
+    throw new Error('メール検索失敗: ' + listResp.status);
+  }
+  const listData = await listResp.json();
+  if (!listData.messages) return messages;
+  // 取得済みメールIDのSetで高速チェック
+  const existingIds = new Set([
+    ...reservations.map(r => r.gmailMsgId).filter(Boolean),
+    ...cancellations.map(r => r.gmailMsgId).filter(Boolean)
+  ]);
+  const toFetch = listData.messages.filter(m => !existingIds.has(m.id));
+  const total = toFetch.length;
+  if (total === 0) return messages;
+  for (let i = 0; i < total; i++) {
+    const m = toFetch[i];
+    showLoading(`メール本文を取得中... (${i + 1}/${total}件)`);
+    const msgResp = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!msgResp.ok) continue;
+    const msgData = await msgResp.json();
+    messages.push({ id: m.id, body: getMessageBody(msgData) });
+  }
   return messages;
 }
 
