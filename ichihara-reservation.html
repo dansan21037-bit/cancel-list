@@ -575,20 +575,24 @@ async function processEmails(messages, type) {
   return count;
 }
 
-// 自動メール取得（サイレント）
+// 自動メール取得（サイレント・2回目以降は軽量）
 async function autoFetchEmails() {
   if (!accessToken || isFetching) return;
   isFetching = true;
   fetchCancelled = false;
   try {
-    const q1 = 'subject:オンライン予約が入りました 1980 after:2025/06/01';
-    const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:2025/06/01';
+    const lastFetch = localStorage.getItem('lastFetchTime_ichihara');
+    const afterDate = lastFetch || '2025/06/01';
+    const limit = lastFetch ? 10 : 500;
+    const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
+    const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
     const [resMsg, canMsg] = await Promise.all([
-      fetchGmailMessages(q1, true, 500),
-      fetchGmailMessages(q2, true, 500)
+      fetchGmailMessages(q1, true, limit),
+      fetchGmailMessages(q2, true, limit)
     ]);
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
+    localStorage.setItem('lastFetchTime_ichihara', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
     if (newRes > 0 || newCan > 0) {
       reservations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
       cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
@@ -1236,6 +1240,15 @@ function tryInitGIS() {
 }
 tryInitGIS();
 startAutoSync();
+// 1時間ごとに自動メール取得
+let autoMailInterval = null;
+function startAutoMailFetch() {
+  if (autoMailInterval) clearInterval(autoMailInterval);
+  autoMailInterval = setInterval(() => {
+    if (isSignedIn && accessToken) autoFetchEmails();
+  }, 60 * 60 * 1000);
+}
+startAutoMailFetch();
 </script>
 </body>
 </html>
