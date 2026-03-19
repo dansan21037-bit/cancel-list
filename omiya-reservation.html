@@ -402,7 +402,7 @@ const DEFAULT_FOLDER_ID = '1nUz5LIufhedp6BN1YLk0cVdrXf95G55e';
 
 let reservations = [], cancellations = [], noshows = [];
 let activeTab = 'reservations';
-let editId = null, sortKey = 'datetime', sortDir = 1;
+let editId = null, sortKey = 'datetime', sortDir = -1;
 let accessToken = null, driveFileId = null, tokenClient = null, isSignedIn = false;
 
 // ── Tab ─────────────────────────────────────────────────────────────────
@@ -417,7 +417,7 @@ function switchTab(tab) {
   document.getElementById('addNoshowBtn').style.display = (tab === 'noshow') ? '' : 'none';
   document.getElementById('fetchMailBtn').style.display = isSignedIn ? '' : 'none';
   if (tab === 'noshow') { sortKey = 'date'; } else { sortKey = 'datetime'; }
-  sortDir = 1;
+  sortDir = -1;
   render();
 }
 
@@ -859,7 +859,9 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   });
   filtered.sort((a, b) => {
     const va = a[sortKey] || '', vb = b[sortKey] || '';
-    return va < vb ? 1 * sortDir : va > vb ? -1 * sortDir : 0;
+    if (va < vb) return -sortDir;
+    if (va > vb) return sortDir;
+    return 0;
   });
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
@@ -919,7 +921,9 @@ function renderNoshowTable(q, dateFrom, dateTo) {
   filtered.sort((a, b) => {
     const va = sortKey === 'count' ? (counts[a.phone]||1) : (a[sortKey]||'');
     const vb = sortKey === 'count' ? (counts[b.phone]||1) : (b[sortKey]||'');
-    return va < vb ? 1 * sortDir : va > vb ? -1 * sortDir : 0;
+    if (va < vb) return -sortDir;
+    if (va > vb) return sortDir;
+    return 0;
   });
   const tbody = document.getElementById('tbody-noshow');
   const empty = document.getElementById('empty-noshow');
@@ -959,7 +963,7 @@ function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 function sortBy(key) {
   if (sortKey === key) sortDir = -sortDir;
-  else { sortKey = key; sortDir = 1; }
+  else { sortKey = key; sortDir = -1; }
   render();
 }
 
