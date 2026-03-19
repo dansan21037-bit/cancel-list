@@ -1126,8 +1126,12 @@ function deleteRecord(id) {
   const r = noshows.find(x => x.id === id);
   if (!r || !confirm(`「${r.name}」（${r.date}）を削除しますか？`)) return;
   if (r.fromReservationId) {
-    const orig = reservations.find(x => x.id === r.fromReservationId);
-    if (orig) orig.movedToNoshow = false;
+    const orig = reservations.find(x => String(x.id) === String(r.fromReservationId));
+    if (orig) { orig.movedToNoshow = false; }
+  }
+  if (!r.fromReservationId && r.phone && r.date) {
+    const orig = reservations.find(x => x.phone === r.phone && x.movedToNoshow && (x.datetime||'').startsWith(r.date));
+    if (orig) { orig.movedToNoshow = false; }
   }
   noshows = noshows.filter(x => x.id !== id);
   saveData(); render(); showToast('削除しました', '');
