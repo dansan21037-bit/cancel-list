@@ -612,9 +612,9 @@ async function fetchEmails() {
     const lastFetch = localStorage.getItem('lastFetchTime_omiya') || '2025/10/01';
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + lastFetch;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + lastFetch;
-    const resMsg = await fetchGmailMessages(q1, false, 20);
+    const resMsg = await fetchGmailMessages(q1, false, 20, 20);
     if (fetchCancelled) return;
-    const canMsg = await fetchGmailMessages(q2, false, 20);
+    const canMsg = await fetchGmailMessages(q2, false, 20, 20);
     if (fetchCancelled) return;
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
@@ -630,16 +630,16 @@ async function fetchEmails() {
   isFetching = false;
 }
 
-async function fetchGmailMessages(query, silent, maxFetch) {
+async function fetchGmailMessages(query, silent, maxFetch, maxList) {
   const messages = [];
   const headers = { Authorization: `Bearer ${accessToken}` };
-  // メール一覧を取得（軽量: IDのみ）
+  const listMax = maxList || 20;
   const ctrl1 = new AbortController();
-  const t1 = setTimeout(() => ctrl1.abort(), 12000);
+  const t1 = setTimeout(() => ctrl1.abort(), 15000);
   let listResp;
   try {
     listResp = await fetch(
-      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=50`,
+      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${listMax}`,
       { headers, signal: ctrl1.signal });
   } catch(e) {
     clearTimeout(t1);
@@ -1128,8 +1128,13 @@ function deleteRecord(id) {
   if (!r || !confirm(`「${r.name}」（${r.date}）を削除しますか？`)) return;
   // 元の予約レコードの「登録済み」フラグを解除
   if (r.fromReservationId) {
-    const orig = reservations.find(x => x.id === r.fromReservationId);
-    if (orig) orig.movedToNoshow = false;
+    const orig = reservations.find(x => String(x.id) === String(r.fromReservationId));
+    if (orig) { orig.movedToNoshow = false; }
+  }
+  // fromReservationIdがない場合も電話番号+日付で照合して解除
+  if (!r.fromReservationId && r.phone && r.date) {
+    const orig = reservations.find(x => x.phone === r.phone && x.movedToNoshow && (x.datetime||'').startsWith(r.date));
+    if (orig) { orig.movedToNoshow = false; }
   }
   noshows = noshows.filter(x => x.id !== id);
   saveData(); render(); showToast('削除しました', '');
