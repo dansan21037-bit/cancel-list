@@ -29,17 +29,20 @@
   .btn-google { background: #4285f4; color: white; }
   .btn-google:hover { background: #3367d6; }
   .tab-bar {
-    display: flex; background: white; border-bottom: 2px solid #e2e8f0;
-    padding: 0 24px; overflow-x: auto;
+    display: flex; background: #f7fafc; border-bottom: 2px solid #e2e8f0;
+    padding: 8px 24px 0; overflow-x: auto; gap: 6px;
   }
   .tab {
-    padding: 14px 20px; border: none; background: none; cursor: pointer;
-    font-size: 14px; font-weight: 600; color: #718096; font-family: inherit;
-    border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap;
-    transition: all 0.2s;
+    padding: 12px 22px; border: 2px solid #e2e8f0; border-bottom: none;
+    background: #edf2f7; cursor: pointer;
+    font-size: 14px; font-weight: 700; color: #718096; font-family: inherit;
+    border-radius: 10px 10px 0 0; white-space: nowrap;
+    transition: all 0.2s; position: relative; top: 2px;
   }
-  .tab:hover { color: #4a5568; background: #f7fafc; }
-  .tab.active { color: #2b6cb0; border-bottom-color: #4299e1; }
+  .tab:hover { color: #4a5568; background: #e2e8f0; }
+  .tab.active { color: white; background: #2b6cb0; border-color: #2b6cb0; box-shadow: 0 -2px 8px rgba(43,108,176,0.3); }
+  .tab.active[data-tab="cancellations"] { background: #c05621; border-color: #c05621; box-shadow: 0 -2px 8px rgba(192,86,33,0.3); }
+  .tab.active[data-tab="noshow"] { background: #c53030; border-color: #c53030; box-shadow: 0 -2px 8px rgba(197,48,48,0.3); }
   .stats-bar {
     display: flex; gap: 12px; padding: 16px 24px; background: white;
     border-bottom: 1px solid #e2e8f0; flex-wrap: wrap;
@@ -48,9 +51,13 @@
     display: flex; align-items: center; gap: 10px; padding: 10px 16px;
     border-radius: 10px; font-size: 14px; font-weight: 600; min-width: 130px;
   }
-  .stat-card.blue-card { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
-  .stat-card.orange-card { background: #fffaf0; color: #c05621; border: 1px solid #fbd38d; }
-  .stat-card.red-card { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+  .stat-card.blue-card { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; cursor: pointer; transition: all 0.2s; }
+  .stat-card.orange-card { background: #fffaf0; color: #c05621; border: 1px solid #fbd38d; cursor: pointer; transition: all 0.2s; }
+  .stat-card.red-card { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; cursor: pointer; transition: all 0.2s; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+  .stat-card.stat-active { box-shadow: 0 0 0 3px rgba(66,153,225,0.4); transform: translateY(-1px); }
+  .stat-card.orange-card.stat-active { box-shadow: 0 0 0 3px rgba(192,86,33,0.3); }
+  .stat-card.red-card.stat-active { box-shadow: 0 0 0 3px rgba(197,48,48,0.3); }
   .stat-num { font-size: 24px; font-weight: 800; }
   .toolbar {
     display: flex; gap: 10px; padding: 14px 24px; background: white;
@@ -88,10 +95,19 @@
   th {
     padding: 12px 14px; text-align: left; font-weight: 700; color: #4a5568;
     font-size: 13px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
-    user-select: none; cursor: pointer;
+    user-select: none;
   }
-  th:hover { color: #2d3748; }
-  th .sort-icon { font-size: 11px; opacity: 0.5; margin-left: 4px; }
+  th[onclick] {
+    cursor: pointer; transition: all 0.15s;
+  }
+  th[onclick]:hover { color: #2b6cb0; background: #ebf8ff; }
+  th .sort-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 4px; background: #edf2f7;
+    font-size: 10px; margin-left: 4px; vertical-align: middle; color: #718096;
+    transition: all 0.15s;
+  }
+  th[onclick]:hover .sort-btn { background: #bee3f8; color: #2b6cb0; }
   tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: #f7fafc !important; }
@@ -112,6 +128,9 @@
   /* キャンセルリスト用バッジ */
   .badge-c3 { background: #d6bcfa; color: #44337a; }
   .badge-c4 { background: #b794f4; color: #322659; }
+  .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: #e53e3e; }
+  .noshow-check:disabled { cursor: default; opacity: 0.6; }
+  .noshow-checked-label { font-size: 11px; color: #c53030; font-weight: 700; }
   .name-cell { font-weight: 600; }
   .phone-cell { font-family: monospace; color: #2b6cb0; font-size: 13px; }
   .date-cell { white-space: nowrap; color: #4a5568; }
@@ -212,9 +231,9 @@
 </div>
 
 <div class="stats-bar">
-  <div class="stat-card blue-card"><div><div class="stat-num" id="stat-reservations">0</div><div>📋 予約件数</div></div></div>
-  <div class="stat-card orange-card"><div><div class="stat-num" id="stat-cancellations">0</div><div>✉️ キャンセル</div></div></div>
-  <div class="stat-card red-card"><div><div class="stat-num" id="stat-noshow">0</div><div>🚫 無断キャンセル</div></div></div>
+  <div class="stat-card blue-card stat-active" id="statCard-reservations" onclick="switchTab('reservations')"><div><div class="stat-num" id="stat-reservations">0</div><div>📋 予約件数</div></div></div>
+  <div class="stat-card orange-card" id="statCard-cancellations" onclick="switchTab('cancellations')"><div><div class="stat-num" id="stat-cancellations">0</div><div>✉️ キャンセル</div></div></div>
+  <div class="stat-card red-card" id="statCard-noshow" onclick="switchTab('noshow')"><div><div class="stat-num" id="stat-noshow">0</div><div>🚫 無断キャンセル</div></div></div>
 </div>
 
 <div class="toolbar">
@@ -236,13 +255,14 @@
   <div class="table-container"><div class="table-scroll">
     <table><thead><tr>
       <th style="width:40px">#</th>
-      <th onclick="sortBy('datetime')">予約日時 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('datetime')">予約日時 <span class="sort-btn">↕</span></th>
       <th>メニュー</th>
-      <th onclick="sortBy('name')">氏名 <span class="sort-icon">↕</span></th>
-      <th onclick="sortBy('phone')">電話番号 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
       <th>メール</th>
       <th>コメント</th>
-      <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center;white-space:nowrap">🚫 無断</th>
       <th>操作</th>
     </tr></thead><tbody id="tbody-reservations"></tbody></table>
   </div>
@@ -255,13 +275,13 @@
   <div class="table-container"><div class="table-scroll">
     <table><thead><tr>
       <th style="width:40px">#</th>
-      <th onclick="sortBy('datetime')">予約日時 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('datetime')">予約日時 <span class="sort-btn">↕</span></th>
       <th>メニュー</th>
-      <th onclick="sortBy('name')">氏名 <span class="sort-icon">↕</span></th>
-      <th onclick="sortBy('phone')">電話番号 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
       <th>メール</th>
       <th>コメント</th>
-      <th onclick="sortBy('receivedAt')">キャンセル日時 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('receivedAt')">キャンセル日時 <span class="sort-btn">↕</span></th>
       <th style="text-align:center">回数</th>
       <th>操作</th>
     </tr></thead><tbody id="tbody-cancellations"></tbody></table>
@@ -275,13 +295,13 @@
   <div class="table-container"><div class="table-scroll">
     <table><thead><tr>
       <th style="width:40px">#</th>
-      <th onclick="sortBy('date')">日付 <span class="sort-icon">↕</span></th>
-      <th onclick="sortBy('time')">時間 <span class="sort-icon">↕</span></th>
-      <th onclick="sortBy('name')">氏名 <span class="sort-icon">↕</span></th>
-      <th onclick="sortBy('phone')">電話番号 <span class="sort-icon">↕</span></th>
+      <th onclick="sortBy('date')">日付 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('time')">時間 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
       <th>メール</th>
       <th>備考</th>
-      <th style="text-align:center" onclick="sortBy('count')">回数 <span class="sort-icon">↕</span></th>
+      <th style="text-align:center" onclick="sortBy('count')">回数 <span class="sort-btn">↕</span></th>
       <th>操作</th>
     </tr></thead><tbody id="tbody-noshow"></tbody></table>
   </div>
@@ -390,6 +410,8 @@ function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   ['reservations','cancellations','noshow'].forEach(t => {
     document.getElementById('panel-' + t).style.display = (t === tab) ? '' : 'none';
+    const card = document.getElementById('statCard-' + t);
+    if (card) card.classList.toggle('stat-active', t === tab);
   });
   document.getElementById('addNoshowBtn').style.display = (tab === 'noshow') ? '' : 'none';
   document.getElementById('fetchMailBtn').style.display = isSignedIn ? '' : 'none';
@@ -409,12 +431,14 @@ function initGIS() {
   } catch(e) { console.error('GIS init error:', e); }
 }
 
-function handleTokenResponse(resp) {
+async function handleTokenResponse(resp) {
   if (resp.error) { showToast('サインイン失敗: ' + resp.error, 'error'); return; }
   accessToken = resp.access_token;
   isSignedIn = true;
   updateAuthUI();
-  loadFromDrive();
+  await loadFromDrive();
+  // Drive同期後、自動でメール取得
+  autoFetchEmails();
 }
 
 function handleAuth() {
@@ -526,8 +550,51 @@ async function saveToDrive() {
 function syncFromDrive() { if (isSignedIn) loadFromDrive(); }
 
 // ── Gmail API ───────────────────────────────────────────────────────────
+let isFetching = false;
+
+// 自動メール取得（ローディング表示なし、サイレント）
+async function autoFetchEmails() {
+  if (!accessToken || isFetching) return;
+  isFetching = true;
+  try {
+    const lastFetch = localStorage.getItem('lastFetchTime_omiya') || '2025/10/01';
+    const afterQuery = ` after:${lastFetch}`;
+
+    const resMessages = await fetchGmailMessages('subject:オンライン予約が入りました 1980' + afterQuery);
+    let newRes = 0;
+    for (const msg of resMessages) {
+      const parsed = parseReservationEmail(msg.body);
+      if (parsed && parsed.menu && parsed.menu.includes('1980')) {
+        parsed.gmailMsgId = msg.id;
+        if (!reservations.find(r => r.id === parsed.id)) { reservations.push(parsed); newRes++; }
+      }
+    }
+    const canMessages = await fetchGmailMessages('subject:オンライン予約がキャンセルされました 1980' + afterQuery);
+    let newCan = 0;
+    for (const msg of canMessages) {
+      const parsed = parseCancellationEmail(msg.body);
+      if (parsed && parsed.menu && parsed.menu.includes('1980')) {
+        parsed.gmailMsgId = msg.id;
+        if (!cancellations.find(r => r.id === parsed.id)) { cancellations.push(parsed); newCan++; }
+      }
+    }
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
+    localStorage.setItem('lastFetchTime_omiya', todayStr);
+    reservations.sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+    cancellations.sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+    if (newRes > 0 || newCan > 0) {
+      saveData(); render();
+      showToast(`自動取得: 予約${newRes}件、キャンセル${newCan}件を追加`, 'success');
+    }
+  } catch(e) { console.error('Auto fetch error:', e); }
+  isFetching = false;
+}
+
+// 手動メール取得（ローディング表示あり）
 async function fetchEmails() {
   if (!accessToken) { showToast('先にGoogleサインインしてください', 'error'); return; }
+  if (isFetching) { showToast('メール取得中です...', ''); return; }
+  isFetching = true;
   showLoading('予約メールを検索中...');
   try {
     // 前回取得日時以降のメールのみ検索（初回は2025/10/01から）
@@ -562,6 +629,7 @@ async function fetchEmails() {
     saveData(); render(); hideLoading();
     showToast(`新規: 予約${newRes}件、キャンセル${newCan}件（合計: 予約${reservations.length}件、キャンセル${cancellations.length}件）`, 'success');
   } catch(e) { hideLoading(); console.error('Gmail fetch error:', e); showToast('メール取得エラー: ' + e.message, 'error'); }
+  isFetching = false;
 }
 
 async function fetchGmailMessages(query) {
@@ -779,9 +847,20 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
     tbody.innerHTML = filtered.map((r, i) => {
       const cnt = r.phone ? (counts[r.phone] || 1) : 1;
       const isCancelTab = (tabId === 'cancellations');
+      const isResTab = (tabId === 'reservations');
       const rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
       const badgeCol = isCancelTab ? `<td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
+      // 予約者リストのみ: 無断キャンセルチェック列
+      let noshowCol = '';
+      if (isResTab) {
+        const alreadyMoved = r.movedToNoshow ? true : false;
+        if (alreadyMoved) {
+          noshowCol = `<td style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
+        } else {
+          noshowCol = `<td style="text-align:center"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></td>`;
+        }
+      }
       return `<tr class="${rowClass}">
       <td style="color:#a0aec0;font-size:12px">${i+1}</td>
       <td class="date-cell">${esc(fmtDT(r.datetime))}</td>
@@ -791,7 +870,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
       <td class="comment-cell">${esc(r.comment)}</td>
       <td class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
-      ${badgeCol}
+      ${noshowCol}${badgeCol}
       <td><div class="actions-cell">
         <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️</button>
@@ -918,6 +997,43 @@ function deleteEmailRecord(tabId, id) {
   saveData();
   render();
   showToast('削除しました', '');
+}
+
+// ── Move Reservation to Noshow ───────────────────────────────────────────
+function moveToNoshow(reservationId, checkbox) {
+  const r = reservations.find(x => x.id === reservationId);
+  if (!r) { if (checkbox) checkbox.checked = false; return; }
+  // 既に登録済みか確認
+  const existingNoshow = noshows.filter(n => n.phone === r.phone);
+  const countAfter = existingNoshow.length + 1;
+  let msg = `「${r.name}」（${r.datetime}）を無断キャンセルリストに登録しますか？`;
+  if (existingNoshow.length > 0) {
+    msg += `\n\n⚠️ この電話番号は既に${existingNoshow.length}件登録済みです。追加後は合計${countAfter}回になります。`;
+  }
+  if (!confirm(msg)) { if (checkbox) checkbox.checked = false; return; }
+  // 予約日時を日付と時間に分割
+  let date = '', time = '';
+  if (r.datetime) {
+    const dtMatch = r.datetime.match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})/);
+    if (dtMatch) { date = dtMatch[1]; time = dtMatch[2]; }
+  }
+  // 無断キャンセルに追加（備考は空 → あとで手入力）
+  const newId = noshows.length > 0 ? Math.max(...noshows.map(n => n.id)) + 1 : 1;
+  noshows.push({
+    id: newId,
+    date: date,
+    time: time,
+    name: r.name || '',
+    phone: r.phone || '',
+    email: r.email || '',
+    note: '',
+    fromReservationId: r.id
+  });
+  // 予約レコードにフラグを付ける
+  r.movedToNoshow = true;
+  saveData();
+  render();
+  showToast(`「${r.name}」を無断キャンセルリストに登録しました（${countAfter}回目）`, 'success');
 }
 
 // ── Noshow CRUD ─────────────────────────────────────────────────────────
