@@ -383,9 +383,9 @@ textarea { resize: vertical; min-height: 60px; }
 
 <!-- メール取得モーダル -->
 <div class="modal-backdrop" id="fetchModal">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:520px">
     <h2>📩 Gmailからメール取得</h2>
-    <p style="font-size:13px;color:#718096;margin-bottom:16px">各院ごとに取得開始日を指定して、Gmailから予約メールを直接取得します。<br>取得したデータはこのアプリのローカルストレージに保存されます。</p>
+    <p style="font-size:13px;color:#718096;margin-bottom:16px">各院のGmailアカウントでサインインし、予約メールを取得します。<br>院ごとに別々のGmailアカウントでサインインしてください。</p>
     <div id="fetchClinicList"></div>
     <div class="form-group" style="margin-top:14px">
       <label>最大取得件数（1院あたり）</label>
@@ -394,11 +394,11 @@ textarea { resize: vertical; min-height: 60px; }
         <option value="100" selected>100件</option>
         <option value="200">200件</option>
         <option value="500">500件</option>
+        <option value="1000">1000件</option>
       </select>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeFetchModal()">閉じる</button>
-      <button class="btn btn-primary" onclick="startFetchEmails()" id="startFetchBtn">取得開始</button>
     </div>
   </div>
 </div>
@@ -426,14 +426,19 @@ const STORAGE_CATEGORIES = 'symptom_ranking_categories';
 
 const DEFAULT_CATEGORIES = [
   { name: '腰痛', keywords: ['腰痛', '腰', 'ぎっくり腰', 'ヘルニア', '腰椎'], color: '#e53e3e' },
-  { name: '肩こり・肩痛', keywords: ['肩こり', '肩痛', '肩', '四十肩', '五十肩', '肩甲骨'], color: '#dd6b20' },
+  { name: '肩こり・肩痛', keywords: ['肩こり', '肩痛', '肩', '四十肩', '五十肩', '肩甲骨', '巻き肩'], color: '#dd6b20' },
   { name: '頭痛', keywords: ['頭痛', '偏頭痛', '片頭痛', '頭が痛'], color: '#d69e2e' },
-  { name: '首痛・ストレートネック', keywords: ['首', '首痛', 'ストレートネック', '頸椎', '寝違え'], color: '#38a169' },
+  { name: '首痛・ストレートネック', keywords: ['首', '首痛', 'ストレートネック', '頸椎', '寝違え', 'スマホネック', 'スマホ首'], color: '#38a169' },
   { name: '膝痛', keywords: ['膝', '膝痛', 'ひざ', '膝関節'], color: '#3182ce' },
   { name: '脚・足の痛み', keywords: ['坐骨神経痛', '脚', '足', 'ふくらはぎ', '足首', 'すね', '股関節', 'O脚', 'X脚'], color: '#805ad5' },
   { name: '姿勢矯正・骨盤矯正', keywords: ['姿勢', '骨盤', '猫背', '矯正', '産後', '歪み', 'ゆがみ', '反り腰'], color: '#d53f8c' },
-  { name: '自律神経・めまい・倦怠感', keywords: ['自律神経', 'めまい', '倦怠感', '不眠', '疲れ', '疲労', 'だるい', '冷え', '冷え性'], color: '#319795' },
+  { name: '自律神経・めまい・倦怠感', keywords: ['自律神経', 'めまい', '倦怠感', '不眠', '疲れ', '疲労', 'だるい', '冷え', '冷え性', 'ストレス', '息苦しい', '動悸', '睡眠', '眠れ', '吐き気', 'むくみ', 'リンパ', '耳鳴り', '食欲不振'], color: '#319795' },
   { name: 'スポーツ障害・ケガ', keywords: ['スポーツ', 'ケガ', '怪我', '捻挫', '打撲', '肉離れ', 'テニス肘', '野球肘'], color: '#2b6cb0' },
+  { name: '眼精疲労・目の症状', keywords: ['眼精疲労', '目の疲れ', '目が疲', 'ドライアイ', '目の奥', '目がかすむ', '視力'], color: '#e67e22' },
+  { name: '背中の痛み', keywords: ['背中', '背骨', '肋骨', '胸椎', '背部'], color: '#8e44ad' },
+  { name: '腕・手・しびれ', keywords: ['腕', '手首', '指', 'しびれ', '痺れ', 'ばね指', '腱鞘炎', '手の痛', '肘'], color: '#16a085' },
+  { name: '交通事故・むちうち', keywords: ['交通事故', 'むちうち', 'ムチウチ', '鞭打ち', '事故'], color: '#c0392b' },
+  { name: 'ヘッドスパ・リラクゼーション', keywords: ['ヘッドスパ', 'ドライヘッドスパ', 'リラクゼーション', 'リラックス', 'マッサージ', '癒し', 'ほぐし'], color: '#2980b9' },
   { name: '未分類', keywords: [], color: '#a0aec0' },
 ];
 
@@ -674,11 +679,22 @@ function openFetchModal() {
   const list = document.getElementById('fetchClinicList');
   list.innerHTML = CLINICS.map(c => {
     const savedDate = localStorage.getItem('gmailFetchDate_' + c.id) || c.defaultAfterDate.replace(/\//g, '-');
-    return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;padding:10px;background:#f7fafc;border-radius:8px;border:1px solid #e2e8f0">
-      <label style="min-width:60px;margin:0"><input type="checkbox" id="fetchCheck_${c.id}" checked style="width:auto;margin-right:6px">${c.name}</label>
-      <div style="flex:1"><label style="font-size:12px;margin:0">取得開始日</label>
-      <input type="date" id="fetchDate_${c.id}" value="${savedDate}" style="font-size:13px;padding:5px 8px"></div>
-      <span style="font-size:12px;color:#718096" id="fetchInfo_${c.id}">現在: ${(clinicData[c.id]?.reservations||[]).length}件</span>
+    const savedAccount = localStorage.getItem('gmailAccount_' + c.id) || '';
+    const resCount = (clinicData[c.id]?.reservations||[]).length;
+    return `<div style="margin-bottom:12px;padding:12px;background:#f7fafc;border-radius:8px;border:1px solid #e2e8f0" id="fetchCard_${c.id}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <strong style="font-size:15px">${c.name}</strong>
+        <span style="font-size:12px;color:#718096">現在: ${resCount}件</span>
+        <span style="font-size:11px;color:#9f7aea;margin-left:auto" id="fetchAccount_${c.id}">${savedAccount ? '前回: '+savedAccount : ''}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="flex:1"><label style="font-size:12px;margin:0">取得開始日</label>
+        <input type="date" id="fetchDate_${c.id}" value="${savedDate}" style="font-size:13px;padding:5px 8px;width:100%"></div>
+        <button class="btn btn-sm" style="background:#9f7aea;color:white;margin-top:14px" onclick="startFetchForClinic('${c.id}')" id="fetchBtn_${c.id}">
+          サインイン＆取得
+        </button>
+      </div>
+      <div id="fetchStatus_${c.id}" style="font-size:12px;margin-top:6px;color:#718096"></div>
     </div>`;
   }).join('');
   document.getElementById('fetchModal').classList.add('open');
@@ -686,82 +702,128 @@ function openFetchModal() {
 
 function closeFetchModal() { document.getElementById('fetchModal').classList.remove('open'); }
 
-async function startFetchEmails() {
-  if (!accessToken) { showToast('Googleサインインしてください', 'error'); return; }
+async function startFetchForClinic(clinicId) {
   if (isFetching) { showToast('取得中です...', ''); return; }
+  const clinic = CLINICS.find(c => c.id === clinicId);
+  if (!clinic) return;
 
-  const maxCount = parseInt(document.getElementById('fetchMaxCount').value) || 100;
-  const targets = CLINICS.filter(c => {
-    const cb = document.getElementById('fetchCheck_' + c.id);
-    return cb && cb.checked;
-  });
-  if (targets.length === 0) { showToast('取得する院を選択してください', 'error'); return; }
+  const statusEl = document.getElementById('fetchStatus_' + clinicId);
+  const btnEl = document.getElementById('fetchBtn_' + clinicId);
 
-  // Save dates
-  targets.forEach(c => {
-    const dateVal = document.getElementById('fetchDate_' + c.id).value;
-    if (dateVal) localStorage.setItem('gmailFetchDate_' + c.id, dateVal);
-  });
+  // 院専用のサインインを実行（別アカウントを選択可能にする）
+  statusEl.textContent = '🔐 Googleサインイン中...';
+  btnEl.disabled = true;
 
-  closeFetchModal();
-  isFetching = true;
-  fetchCancelled = false;
-  document.getElementById('cancelFetchBtn').style.display = '';
+  try {
+    const clinicToken = await requestClinicToken();
+    if (!clinicToken) {
+      statusEl.textContent = '❌ サインインがキャンセルされました';
+      btnEl.disabled = false;
+      return;
+    }
 
-  let totalNew = 0;
-  for (const clinic of targets) {
-    if (fetchCancelled) break;
-    const dateVal = document.getElementById('fetchDate_' + clinic.id).value || clinic.defaultAfterDate;
-    const afterDate = dateVal.replace(/-/g, '/');
-    showLoading(`${clinic.name}: メールを検索中...`);
-
+    // サインインしたアカウントのメールアドレスを取得して表示
     try {
-      const query = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
-      const messages = await fetchGmailMessages(query, clinic, maxCount);
-      if (fetchCancelled) break;
+      const profileResp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${clinicToken}` }
+      });
+      if (profileResp.ok) {
+        const profile = await profileResp.json();
+        const email = profile.email || '';
+        document.getElementById('fetchAccount_' + clinicId).textContent = email;
+        localStorage.setItem('gmailAccount_' + clinicId, email);
+      }
+    } catch(e) { /* ignore profile fetch error */ }
 
-      let newCount = 0;
-      const existing = clinicData[clinic.id]?.reservations || [];
-      const existingIds = new Set(existing.map(r => r.id).filter(Boolean));
+    // 取得開始日を保存
+    const dateVal = document.getElementById('fetchDate_' + clinicId).value || clinic.defaultAfterDate;
+    localStorage.setItem('gmailFetchDate_' + clinicId, dateVal);
+    const afterDate = dateVal.replace(/-/g, '/');
 
-      for (const msg of messages) {
-        const parsed = parseReservationEmail(msg.body);
-        if (parsed && parsed.menu && parsed.menu.includes('1980')) {
-          parsed.gmailMsgId = msg.id;
-          if (!existingIds.has(parsed.id)) {
-            existing.push(parsed);
-            existingIds.add(parsed.id);
-            newCount++;
-          }
+    const maxCount = parseInt(document.getElementById('fetchMaxCount').value) || 100;
+
+    statusEl.textContent = '📧 メールを検索中...';
+    isFetching = true;
+    fetchCancelled = false;
+
+    const query = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
+    const messages = await fetchGmailMessagesWithToken(query, clinic, maxCount, clinicToken);
+
+    if (fetchCancelled) {
+      statusEl.textContent = '⚠️ キャンセルされました';
+      isFetching = false;
+      btnEl.disabled = false;
+      return;
+    }
+
+    let newCount = 0;
+    const existing = clinicData[clinic.id]?.reservations || [];
+    const existingIds = new Set(existing.map(r => r.id).filter(Boolean));
+
+    for (const msg of messages) {
+      const parsed = parseReservationEmail(msg.body);
+      if (parsed && parsed.menu && parsed.menu.includes('1980')) {
+        parsed.gmailMsgId = msg.id;
+        if (!existingIds.has(parsed.id)) {
+          existing.push(parsed);
+          existingIds.add(parsed.id);
+          newCount++;
         }
       }
-
-      if (newCount > 0) {
-        existing.sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
-        if (!clinicData[clinic.id]) clinicData[clinic.id] = { reservations: [], cancellations: [], noshows: [] };
-        clinicData[clinic.id].reservations = existing;
-        saveGmailData(clinic.id);
-        totalNew += newCount;
-      }
-      showToast(`${clinic.name}: ${newCount}件の新規予約を取得`, 'success');
-    } catch (e) {
-      if (!fetchCancelled) showToast(`${clinic.name}: エラー - ${e.message}`, 'error');
     }
+
+    if (newCount > 0) {
+      existing.sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+      if (!clinicData[clinic.id]) clinicData[clinic.id] = { reservations: [], cancellations: [], noshows: [] };
+      clinicData[clinic.id].reservations = existing;
+      saveGmailData(clinic.id);
+    }
+
+    const totalNow = (clinicData[clinic.id]?.reservations || []).length;
+    statusEl.innerHTML = `✅ <strong>${newCount}件</strong>の新規予約を取得（合計: ${totalNow}件）`;
+    showToast(`${clinic.name}: ${newCount}件の新規予約を取得`, 'success');
+    renderAll();
+
+  } catch (e) {
+    statusEl.textContent = '❌ エラー: ' + e.message;
+    showToast(`${clinic.name}: エラー - ${e.message}`, 'error');
   }
 
   isFetching = false;
-  document.getElementById('cancelFetchBtn').style.display = 'none';
-  hideLoading();
-  renderAll();
-  if (totalNew > 0) showToast(`合計${totalNew}件の新規予約を取得しました`, 'success');
+  btnEl.disabled = false;
 }
 
-async function fetchGmailMessages(query, clinic, maxFetch) {
+// 院ごとのサインイン用：毎回アカウント選択画面を表示
+function requestClinicToken() {
+  return new Promise((resolve) => {
+    const clientId = localStorage.getItem('google_client_id');
+    if (!clientId) { showToast('先にClient IDを設定してください', 'error'); openSettingsModal(); resolve(null); return; }
+    try {
+      const tc = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: DRIVE_SCOPES,
+        prompt: 'select_account',
+        callback: (resp) => {
+          if (resp.error) { resolve(null); return; }
+          resolve(resp.access_token);
+        },
+      });
+      tc.requestAccessToken();
+    } catch(e) {
+      showToast('Google APIの読み込みを待っています...', 'error');
+      resolve(null);
+    }
+  });
+}
+
+// トークンを引数で受け取るバージョン
+async function fetchGmailMessagesWithToken(query, clinic, maxFetch, token) {
   const messages = [];
-  const headers = { Authorization: `Bearer ${accessToken}` };
-  // ページネーションで全件取得
+  const headers = { Authorization: `Bearer ${token}` };
   let nextPageToken = null;
   let allMsgIds = [];
+
+  const statusEl = document.getElementById('fetchStatus_' + clinic.id);
 
   do {
     if (fetchCancelled) break;
@@ -781,6 +843,7 @@ async function fetchGmailMessages(query, clinic, maxFetch) {
       const data = await resp.json();
       if (data.messages) allMsgIds = allMsgIds.concat(data.messages);
       nextPageToken = data.nextPageToken || null;
+      if (statusEl) statusEl.textContent = `📧 メール検索中... ${allMsgIds.length}件発見`;
     } catch (e) {
       clearTimeout(timer);
       if (e.name === 'AbortError') throw new Error('タイムアウトしました');
@@ -794,11 +857,11 @@ async function fetchGmailMessages(query, clinic, maxFetch) {
   );
   const toFetch = allMsgIds.filter(m => !existingGmailIds.has(m.id)).slice(0, maxFetch);
 
-  showLoading(`${clinic.name}: ${toFetch.length}件のメールを取得中...`);
+  if (statusEl) statusEl.textContent = `📥 ${toFetch.length}件のメールを取得中...`;
 
   for (let i = 0; i < toFetch.length; i++) {
     if (fetchCancelled) break;
-    showLoading(`${clinic.name}: メール取得中... (${i + 1}/${toFetch.length}件)`);
+    if (statusEl) statusEl.textContent = `📥 メール取得中... (${i + 1}/${toFetch.length}件)`;
     const m = toFetch[i];
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -819,6 +882,8 @@ async function fetchGmailMessages(query, clinic, maxFetch) {
   }
   return messages;
 }
+
+// 旧fetchGmailMessages は fetchGmailMessagesWithToken に統合済み
 
 function getMessageBody(message) {
   const payload = message.payload;
