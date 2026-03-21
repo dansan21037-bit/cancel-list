@@ -128,6 +128,7 @@
   /* キャンセルリスト用バッジ */
   .badge-c3 { background: #d6bcfa; color: #44337a; }
   .badge-c4 { background: #b794f4; color: #322659; }
+  .badge-repeat { background: #fed7d7; color: #c53030; font-weight: bold; border: 1px solid #fc8181; }
   .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: #e53e3e; }
   .noshow-check:disabled { cursor: default; opacity: 0.6; }
   .noshow-checked-label { font-size: 11px; color: #c53030; font-weight: 700; }
@@ -731,6 +732,17 @@ function decodeBase64Url(data) {
   }
 }
 
+// ── Date Parser Helper ──────────────────────────────────────────────────
+function parseDateTimeFromText(text) {
+  // パターン1: 2026-01-31(土) 23:22 (ハイフン区切り)
+  const m1 = text.match(/(\d{4}-\d{2}-\d{2})\s*\([^\)]*\)\s*(\d{1,2}:\d{2})/);
+  if (m1) return m1[1] + ' ' + m1[2];
+  // パターン2: 2026年03月21日(土) 18:00 (漢字区切り)
+  const m2 = text.match(/(\d{4})年(\d{2})月(\d{2})日\s*\([^\)]*\)\s*(\d{1,2}:\d{2})/);
+  if (m2) return m2[1] + '-' + m2[2] + '-' + m2[3] + ' ' + m2[4];
+  return '';
+}
+
 // ── Email Parsers ───────────────────────────────────────────────────────
 function parseReservationEmail(body) {
   try {
@@ -738,8 +750,7 @@ function parseReservationEmail(body) {
     if (!idMatch) return null;
     const id = idMatch[1];
     const afterSep = body.split('---')[1] || body;
-    const dtMatch = afterSep.match(/(\d{4}-\d{2}-\d{2})\s*\([^\)]*\)\s*(\d{1,2}:\d{2})/);
-    const datetime = dtMatch ? dtMatch[1] + ' ' + dtMatch[2] : '';
+    const datetime = parseDateTimeFromText(afterSep);
     let menu = '';
     const menuMatch = afterSep.match(/\d{1,2}:\d{2}\s*\n\s*(.+)/);
     if (menuMatch) menu = menuMatch[1].trim();
@@ -756,8 +767,8 @@ function parseReservationEmail(body) {
     const commentMatch = body.match(/コメント[：:]\s*\n([\s\S]*?)(?=\n\s*(?:受付日時|キャンセル日時)|$)/);
     if (commentMatch) comment = commentMatch[1].trim();
     let receivedAt = '';
-    const recMatch = body.match(/受付日時[：:]\s*\n\s*(\d{4}-\d{2}-\d{2})\s*\([^\)]*\)\s*(\d{1,2}:\d{2})/);
-    if (recMatch) receivedAt = recMatch[1] + ' ' + recMatch[2];
+    const recBlock = body.split(/受付日時[：:]/)[1] || '';
+    receivedAt = parseDateTimeFromText(recBlock);
     return { id, datetime, menu, name, email, phone, comment, receivedAt, type: 'reservation' };
   } catch(e) { console.error('Parse error:', e); return null; }
 }
@@ -768,8 +779,7 @@ function parseCancellationEmail(body) {
     if (!idMatch) return null;
     const id = idMatch[1];
     const afterSep = body.split('---')[1] || body;
-    const dtMatch = afterSep.match(/(\d{4}-\d{2}-\d{2})\s*\([^\)]*\)\s*(\d{1,2}:\d{2})/);
-    const datetime = dtMatch ? dtMatch[1] + ' ' + dtMatch[2] : '';
+    const datetime = parseDateTimeFromText(afterSep);
     let menu = '';
     const menuMatch = afterSep.match(/\d{1,2}:\d{2}\s*\n\s*(.+)/);
     if (menuMatch) menu = menuMatch[1].trim();
@@ -786,8 +796,8 @@ function parseCancellationEmail(body) {
     const commentMatch = body.match(/コメント[：:]\s*\n([\s\S]*?)(?=\n\s*(?:受付日時|キャンセル日時)|$)/);
     if (commentMatch) comment = commentMatch[1].trim();
     let receivedAt = '';
-    const canMatch = body.match(/キャンセル日時[：:]\s*\n\s*(\d{4}-\d{2}-\d{2})\s*\([^\)]*\)\s*(\d{1,2}:\d{2})/);
-    if (canMatch) receivedAt = canMatch[1] + ' ' + canMatch[2];
+    const canBlock = body.split(/キャンセル日時[：:]/)[1] || '';
+    receivedAt = parseDateTimeFromText(canBlock);
     return { id, datetime, menu, name, email, phone, comment, receivedAt, type: 'cancellation' };
   } catch(e) { console.error('Parse error:', e); return null; }
 }
@@ -875,6 +885,15 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
   const counts = getCancelCounts(data);
+  // リピーター検出: 電話番号で全リストを照合
+  const repeatCounts = {};
+  if (tabId === 'reservations') {
+    const allRecords = [...reservations, ...cancellations, ...noshows];
+    for (const rec of allRecords) {
+      const ph = rec.phone || '';
+      if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
+    }
+  }
   if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; }
   else {
     empty.style.display = 'none';
@@ -885,6 +904,11 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
       const badgeCol = isCancelTab ? `<td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
+      // リピーターバッジ（予約リストのみ）
+      let repeatBadge = '';
+      if (isResTab && r.phone && repeatCounts[r.phone] >= 2) {
+        repeatBadge = ` <span class="badge badge-repeat">🔁再予約 ${repeatCounts[r.phone]}回目</span>`;
+      }
       // 予約者リストのみ: 無断キャンセルチェック列
       let noshowCol = '';
       if (isResTab) {
@@ -899,7 +923,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td style="color:#a0aec0;font-size:12px">${i+1}</td>
       <td class="date-cell">${esc(fmtDT(r.datetime))}</td>
       <td class="menu-cell">${esc(r.menu)}</td>
-      <td class="name-cell">${esc(r.name)}</td>
+      <td class="name-cell">${esc(r.name)}${repeatBadge}</td>
       <td class="phone-cell">${esc(r.phone)}</td>
       <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
       <td class="comment-cell">${esc(r.comment)}</td>
