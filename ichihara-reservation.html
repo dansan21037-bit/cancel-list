@@ -66,10 +66,12 @@
   .search-wrap { position: relative; flex: 1; min-width: 220px; max-width: 400px; }
   .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #718096; font-size: 16px; }
   .search-input {
-    width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #e2e8f0;
+    width: 100%; padding: 9px 32px 9px 34px; border: 1px solid #e2e8f0;
     border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; transition: border 0.2s;
   }
   .search-input:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+  .search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #a0aec0; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 13px; line-height: 20px; text-align: center; cursor: pointer; display: none; padding: 0; }
+  .search-clear:hover { background: #e53e3e; }
   .btn {
     padding: 9px 16px; border: none; border-radius: 8px; font-size: 14px;
     font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.2s;
@@ -241,7 +243,8 @@
 <div class="toolbar">
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
-    <input type="text" class="search-input" id="searchInput" placeholder="名前・電話番号・日付で検索..." oninput="render()">
+    <input type="text" class="search-input" id="searchInput" placeholder="名前・電話番号・日付で検索..." oninput="toggleClearBtn();render()">
+    <button class="search-clear" id="searchClear" onclick="document.getElementById('searchInput').value='';toggleClearBtn();render();">✕</button>
   </div>
   <div class="date-filter">
     <input type="date" id="filterDateFrom" onchange="render()">
@@ -860,6 +863,10 @@ function getCancelCounts(data) {
 }
 
 // ── Render ──────────────────────────────────────────────────────────────
+function toggleClearBtn() {
+  const v = document.getElementById('searchInput').value;
+  document.getElementById('searchClear').style.display = v ? 'block' : 'none';
+}
 function render() {
   const q = document.getElementById('searchInput').value.toLowerCase().trim();
   const dateFrom = document.getElementById('filterDateFrom').value;
@@ -932,7 +939,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
           searchKey = r.name;
         }
         if (repCnt >= 2) {
-          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${searchKey.replace(/'/g,"\\'")}';render();">再${repCnt}</span>`;
+          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${searchKey.replace(/'/g,"\\'")}';toggleClearBtn();render();">再${repCnt}</span>`;
         }
       }
       // 予約者リストのみ: 無断キャンセルチェック列
