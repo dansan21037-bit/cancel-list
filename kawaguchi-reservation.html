@@ -672,10 +672,10 @@ async function fetchGmailMessages(query, silent, maxFetch, maxList) {
   const listData = await listResp.json();
   if (!listData.messages) return messages;
 
-  // 取得済みを除外
+  // 取得済みを除外（ただし日付が空欄のレコードは再取得対象にする）
   const existingIds = new Set([
-    ...reservations.map(r => r.gmailMsgId).filter(Boolean),
-    ...cancellations.map(r => r.gmailMsgId).filter(Boolean)
+    ...reservations.filter(r => r.datetime).map(r => r.gmailMsgId).filter(Boolean),
+    ...cancellations.filter(r => r.datetime).map(r => r.gmailMsgId).filter(Boolean)
   ]);
   const toFetch = listData.messages.filter(m => !existingIds.has(m.id)).slice(0, maxFetch || 15);
   if (toFetch.length === 0) return messages;
