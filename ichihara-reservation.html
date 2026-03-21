@@ -576,13 +576,21 @@ async function processEmails(messages, type) {
 }
 
 // 自動メール取得（サイレント・2回目以降は軽量）
+function getSearchDate(storageKey, defaultDate) {
+  const last = localStorage.getItem(storageKey);
+  if (!last) return defaultDate;
+  const d = new Date(last.replace(/\//g, '-'));
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0,10).replace(/-/g,'/');
+}
+
 async function autoFetchEmails() {
   if (!accessToken || isFetching) return;
   isFetching = true;
   fetchCancelled = false;
   try {
     const lastFetch = localStorage.getItem('lastFetchTime_ichihara');
-    const afterDate = lastFetch || '2025/06/01';
+    const afterDate = lastFetch ? getSearchDate('lastFetchTime_ichihara', '2025/06/01') : '2025/06/01';
     const limit = lastFetch ? 10 : 20;
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
@@ -611,9 +619,9 @@ async function fetchEmails() {
   fetchCancelled = false;
   showLoading('メールを検索中...');
   try {
-    const lastFetch = localStorage.getItem('lastFetchTime_ichihara') || '2025/06/01';
-    const q1 = 'subject:オンライン予約が入りました 1980 after:' + lastFetch;
-    const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + lastFetch;
+    const afterDate = getSearchDate('lastFetchTime_ichihara', '2025/06/01');
+    const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
+    const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
     const resMsg = await fetchGmailMessages(q1, false, 20, 20);
     if (fetchCancelled) return;
     const canMsg = await fetchGmailMessages(q2, false, 20, 20);
