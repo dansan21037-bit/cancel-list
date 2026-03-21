@@ -925,7 +925,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         const nmCnt = normName(r.name) ? (repeatByName[normName(r.name)] || 0) : 0;
         const repCnt = Math.max(phCnt, nmCnt);
         if (repCnt >= 2) {
-          repeatBadge = ` <span class="badge badge-repeat">再${repCnt}</span>`;
+          const searchKey = ph || r.name || '';
+          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${searchKey.replace(/'/g,"\\'")}';render();">再${repCnt}</span>`;
         }
       }
       // 予約者リストのみ: 無断キャンセルチェック列
