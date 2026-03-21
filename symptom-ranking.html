@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>院別症状ランキング</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: white; padding: 18px 24px; display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.header-icon { font-size: 30px; }
+.header h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+.header-sub { font-size: 12px; color: #a0aec0; margin-top: 2px; }
+.header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.clinic-select {
+  padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.1); color: white; font-size: 14px; font-family: inherit;
+  cursor: pointer; outline: none;
+}
+.clinic-select option { color: #333; background: white; }
+
+/* Auth bar */
+.auth-bar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 24px;
+  background: #edf2f7; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #4a5568;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-dot.online { background: #48bb78; }
+.status-dot.offline { background: #a0aec0; }
+.sync-info { flex: 1; }
+
+/* Buttons */
+.btn {
+  padding: 8px 14px; border: none; border-radius: 8px; font-size: 13px;
+  font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.btn-primary { background: #4299e1; color: white; }
+.btn-primary:hover { background: #3182ce; }
+.btn-google { background: #4285f4; color: white; }
+.btn-google:hover { background: #3367d6; }
+.btn-outline { background: white; color: #4a5568; border: 1px solid #e2e8f0; }
+.btn-outline:hover { background: #f7fafc; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-success { background: #48bb78; color: white; }
+.btn-success:hover { background: #38a169; }
+.btn-header {
+  background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3);
+  padding: 7px 14px; border-radius: 8px; font-size: 13px; font-family: inherit;
+  cursor: pointer; font-weight: 600; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.btn-header:hover { background: rgba(255,255,255,0.2); }
+
+/* Filter bar */
+.filter-bar {
+  display: flex; gap: 10px; padding: 14px 24px; background: white;
+  border-bottom: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap;
+}
+.period-select, .month-select {
+  padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+  font-size: 13px; font-family: inherit; outline: none;
+}
+.period-select:focus, .month-select:focus { border-color: #4299e1; }
+
+/* Stats cards */
+.stats-bar {
+  display: flex; gap: 12px; padding: 16px 24px; background: white;
+  border-bottom: 1px solid #e2e8f0; flex-wrap: wrap;
+}
+.stat-card {
+  display: flex; align-items: center; gap: 10px; padding: 12px 18px;
+  border-radius: 10px; font-size: 14px; font-weight: 600; min-width: 140px;
+}
+.stat-card.blue { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+.stat-card.green { background: #f0fff4; color: #276749; border: 1px solid #c6f6d5; }
+.stat-card.gray { background: #f7fafc; color: #718096; border: 1px solid #e2e8f0; }
+.stat-num { font-size: 26px; font-weight: 800; }
+
+/* Tabs */
+.tab-bar {
+  display: flex; background: #f7fafc; border-bottom: 2px solid #e2e8f0;
+  padding: 8px 24px 0; gap: 6px;
+}
+.tab {
+  padding: 11px 20px; border: 2px solid #e2e8f0; border-bottom: none;
+  background: #edf2f7; cursor: pointer; font-size: 14px; font-weight: 700;
+  color: #718096; font-family: inherit; border-radius: 10px 10px 0 0;
+  transition: all 0.2s; position: relative; top: 2px;
+}
+.tab:hover { color: #4a5568; background: #e2e8f0; }
+.tab.active { color: white; background: #2b6cb0; border-color: #2b6cb0; }
+
+/* Charts area */
+.charts-area {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  padding: 20px 24px;
+}
+.chart-card {
+  background: white; border-radius: 12px; padding: 20px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+}
+.chart-card h3 {
+  font-size: 15px; color: #4a5568; margin-bottom: 14px; font-weight: 700;
+}
+.chart-container { position: relative; width: 100%; max-height: 350px; }
+
+/* Ranking table */
+.table-wrap { padding: 0 24px 20px; }
+.table-container {
+  background: white; border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead tr { background: #f7fafc; }
+th {
+  padding: 12px 14px; text-align: left; font-weight: 700; color: #4a5568;
+  font-size: 13px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: #f7fafc; }
+td { padding: 11px 14px; vertical-align: middle; }
+.rank-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%; font-weight: 800; font-size: 13px;
+}
+.rank-1 { background: #ffd700; color: #744210; }
+.rank-2 { background: #c0c0c0; color: #4a5568; }
+.rank-3 { background: #cd7f32; color: white; }
+.rank-other { background: #e2e8f0; color: #4a5568; }
+.bar-cell { width: 200px; }
+.bar-bg { background: #edf2f7; border-radius: 4px; height: 22px; position: relative; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.bar-label { position: absolute; right: 6px; top: 2px; font-size: 11px; color: #4a5568; font-weight: 600; }
+.pct-cell { font-weight: 700; color: #2b6cb0; }
+.trend-up { color: #48bb78; font-weight: 600; }
+.trend-down { color: #e53e3e; font-weight: 600; }
+.trend-same { color: #a0aec0; }
+
+/* Detail table */
+.name-cell { font-weight: 600; }
+.phone-cell { font-family: monospace; color: #2b6cb0; font-size: 13px; }
+.date-cell { white-space: nowrap; color: #4a5568; }
+.comment-cell { font-size: 13px; max-width: 250px; color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-cell:hover { white-space: normal; overflow: visible; position: relative; z-index: 10; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
+.symptom-tag {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.symptom-select {
+  padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+  font-size: 12px; font-family: inherit; outline: none; cursor: pointer;
+}
+
+.table-footer {
+  padding: 10px 14px; background: #f7fafc; border-top: 1px solid #e2e8f0;
+  font-size: 13px; color: #718096; display: flex; justify-content: space-between;
+}
+
+.empty-state { text-align: center; padding: 60px 20px; color: #a0aec0; }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 15px; }
+
+/* Modals */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 100; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 560px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: modalIn 0.2s ease;
+  max-height: 90vh; overflow-y: auto;
+}
+@keyframes modalIn { from { opacity:0; transform: translateY(-20px) scale(0.97); } to { opacity:1; transform: none; } }
+.modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: #1a202c; }
+.form-group { margin-bottom: 14px; }
+label { display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 5px; }
+input, select, textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+  font-size: 14px; font-family: inherit; outline: none; background: white;
+}
+input:focus, select:focus, textarea:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+textarea { resize: vertical; min-height: 60px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.help-text { font-size: 12px; color: #718096; margin-top: 4px; line-height: 1.5; }
+.step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
+.step-num { display: inline-block; background: #4299e1; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
+
+/* Category editor */
+.cat-list { max-height: 400px; overflow-y: auto; }
+.cat-item {
+  display: flex; gap: 8px; align-items: flex-start; padding: 10px;
+  border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; background: #f7fafc;
+}
+.cat-item input { flex: none; width: 140px; }
+.cat-item textarea { flex: 1; min-height: 36px; font-size: 12px; }
+.cat-item .btn-remove { flex: none; background: #fed7d7; color: #c53030; border: none; border-radius: 6px; padding: 6px 8px; cursor: pointer; font-size: 12px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; background: #2d3748; color: white;
+  padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 200;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3); opacity: 0; transform: translateY(10px);
+  transition: all 0.3s; pointer-events: none; max-width: 400px;
+}
+.toast.show { opacity: 1; transform: none; }
+.toast.success { background: #276749; }
+.toast.error { background: #9b2c2c; }
+
+/* Loading */
+.loading-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+  z-index: 150; align-items: center; justify-content: center;
+}
+.loading-overlay.show { display: flex; }
+.loading-box {
+  background: white; padding: 30px 40px; border-radius: 16px;
+  text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.spinner {
+  width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #4299e1;
+  border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .charts-area { grid-template-columns: 1fr; }
+  .header h1 { font-size: 16px; }
+  .filter-bar { gap: 6px; }
+  td, th { padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📊</div>
+  <div>
+    <h1>院別症状ランキング</h1>
+    <div class="header-sub">予約コメントから症状を自動分類・集計</div>
+  </div>
+  <div class="header-right">
+    <select class="clinic-select" id="clinicSelect" onchange="onClinicChange()">
+      <option value="all">全院</option>
+      <option value="omiya">大宮院</option>
+      <option value="kawaguchi">川口院</option>
+      <option value="ichihara">市原院</option>
+    </select>
+    <button class="btn-header" onclick="exportExcel()">📥 Excel出力</button>
+    <button class="btn-header" onclick="openCategoryModal()">🏷️ カテゴリ設定</button>
+    <button class="btn-header" onclick="openSettingsModal()">⚙️ 設定</button>
+  </div>
+</div>
+
+<div class="auth-bar" id="authBar">
+  <span class="status-dot offline" id="statusDot"></span>
+  <span class="sync-info" id="syncInfo">Google Drive: 未接続</span>
+  <button class="btn btn-sm btn-google" id="authBtn" onclick="handleAuth()">Googleサインイン</button>
+  <button class="btn btn-sm btn-outline" id="syncBtn" onclick="syncAllClinics()" style="display:none">🔄 同期</button>
+</div>
+
+<div class="filter-bar">
+  <select class="period-select" id="periodSelect" onchange="onPeriodChange()">
+    <option value="all">全期間</option>
+    <option value="monthly">月別</option>
+  </select>
+  <input type="month" class="month-select" id="monthSelect" onchange="renderAll()" style="display:none">
+  <div style="flex:1"></div>
+  <span id="dataInfo" style="font-size:13px;color:#718096"></span>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-card blue"><div><div class="stat-num" id="statTotal">0</div><div>総予約数</div></div></div>
+  <div class="stat-card green"><div><div class="stat-num" id="statClassified">0</div><div>分類済み</div></div></div>
+  <div class="stat-card gray"><div><div class="stat-num" id="statUnclassified">0</div><div>未分類</div></div></div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab active" data-tab="ranking" onclick="switchTab('ranking')">📊 ランキング</button>
+  <button class="tab" data-tab="detail" onclick="switchTab('detail')">📋 予約一覧</button>
+</div>
+
+<!-- Ranking panel -->
+<div id="panel-ranking">
+  <div class="charts-area">
+    <div class="chart-card">
+      <h3>症状別件数（棒グラフ）</h3>
+      <div class="chart-container"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>症状別割合（円グラフ）</h3>
+      <div class="chart-container"><canvas id="pieChart"></canvas></div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-container"><div class="table-scroll">
+      <table><thead><tr>
+        <th style="width:50px">順位</th>
+        <th>症状カテゴリ</th>
+        <th style="text-align:right">件数</th>
+        <th class="bar-cell">グラフ</th>
+        <th style="text-align:right">割合</th>
+        <th style="text-align:center">前月比</th>
+      </tr></thead><tbody id="rankingBody"></tbody></table>
+    </div>
+    <div class="empty-state" id="emptyRanking" style="display:none"><div class="icon">📊</div><p>データがありません<br><small>Googleサインインしてデータを読み込んでください</small></p></div>
+    <div class="table-footer"><span id="rankingCount">0件</span><span id="rankingLabel" style="color:#2b6cb0;font-weight:600;">院別症状ランキング</span></div>
+  </div></div>
+</div>
+
+<!-- Detail panel -->
+<div id="panel-detail" style="display:none">
+  <div class="table-wrap">
+    <div class="table-container"><div class="table-scroll">
+      <table><thead><tr>
+        <th style="width:40px">#</th>
+        <th>予約日時</th>
+        <th>氏名</th>
+        <th>電話番号</th>
+        <th>コメント</th>
+        <th>症状分類</th>
+        <th>院</th>
+      </tr></thead><tbody id="detailBody"></tbody></table>
+    </div>
+    <div class="empty-state" id="emptyDetail" style="display:none"><div class="icon">📋</div><p>データがありません</p></div>
+    <div class="table-footer"><span id="detailCount">0件</span><span style="color:#2b6cb0;font-weight:600;">予約一覧（症状タグ付き）</span></div>
+  </div></div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal" style="max-width:480px">
+    <h2>⚙️ Google Drive & Gmail 設定</h2>
+    <div class="step"><span class="step-num">1</span><a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> でプロジェクトを作成</div>
+    <div class="step"><span class="step-num">2</span>「APIとサービス」→「ライブラリ」で <strong>Google Drive API</strong> と <strong>Gmail API</strong> を有効化</div>
+    <div class="step"><span class="step-num">3</span>「認証情報」→「OAuth 2.0 クライアントID」を作成（種類：ウェブアプリ）</div>
+    <div class="step"><span class="step-num">4</span>「承認済みのJavaScript生成元」に <strong id="currentOrigin"></strong> を追加</div>
+    <div class="form-group" style="margin-top:16px">
+      <label>OAuth クライアントID</label>
+      <input type="text" id="clientIdInput" placeholder="xxxx.apps.googleusercontent.com">
+    </div>
+    <div class="form-group">
+      <label>共有フォルダID</label>
+      <input type="text" id="folderIdInput" placeholder="Google DriveのフォルダID">
+      <div class="help-text">フォルダURLの末尾部分がIDです</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeSettingsModal()">閉じる</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Settings Modal -->
+<div class="modal-backdrop" id="categoryModal">
+  <div class="modal" style="max-width:640px">
+    <h2>🏷️ 症状カテゴリ設定</h2>
+    <p style="font-size:13px;color:#718096;margin-bottom:14px">カテゴリ名とキーワード（カンマ区切り）を設定してください。コメント欄にキーワードが含まれると自動分類されます。</p>
+    <div class="cat-list" id="catList"></div>
+    <button class="btn btn-outline" onclick="addCategory()" style="margin-top:8px">＋ カテゴリ追加</button>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeCategoryModal()">キャンセル</button>
+      <button class="btn btn-outline" onclick="resetCategories()">初期値に戻す</button>
+      <button class="btn btn-primary" onclick="saveCategories()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box"><div class="spinner"></div><div id="loadingText">データを読み込み中...</div></div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const CLINICS = [
+  { id: 'omiya',     name: '大宮院', storageKey: 'reservation_omiya',     driveFile: 'reservation_omiya.json',     defaultAfterDate: '2025/10/01' },
+  { id: 'kawaguchi', name: '川口院', storageKey: 'reservation_kawaguchi', driveFile: 'reservation_kawaguchi.json', defaultAfterDate: '2025/01/01' },
+  { id: 'ichihara',  name: '市原院', storageKey: 'reservation_ichihara', driveFile: 'reservation_ichihara.json', defaultAfterDate: '2025/01/01' },
+];
+const FILTER_KEY = '1980';
+const DEFAULT_FOLDER_ID = '1nUz5LIufhedp6BN1YLk0cVdrXf95G55e';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+const STORAGE_SYMPTOM = 'symptom_ranking_tags';
+const STORAGE_CATEGORIES = 'symptom_ranking_categories';
+
+const DEFAULT_CATEGORIES = [
+  { name: '腰痛', keywords: ['腰痛', '腰', 'ぎっくり腰', 'ヘルニア', '腰椎'], color: '#e53e3e' },
+  { name: '肩こり・肩痛', keywords: ['肩こり', '肩痛', '肩', '四十肩', '五十肩', '肩甲骨'], color: '#dd6b20' },
+  { name: '頭痛', keywords: ['頭痛', '偏頭痛', '片頭痛', '頭が痛'], color: '#d69e2e' },
+  { name: '首痛・ストレートネック', keywords: ['首', '首痛', 'ストレートネック', '頸椎', '寝違え'], color: '#38a169' },
+  { name: '膝痛', keywords: ['膝', '膝痛', 'ひざ', '膝関節'], color: '#3182ce' },
+  { name: '脚・足の痛み', keywords: ['坐骨神経痛', '脚', '足', 'ふくらはぎ', '足首', 'すね', '股関節', 'O脚', 'X脚'], color: '#805ad5' },
+  { name: '姿勢矯正・骨盤矯正', keywords: ['姿勢', '骨盤', '猫背', '矯正', '産後', '歪み', 'ゆがみ', '反り腰'], color: '#d53f8c' },
+  { name: '自律神経・めまい・倦怠感', keywords: ['自律神経', 'めまい', '倦怠感', '不眠', '疲れ', '疲労', 'だるい', '冷え', '冷え性'], color: '#319795' },
+  { name: 'スポーツ障害・ケガ', keywords: ['スポーツ', 'ケガ', '怪我', '捻挫', '打撲', '肉離れ', 'テニス肘', '野球肘'], color: '#2b6cb0' },
+  { name: '未分類', keywords: [], color: '#a0aec0' },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+let clinicData = {}; // { omiya: { reservations: [], cancellations: [], noshows: [] }, ... }
+let symptomTags = {}; // { 'omiya_12345': 'カテゴリ名', ... }  手動変更分
+let categories = [];
+let activeTab = 'ranking';
+let selectedClinic = 'all';
+let periodMode = 'all';
+let accessToken = null, tokenClient = null, isSignedIn = false;
+let barChart = null, pieChart = null;
+
+// ── Init ──────────────────────────────────────────────────────────────────
+function init() {
+  loadCategories();
+  loadSymptomTags();
+  loadAllLocal();
+  renderAll();
+  tryInitGIS();
+  document.getElementById('currentOrigin').textContent = window.location.origin || '';
+  // Set default month to current month
+  const now = new Date();
+  document.getElementById('monthSelect').value = now.toISOString().slice(0,7);
+}
+
+// ── Categories ────────────────────────────────────────────────────────────
+function loadCategories() {
+  try {
+    const saved = localStorage.getItem(STORAGE_CATEGORIES);
+    categories = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  } catch(e) { categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); }
+}
+function saveCategoriesToStorage() {
+  localStorage.setItem(STORAGE_CATEGORIES, JSON.stringify(categories));
+}
+
+// ── Symptom Tags (manual overrides) ──────────────────────────────────────
+function loadSymptomTags() {
+  try {
+    const saved = localStorage.getItem(STORAGE_SYMPTOM);
+    symptomTags = saved ? JSON.parse(saved) : {};
+  } catch(e) { symptomTags = {}; }
+}
+function saveSymptomTags() {
+  localStorage.setItem(STORAGE_SYMPTOM, JSON.stringify(symptomTags));
+}
+
+// ── Classify ─────────────────────────────────────────────────────────────
+function classifySymptom(comment, clinicId, reservationId) {
+  const tagKey = clinicId + '_' + reservationId;
+  if (symptomTags[tagKey]) return symptomTags[tagKey];
+  if (!comment) return '未分類';
+  const text = comment.toLowerCase();
+  for (const cat of categories) {
+    if (cat.name === '未分類') continue;
+    for (const kw of cat.keywords) {
+      if (text.includes(kw.toLowerCase())) return cat.name;
+    }
+  }
+  return '未分類';
+}
+
+// ── Local Storage ────────────────────────────────────────────────────────
+function loadAllLocal() {
+  CLINICS.forEach(c => {
+    try {
+      const saved = localStorage.getItem(c.storageKey);
+      if (saved) {
+        const d = JSON.parse(saved);
+        clinicData[c.id] = { reservations: d.reservations || [], cancellations: d.cancellations || [], noshows: d.noshows || [] };
+      } else {
+        clinicData[c.id] = { reservations: [], cancellations: [], noshows: [] };
+      }
+    } catch(e) { clinicData[c.id] = { reservations: [], cancellations: [], noshows: [] }; }
+  });
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+function tryInitGIS() {
+  const clientId = localStorage.getItem('google_client_id');
+  if (!clientId) return;
+  if (typeof google !== 'undefined' && google.accounts) initGIS();
+  else setTimeout(tryInitGIS, 500);
+}
+
+function initGIS() {
+  const clientId = localStorage.getItem('google_client_id');
+  if (!clientId) return;
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId, scope: DRIVE_SCOPES, callback: handleTokenResponse,
+    });
+  } catch(e) { console.error('GIS init error:', e); }
+}
+
+async function handleTokenResponse(resp) {
+  if (resp.error) { showToast('サインイン失敗: ' + resp.error, 'error'); return; }
+  accessToken = resp.access_token;
+  isSignedIn = true;
+  updateAuthUI();
+  await syncAllClinics();
+}
+
+function handleAuth() {
+  if (isSignedIn) { signOut(); return; }
+  const clientId = localStorage.getItem('google_client_id');
+  if (!clientId) { showToast('先にClient IDを設定してください', 'error'); openSettingsModal(); return; }
+  if (!tokenClient) initGIS();
+  if (tokenClient) tokenClient.requestAccessToken();
+  else showToast('Google APIの読み込みを待っています...', 'error');
+}
+
+function signOut() {
+  if (accessToken) { try { google.accounts.oauth2.revoke(accessToken); } catch(e) {} }
+  accessToken = null; isSignedIn = false; tokenClient = null;
+  updateAuthUI();
+  showToast('サインアウトしました', '');
+}
+
+function updateAuthUI() {
+  const dot = document.getElementById('statusDot');
+  const info = document.getElementById('syncInfo');
+  const btn = document.getElementById('authBtn');
+  const syncBtn = document.getElementById('syncBtn');
+  if (isSignedIn) {
+    dot.className = 'status-dot online'; info.textContent = 'Google: 接続中';
+    btn.textContent = 'サインアウト'; btn.className = 'btn btn-sm btn-outline';
+    syncBtn.style.display = '';
+  } else {
+    dot.className = 'status-dot offline'; info.textContent = 'Google: 未接続';
+    btn.textContent = 'Googleサインイン'; btn.className = 'btn btn-sm btn-google';
+    syncBtn.style.display = 'none';
+  }
+}
+
+// ── Drive Read ────────────────────────────────────────────────────────────
+async function syncAllClinics() {
+  if (!accessToken) return;
+  showLoading('Google Driveからデータを読み込み中...');
+  const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
+  let loaded = 0;
+  for (const clinic of CLINICS) {
+    try {
+      showLoading(`${clinic.name} を読み込み中...`);
+      const data = await loadClinicFromDrive(clinic, folderId);
+      if (data) {
+        clinicData[clinic.id] = data;
+        loaded++;
+      }
+    } catch(e) {
+      console.error(`${clinic.name} load error:`, e);
+    }
+  }
+  hideLoading();
+  renderAll();
+  if (loaded > 0) {
+    document.getElementById('syncInfo').textContent = `Google Drive: ${loaded}院分同期済み (${new Date().toLocaleString('ja-JP')})`;
+    showToast(`${loaded}院分のデータを読み込みました`, 'success');
+  } else {
+    showToast('データの読み込みに失敗しました', 'error');
+  }
+}
+
+async function loadClinicFromDrive(clinic, folderId) {
+  const query = `name='${clinic.driveFile}' and trashed=false and '${folderId}' in parents`;
+  const searchResp = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!searchResp.ok) throw new Error('検索失敗: ' + searchResp.status);
+  const searchData = await searchResp.json();
+  if (!searchData.files || searchData.files.length === 0) return null;
+  const fileId = searchData.files[0].id;
+  const fileResp = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!fileResp.ok) throw new Error('読み込み失敗: ' + fileResp.status);
+  const data = await fileResp.json();
+  return { reservations: data.reservations || [], cancellations: data.cancellations || [], noshows: data.noshows || [] };
+}
+
+// ── Get filtered data ────────────────────────────────────────────────────
+function getFilteredReservations() {
+  let allRes = [];
+  const clinicIds = selectedClinic === 'all' ? CLINICS.map(c => c.id) : [selectedClinic];
+  for (const cid of clinicIds) {
+    const data = clinicData[cid];
+    if (!data) continue;
+    (data.reservations || []).forEach(r => {
+      allRes.push({ ...r, clinicId: cid, clinicName: CLINICS.find(c => c.id === cid).name });
+    });
+  }
+  // Filter by period
+  if (periodMode === 'monthly') {
+    const month = document.getElementById('monthSelect').value; // e.g. "2026-03"
+    if (month) {
+      allRes = allRes.filter(r => (r.datetime || '').startsWith(month));
+    }
+  }
+  return allRes;
+}
+
+function getPrevMonthReservations() {
+  if (periodMode !== 'monthly') return [];
+  const monthVal = document.getElementById('monthSelect').value;
+  if (!monthVal) return [];
+  const d = new Date(monthVal + '-01');
+  d.setMonth(d.getMonth() - 1);
+  const prevMonth = d.toISOString().slice(0,7);
+  let allRes = [];
+  const clinicIds = selectedClinic === 'all' ? CLINICS.map(c => c.id) : [selectedClinic];
+  for (const cid of clinicIds) {
+    const data = clinicData[cid];
+    if (!data) continue;
+    (data.reservations || []).forEach(r => {
+      allRes.push({ ...r, clinicId: cid });
+    });
+  }
+  return allRes.filter(r => (r.datetime || '').startsWith(prevMonth));
+}
+
+// ── Aggregate ────────────────────────────────────────────────────────────
+function aggregate(reservations) {
+  const counts = {};
+  categories.forEach(c => { counts[c.name] = 0; });
+  reservations.forEach(r => {
+    const symptom = classifySymptom(r.comment, r.clinicId, r.id);
+    counts[symptom] = (counts[symptom] || 0) + 1;
+  });
+  // Sort by count descending, keep 未分類 last
+  const sorted = Object.entries(counts)
+    .filter(([name]) => name !== '未分類')
+    .sort((a, b) => b[1] - a[1]);
+  if (counts['未分類'] !== undefined) sorted.push(['未分類', counts['未分類']]);
+  return sorted;
+}
+
+// ── Render All ────────────────────────────────────────────────────────────
+function renderAll() {
+  const reservations = getFilteredReservations();
+  const ranked = aggregate(reservations);
+  const total = reservations.length;
+  const unclassified = ranked.find(r => r[0] === '未分類');
+  const unclassifiedCount = unclassified ? unclassified[1] : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statClassified').textContent = total - unclassifiedCount;
+  document.getElementById('statUnclassified').textContent = unclassifiedCount;
+
+  // Data info
+  const clinicLabel = selectedClinic === 'all' ? '全院' : CLINICS.find(c => c.id === selectedClinic).name;
+  const periodLabel = periodMode === 'all' ? '全期間' : document.getElementById('monthSelect').value;
+  document.getElementById('dataInfo').textContent = `${clinicLabel} / ${periodLabel}`;
+
+  renderRanking(ranked, total);
+  renderCharts(ranked, total);
+  renderDetail(reservations);
+}
+
+// ── Render Ranking Table ─────────────────────────────────────────────────
+function renderRanking(ranked, total) {
+  const tbody = document.getElementById('rankingBody');
+  const empty = document.getElementById('emptyRanking');
+  const prevRes = getPrevMonthReservations();
+  const prevRanked = prevRes.length > 0 ? aggregate(prevRes) : null;
+  const prevMap = {};
+  if (prevRanked) prevRanked.forEach(r => { prevMap[r[0]] = r[1]; });
+
+  if (total === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    let rank = 0;
+    tbody.innerHTML = ranked.map(([name, count], i) => {
+      if (name !== '未分類') rank = i + 1;
+      else rank = '-';
+      const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+      const maxCount = ranked[0] ? ranked[0][1] : 1;
+      const barW = maxCount > 0 ? ((count / maxCount) * 100).toFixed(0) : 0;
+      const cat = categories.find(c => c.name === name);
+      const color = cat ? cat.color : '#a0aec0';
+      const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+      // Trend
+      let trend = '';
+      if (prevRanked && periodMode === 'monthly') {
+        const prev = prevMap[name] || 0;
+        const diff = count - prev;
+        if (diff > 0) trend = `<span class="trend-up">+${diff}</span>`;
+        else if (diff < 0) trend = `<span class="trend-down">${diff}</span>`;
+        else trend = `<span class="trend-same">±0</span>`;
+      } else {
+        trend = '<span class="trend-same">-</span>';
+      }
+      return `<tr>
+        <td style="text-align:center"><span class="rank-badge ${rankClass}">${rank}</span></td>
+        <td><span class="symptom-tag" style="background:${color}20;color:${color};border:1px solid ${color}40">${esc(name)}</span></td>
+        <td style="text-align:right;font-weight:700">${count}</td>
+        <td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${color}"></div><span class="bar-label">${count}</span></div></td>
+        <td style="text-align:right" class="pct-cell">${pct}%</td>
+        <td style="text-align:center">${trend}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('rankingCount').textContent = `${ranked.filter(r => r[1] > 0).length}カテゴリ / 全${total}件`;
+}
+
+// ── Render Charts ────────────────────────────────────────────────────────
+function renderCharts(ranked, total) {
+  const labels = ranked.map(r => r[0]);
+  const data = ranked.map(r => r[1]);
+  const colors = ranked.map(r => {
+    const cat = categories.find(c => c.name === r[0]);
+    return cat ? cat.color : '#a0aec0';
+  });
+
+  // Bar chart
+  const barCtx = document.getElementById('barChart').getContext('2d');
+  if (barChart) barChart.destroy();
+  barChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '件数',
+        data,
+        backgroundColor: colors.map(c => c + '99'),
+        borderColor: colors,
+        borderWidth: 1,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 } },
+        y: { ticks: { font: { size: 12, weight: 'bold' } } }
+      }
+    }
+  });
+
+  // Pie chart
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.map(c => c + 'cc'),
+        borderColor: '#fff',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 12 }, padding: 10, usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+              return `${ctx.label}: ${ctx.raw}件 (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Render Detail Table ──────────────────────────────────────────────────
+function renderDetail(reservations) {
+  const tbody = document.getElementById('detailBody');
+  const empty = document.getElementById('emptyDetail');
+  // Sort by datetime desc
+  const sorted = [...reservations].sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+  if (sorted.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = sorted.map((r, i) => {
+      const symptom = classifySymptom(r.comment, r.clinicId, r.id);
+      const cat = categories.find(c => c.name === symptom);
+      const color = cat ? cat.color : '#a0aec0';
+      const options = categories.map(c =>
+        `<option value="${esc(c.name)}" ${c.name === symptom ? 'selected' : ''}>${esc(c.name)}</option>`
+      ).join('');
+      return `<tr>
+        <td style="color:#a0aec0;font-size:12px">${i+1}</td>
+        <td class="date-cell">${esc(fmtDT(r.datetime))}</td>
+        <td class="name-cell">${esc(r.name)}</td>
+        <td class="phone-cell">${esc(r.phone)}</td>
+        <td class="comment-cell" title="${esc(r.comment)}">${esc(r.comment)}</td>
+        <td><select class="symptom-select" style="border-color:${color}" onchange="changeSymptom('${r.clinicId}','${r.id}',this.value)">${options}</select></td>
+        <td style="font-size:12px;color:#718096">${esc(r.clinicName)}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('detailCount').textContent = `${sorted.length}件`;
+}
+
+function changeSymptom(clinicId, reservationId, newSymptom) {
+  const tagKey = clinicId + '_' + reservationId;
+  if (newSymptom === classifySymptomAuto(clinicId, reservationId)) {
+    delete symptomTags[tagKey];
+  } else {
+    symptomTags[tagKey] = newSymptom;
+  }
+  saveSymptomTags();
+  renderAll();
+}
+
+function classifySymptomAuto(clinicId, reservationId) {
+  const data = clinicData[clinicId];
+  if (!data) return '未分類';
+  const r = data.reservations.find(x => x.id === reservationId);
+  if (!r || !r.comment) return '未分類';
+  const text = r.comment.toLowerCase();
+  for (const cat of categories) {
+    if (cat.name === '未分類') continue;
+    for (const kw of cat.keywords) {
+      if (text.includes(kw.toLowerCase())) return cat.name;
+    }
+  }
+  return '未分類';
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+function fmtDT(dt) {
+  if (!dt) return '';
+  const m = dt.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})/);
+  return m ? `${m[1]}年${m[2]}月${m[3]}日 ${m[4]}` : dt;
+}
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Tab / Filter Controls ────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('panel-ranking').style.display = tab === 'ranking' ? '' : 'none';
+  document.getElementById('panel-detail').style.display = tab === 'detail' ? '' : 'none';
+}
+
+function onClinicChange() {
+  selectedClinic = document.getElementById('clinicSelect').value;
+  renderAll();
+}
+
+function onPeriodChange() {
+  periodMode = document.getElementById('periodSelect').value;
+  document.getElementById('monthSelect').style.display = periodMode === 'monthly' ? '' : 'none';
+  renderAll();
+}
+
+// ── Settings Modal ───────────────────────────────────────────────────────
+function openSettingsModal() {
+  document.getElementById('clientIdInput').value = localStorage.getItem('google_client_id') || '';
+  document.getElementById('folderIdInput').value = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('open'); }
+
+function saveSettings() {
+  const clientId = document.getElementById('clientIdInput').value.trim();
+  const rawFolder = document.getElementById('folderIdInput').value.trim();
+  const folderId = extractFolderId(rawFolder);
+  if (clientId) localStorage.setItem('google_client_id', clientId);
+  else localStorage.removeItem('google_client_id');
+  if (folderId && folderId !== DEFAULT_FOLDER_ID) localStorage.setItem('google_folder_id', folderId);
+  else localStorage.removeItem('google_folder_id');
+  tokenClient = null;
+  if (clientId) initGIS();
+  closeSettingsModal();
+  showToast('設定を保存しました', 'success');
+}
+
+function extractFolderId(input) {
+  if (!input) return '';
+  const match = input.match(/folders\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : input;
+}
+
+// ── Category Modal ───────────────────────────────────────────────────────
+function openCategoryModal() {
+  renderCatList();
+  document.getElementById('categoryModal').classList.add('open');
+}
+function closeCategoryModal() { document.getElementById('categoryModal').classList.remove('open'); }
+
+function renderCatList() {
+  const list = document.getElementById('catList');
+  list.innerHTML = categories.map((c, i) => `
+    <div class="cat-item">
+      <input type="text" value="${esc(c.name)}" placeholder="カテゴリ名" id="catName${i}" style="border-left:4px solid ${c.color}">
+      <textarea id="catKw${i}" placeholder="キーワード（カンマ区切り）">${esc(c.keywords.join(', '))}</textarea>
+      <input type="color" value="${c.color}" id="catColor${i}" style="width:36px;padding:2px;cursor:pointer">
+      ${c.name !== '未分類' ? `<button class="btn-remove" onclick="removeCategory(${i})">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function addCategory() {
+  const colors = ['#e53e3e','#dd6b20','#d69e2e','#38a169','#3182ce','#805ad5','#d53f8c','#319795','#2b6cb0','#718096'];
+  categories.splice(categories.length - 1, 0, { name: '新カテゴリ', keywords: [], color: colors[categories.length % colors.length] });
+  renderCatList();
+}
+
+function removeCategory(i) {
+  categories.splice(i, 1);
+  renderCatList();
+}
+
+function resetCategories() {
+  categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  renderCatList();
+  showToast('初期値に戻しました', '');
+}
+
+function saveCategories() {
+  const newCats = [];
+  for (let i = 0; i < categories.length; i++) {
+    const nameEl = document.getElementById('catName' + i);
+    const kwEl = document.getElementById('catKw' + i);
+    const colorEl = document.getElementById('catColor' + i);
+    if (!nameEl) continue;
+    const name = nameEl.value.trim();
+    const kws = kwEl.value.split(/[,、，]/).map(k => k.trim()).filter(k => k);
+    const color = colorEl.value;
+    if (name) newCats.push({ name, keywords: kws, color });
+  }
+  // Ensure 未分類 exists
+  if (!newCats.find(c => c.name === '未分類')) {
+    newCats.push({ name: '未分類', keywords: [], color: '#a0aec0' });
+  }
+  categories = newCats;
+  saveCategoriesToStorage();
+  closeCategoryModal();
+  renderAll();
+  showToast('カテゴリを保存しました', 'success');
+}
+
+// ── Excel Export ─────────────────────────────────────────────────────────
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  const today = new Date().toISOString().slice(0,10);
+  const reservations = getFilteredReservations();
+  const ranked = aggregate(reservations);
+  const total = reservations.length;
+
+  // Ranking sheet
+  const rankRows = ranked.map(([name, count], i) => [
+    name !== '未分類' ? i+1 : '-',
+    name,
+    count,
+    total > 0 ? ((count/total)*100).toFixed(1) + '%' : '0%'
+  ]);
+  const rankWs = XLSX.utils.aoa_to_sheet([['順位','症状カテゴリ','件数','割合'], ...rankRows]);
+  rankWs['!cols'] = [6,20,10,10].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, rankWs, 'ランキング');
+
+  // Detail sheet
+  const detailRows = reservations.map(r => [
+    r.datetime, r.name, r.phone, r.comment,
+    classifySymptom(r.comment, r.clinicId, r.id),
+    r.clinicName
+  ]);
+  const detailWs = XLSX.utils.aoa_to_sheet([['予約日時','氏名','電話番号','コメント','症状分類','院'], ...detailRows]);
+  detailWs['!cols'] = [18,14,14,30,16,10].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, detailWs, '予約一覧');
+
+  const clinicLabel = selectedClinic === 'all' ? '全院' : CLINICS.find(c => c.id === selectedClinic).name;
+  XLSX.writeFile(wb, `症状ランキング_${clinicLabel}_${today}.xlsx`);
+  showToast('Excelファイルを出力しました', 'success');
+}
+
+// ── Toast / Loading ──────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : '');
+  setTimeout(() => { t.className = 'toast'; }, 4000);
+}
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text || 'データを読み込み中...';
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+// ── Events ───────────────────────────────────────────────────────────────
+document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) closeSettingsModal(); });
+document.getElementById('categoryModal').addEventListener('click', function(e) { if (e.target === this) closeCategoryModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSettingsModal(); closeCategoryModal(); } });
+
+// ── Start ────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
