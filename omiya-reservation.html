@@ -128,7 +128,7 @@
   /* キャンセルリスト用バッジ */
   .badge-c3 { background: #d6bcfa; color: #44337a; }
   .badge-c4 { background: #b794f4; color: #322659; }
-  .badge-repeat { background: #fed7d7; color: #c53030; font-weight: bold; border: 1px solid #fc8181; }
+  .badge-repeat { background: #c53030; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; white-space: nowrap; vertical-align: middle; }
   .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: #e53e3e; }
   .noshow-check:disabled { cursor: default; opacity: 0.6; }
   .noshow-checked-label { font-size: 11px; color: #c53030; font-weight: 700; }
@@ -137,7 +137,8 @@
   .date-cell { white-space: nowrap; color: #4a5568; }
   .note-cell { color: #718096; font-size: 13px; max-width: 260px; }
   .menu-cell { font-size: 13px; max-width: 280px; color: #4a5568; }
-  .comment-cell { font-size: 13px; max-width: 200px; color: #718096; }
+  .comment-cell { font-size: 12px; max-width: 150px; color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .comment-cell:hover { white-space: normal; overflow: visible; position: relative; z-index: 10; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
   .actions-cell { display: flex; gap: 5px; }
   .empty-state { text-align: center; padding: 60px 20px; color: #a0aec0; }
   .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
@@ -895,13 +896,12 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
   const counts = getCancelCounts(data);
-  // リピーター検出: 電話番号で全リストを照合（名前正規化でも補完）
+  // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人
   const repeatCounts = {};
   const repeatByName = {};
   const normName = (n) => (n||'').replace(/[\s　]/g, '').trim();
   if (tabId === 'reservations') {
-    const allRecords = [...reservations, ...cancellations, ...noshows];
-    for (const rec of allRecords) {
+    for (const rec of reservations) {
       const ph = rec.phone || '';
       if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
       const nm = normName(rec.name);
@@ -925,7 +925,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         const nmCnt = normName(r.name) ? (repeatByName[normName(r.name)] || 0) : 0;
         const repCnt = Math.max(phCnt, nmCnt);
         if (repCnt >= 2) {
-          repeatBadge = ` <span class="badge badge-repeat">🔁再予約 ${repCnt}回目</span>`;
+          repeatBadge = ` <span class="badge badge-repeat">再${repCnt}</span>`;
         }
       }
       // 予約者リストのみ: 無断キャンセルチェック列
