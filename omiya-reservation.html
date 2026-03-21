@@ -918,14 +918,18 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
       const badgeCol = isCancelTab ? `<td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
-      // リピーターバッジ（予約リストのみ: 電話番号 or 正規化名前で判定）
+      // リピーターバッジ（予約リストのみ）
       let repeatBadge = '';
       if (isResTab) {
-        const phCnt = r.phone ? (repeatCounts[r.phone] || 0) : 0;
-        const nmCnt = normName(r.name) ? (repeatByName[normName(r.name)] || 0) : 0;
-        const repCnt = Math.max(phCnt, nmCnt);
+        let repCnt = 0, searchKey = '';
+        if (r.phone) {
+          repCnt = repeatCounts[r.phone] || 0;
+          searchKey = r.phone;
+        } else if (normName(r.name)) {
+          repCnt = repeatByName[normName(r.name)] || 0;
+          searchKey = r.name;
+        }
         if (repCnt >= 2) {
-          const searchKey = ph || r.name || '';
           repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${searchKey.replace(/'/g,"\\'")}';render();">再${repCnt}</span>`;
         }
       }
