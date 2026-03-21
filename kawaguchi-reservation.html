@@ -570,7 +570,13 @@ async function processEmails(messages, type) {
     const parsed = parser(msg.body);
     if (parsed && parsed.menu && parsed.menu.includes('1980')) {
       parsed.gmailMsgId = msg.id;
-      if (!list.find(r => r.id === parsed.id)) { list.push(parsed); count++; }
+      const existing = list.find(r => r.id === parsed.id);
+      if (!existing) {
+        list.push(parsed); count++;
+      } else if (!existing.datetime && parsed.datetime) {
+        Object.assign(existing, parsed);
+        count++;
+      }
     }
   }
   return count;
@@ -889,13 +895,17 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
   const counts = getCancelCounts(data);
-  // リピーター検出: 電話番号で全リストを照合
+  // リピーター検出: 電話番号で全リストを照合（名前正規化でも補完）
   const repeatCounts = {};
+  const repeatByName = {};
+  const normName = (n) => (n||'').replace(/[\s　]/g, '').trim();
   if (tabId === 'reservations') {
     const allRecords = [...reservations, ...cancellations, ...noshows];
     for (const rec of allRecords) {
       const ph = rec.phone || '';
       if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
+      const nm = normName(rec.name);
+      if (nm) repeatByName[nm] = (repeatByName[nm] || 0) + 1;
     }
   }
   if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; }
@@ -908,10 +918,15 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
       const badgeCol = isCancelTab ? `<td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
-      // リピーターバッジ（予約リストのみ）
+      // リピーターバッジ（予約リストのみ: 電話番号 or 正規化名前で判定）
       let repeatBadge = '';
-      if (isResTab && r.phone && repeatCounts[r.phone] >= 2) {
-        repeatBadge = ` <span class="badge badge-repeat">🔁再予約 ${repeatCounts[r.phone]}回目</span>`;
+      if (isResTab) {
+        const phCnt = r.phone ? (repeatCounts[r.phone] || 0) : 0;
+        const nmCnt = normName(r.name) ? (repeatByName[normName(r.name)] || 0) : 0;
+        const repCnt = Math.max(phCnt, nmCnt);
+        if (repCnt >= 2) {
+          repeatBadge = ` <span class="badge badge-repeat">🔁再予約 ${repCnt}回目</span>`;
+        }
       }
       // 予約者リストのみ: 無断キャンセルチェック列
       let noshowCol = '';
