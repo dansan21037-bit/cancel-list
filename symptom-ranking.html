@@ -307,6 +307,12 @@ textarea { resize: vertical; min-height: 60px; }
       <div class="chart-container"><canvas id="pieChart"></canvas></div>
     </div>
   </div>
+  <div class="charts-area" id="trendChartArea" style="display:none">
+    <div class="chart-card" style="flex:1;min-width:100%">
+      <h3 id="trendChartTitle">直近6ヶ月 症状ランキング推移</h3>
+      <div class="chart-container" style="height:350px"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
   <div class="table-wrap">
     <div class="table-container"><div class="table-scroll">
       <table><thead><tr>
@@ -450,7 +456,7 @@ let activeTab = 'ranking';
 let selectedClinic = 'all';
 let periodMode = 'all';
 let accessToken = null, tokenClient = null, isSignedIn = false;
-let barChart = null, pieChart = null;
+let barChart = null, pieChart = null, trendChart = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────
 function init() {
@@ -1116,6 +1122,38 @@ function renderRanking(ranked, total) {
   document.getElementById('rankingCount').textContent = `症状記載: ${withCommentTotal}件 / 全${total}件（コメントなし含む）`;
 }
 
+// ── Trend Data (直近6ヶ月) ───────────────────────────────────────────────
+function getTrendData() {
+  const monthVal = document.getElementById('monthSelect').value;
+  if (!monthVal) return null;
+  const baseDate = new Date(monthVal + '-01');
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(baseDate);
+    d.setMonth(d.getMonth() - i);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  // 全予約を取得（期間フィルタなし）
+  let allRes = [];
+  const clinicIds = selectedClinic === 'all' ? CLINICS.map(c => c.id) : [selectedClinic];
+  for (const cid of clinicIds) {
+    const data = clinicData[cid];
+    if (!data) continue;
+    (data.reservations || []).forEach(r => {
+      allRes.push({ ...r, clinicId: cid });
+    });
+  }
+  // 月ごとに集計
+  const monthlyData = {};
+  for (const m of months) {
+    const mRes = allRes.filter(r => (r.datetime || '').startsWith(m));
+    const agg = aggregate(mRes);
+    monthlyData[m] = {};
+    agg.forEach(([name, count]) => { monthlyData[m][name] = count; });
+  }
+  return { months, monthlyData };
+}
+
 // ── Render Charts ────────────────────────────────────────────────────────
 function renderCharts(ranked, total) {
   // グラフでは「コメントなし」を除外して症状記載ありのみ表示
@@ -1186,6 +1224,82 @@ function renderCharts(ranked, total) {
       }
     }
   });
+
+  // Trend line chart (月別モードのみ)
+  const trendArea = document.getElementById('trendChartArea');
+  if (periodMode === 'monthly') {
+    const trend = getTrendData();
+    if (trend && trend.months.length > 0) {
+      trendArea.style.display = '';
+      const trendCtx = document.getElementById('trendChart').getContext('2d');
+      if (trendChart) trendChart.destroy();
+
+      // 上位カテゴリ（未分類・コメントなし除外、件数上位8つ）を表示
+      const topCategories = chartData
+        .filter(r => r[0] !== '未分類' && r[0] !== 'コメントなし' && r[1] > 0)
+        .slice(0, 8)
+        .map(r => r[0]);
+
+      const datasets = topCategories.map(catName => {
+        const cat = categories.find(c => c.name === catName);
+        const color = cat ? cat.color : '#a0aec0';
+        return {
+          label: catName,
+          data: trend.months.map(m => trend.monthlyData[m][catName] || 0),
+          borderColor: color,
+          backgroundColor: color + '22',
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointBackgroundColor: color,
+          tension: 0.3,
+          fill: false,
+        };
+      });
+
+      const monthLabels = trend.months.map(m => {
+        const [y, mo] = m.split('-');
+        return `${parseInt(mo)}月`;
+      });
+
+      trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: { labels: monthLabels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { font: { size: 11 }, padding: 12, usePointStyle: true, pointStyle: 'circle' }
+            },
+            tooltip: {
+              callbacks: {
+                title: function(items) {
+                  const idx = items[0].dataIndex;
+                  return trend.months[idx];
+                },
+                label: function(ctx) {
+                  return `${ctx.dataset.label}: ${ctx.raw}件`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: '件数', font: { size: 12 } } },
+            x: { ticks: { font: { size: 12, weight: 'bold' } } }
+          }
+        }
+      });
+      document.getElementById('trendChartTitle').textContent =
+        `症状ランキング推移（${monthLabels[0]}〜${monthLabels[monthLabels.length-1]}）`;
+    } else {
+      trendArea.style.display = 'none';
+    }
+  } else {
+    trendArea.style.display = 'none';
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+  }
 }
 
 // ── Render Detail Table ──────────────────────────────────────────────────
