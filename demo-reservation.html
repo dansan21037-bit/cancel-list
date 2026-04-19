@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>予約管理システム デモ版</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  .header {
+    background: linear-gradient(135deg, #234e52 0%, #285e61 50%, #2c7a7b 100%);
+    color: white; padding: 20px 24px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .header-icon { font-size: 32px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .header-sub { font-size: 13px; color: #a0aec0; margin-top: 2px; }
+  .header-right { margin-left: auto; display: flex; gap: 10px; }
+  .auth-bar {
+    display: flex; align-items: center; gap: 10px; padding: 8px 24px;
+    background: #edf2f7; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #4a5568;
+  }
+  .auth-bar .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .auth-bar .status-dot.online { background: #48bb78; }
+  .auth-bar .status-dot.offline { background: #a0aec0; }
+  .auth-bar .sync-info { flex: 1; }
+  .btn-google { background: #4285f4; color: white; }
+  .btn-google:hover { background: #3367d6; }
+  .tab-bar {
+    display: flex; background: #f7fafc; border-bottom: 2px solid #e2e8f0;
+    padding: 8px 24px 0; overflow-x: auto; gap: 6px;
+  }
+  .tab {
+    padding: 12px 22px; border: 2px solid #e2e8f0; border-bottom: none;
+    background: #edf2f7; cursor: pointer;
+    font-size: 14px; font-weight: 700; color: #718096; font-family: inherit;
+    border-radius: 10px 10px 0 0; white-space: nowrap;
+    transition: all 0.2s; position: relative; top: 2px;
+  }
+  .tab:hover { color: #4a5568; background: #e2e8f0; }
+  .tab.active { color: white; background: #2b6cb0; border-color: #2b6cb0; box-shadow: 0 -2px 8px rgba(43,108,176,0.3); }
+  .tab.active[data-tab="cancellations"] { background: #c05621; border-color: #c05621; box-shadow: 0 -2px 8px rgba(192,86,33,0.3); }
+  .tab.active[data-tab="noshow"] { background: #c53030; border-color: #c53030; box-shadow: 0 -2px 8px rgba(197,48,48,0.3); }
+  .stats-bar {
+    display: flex; gap: 12px; padding: 16px 24px; background: white;
+    border-bottom: 1px solid #e2e8f0; flex-wrap: wrap;
+  }
+  .stat-card {
+    display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+    border-radius: 10px; font-size: 14px; font-weight: 600; min-width: 130px;
+  }
+  .stat-card.blue-card { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; cursor: pointer; transition: all 0.2s; }
+  .stat-card.orange-card { background: #fffaf0; color: #c05621; border: 1px solid #fbd38d; cursor: pointer; transition: all 0.2s; }
+  .stat-card.red-card { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; cursor: pointer; transition: all 0.2s; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+  .stat-card.stat-active { box-shadow: 0 0 0 3px rgba(66,153,225,0.4); transform: translateY(-1px); }
+  .stat-card.orange-card.stat-active { box-shadow: 0 0 0 3px rgba(192,86,33,0.3); }
+  .stat-card.red-card.stat-active { box-shadow: 0 0 0 3px rgba(197,48,48,0.3); }
+  .stat-num { font-size: 24px; font-weight: 800; }
+  .toolbar {
+    display: flex; gap: 10px; padding: 14px 24px; background: white;
+    border-bottom: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 220px; max-width: 400px; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #718096; font-size: 16px; }
+  .search-input {
+    width: 100%; padding: 9px 32px 9px 34px; border: 1px solid #e2e8f0;
+    border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; transition: border 0.2s;
+  }
+  .search-input:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+  .search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #a0aec0; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 13px; line-height: 20px; text-align: center; cursor: pointer; display: none; padding: 0; }
+  .search-clear:hover { background: #e53e3e; }
+  .btn {
+    padding: 9px 16px; border: none; border-radius: 8px; font-size: 14px;
+    font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn-primary { background: #4299e1; color: white; }
+  .btn-primary:hover { background: #3182ce; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(66,153,225,0.4); }
+  .btn-success { background: #48bb78; color: white; }
+  .btn-outline { background: white; color: #4a5568; border: 1px solid #e2e8f0; }
+  .btn-outline:hover { background: #f7fafc; border-color: #cbd5e0; }
+  .btn-danger { background: #fc8181; color: white; }
+  .btn-danger:hover { background: #f56565; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-mail { background: #9f7aea; color: white; }
+  .btn-mail:hover { background: #805ad5; }
+  .date-filter { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .date-filter input[type="date"] { width: auto; padding: 6px 10px; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px; }
+  .table-wrap { padding: 16px 24px; }
+  .table-container { background: white; border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead tr { background: #f7fafc; }
+  th {
+    padding: 12px 14px; text-align: left; font-weight: 700; color: #4a5568;
+    font-size: 13px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+    user-select: none;
+  }
+  th[onclick] {
+    cursor: pointer; transition: all 0.15s;
+  }
+  th[onclick]:hover { color: #2b6cb0; background: #ebf8ff; }
+  th .sort-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 4px; background: #edf2f7;
+    font-size: 10px; margin-left: 4px; vertical-align: middle; color: #718096;
+    transition: all 0.15s;
+  }
+  th[onclick]:hover .sort-btn { background: #bee3f8; color: #2b6cb0; }
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #f7fafc !important; }
+  td { padding: 11px 14px; vertical-align: middle; }
+  /* 無断キャンセル用（オレンジ/赤） */
+  tr.row-orange { background: #fffaf0; }
+  tr.row-red { background: #fff5f5; }
+  /* キャンセルリスト用（青紫/濃紫） */
+  tr.row-cancel-3 { background: #f0e6ff; }
+  tr.row-cancel-4 { background: #e2d0f8; }
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; font-weight: 800; font-size: 13px;
+  }
+  .badge-1 { background: #e2e8f0; color: #4a5568; }
+  .badge-2 { background: #fbd38d; color: #744210; }
+  .badge-3 { background: #fc8181; color: #822727; }
+  /* キャンセルリスト用バッジ */
+  .badge-c3 { background: #d6bcfa; color: #44337a; }
+  .badge-c4 { background: #b794f4; color: #322659; }
+  .badge-repeat { background: #c53030; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; white-space: nowrap; vertical-align: middle; }
+  .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: #e53e3e; }
+  .noshow-check:disabled { cursor: default; opacity: 0.6; }
+  .noshow-checked-label { font-size: 11px; color: #c53030; font-weight: 700; }
+  .name-cell { font-weight: 600; }
+  .phone-cell { font-family: monospace; color: #2b6cb0; font-size: 13px; }
+  .date-cell { white-space: nowrap; color: #4a5568; }
+  .note-cell { color: #718096; font-size: 13px; max-width: 260px; }
+  .menu-cell { font-size: 13px; max-width: 280px; color: #4a5568; }
+  .comment-cell { font-size: 12px; max-width: 150px; color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .comment-cell:hover { white-space: normal; overflow: visible; position: relative; z-index: 10; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
+  .actions-cell { display: flex; gap: 5px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: #a0aec0; }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; }
+  .table-footer {
+    padding: 10px 14px; background: #f7fafc; border-top: 1px solid #e2e8f0;
+    font-size: 13px; color: #718096; display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 100; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: modalIn 0.2s ease;
+    max-height: 90vh; overflow-y: auto;
+  }
+  @keyframes modalIn { from { opacity:0; transform: translateY(-20px) scale(0.97); } to { opacity:1; transform: none; } }
+  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: #1a202c; }
+  .form-group { margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 5px; }
+  input, select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 14px; font-family: inherit; outline: none; transition: border 0.2s; background: white;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+  textarea { resize: vertical; min-height: 70px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #2d3748; color: white;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 200;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3); opacity: 0; transform: translateY(10px);
+    transition: all 0.3s; pointer-events: none; max-width: 400px;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.success { background: #276749; }
+  .toast.error { background: #9b2c2c; }
+  .settings-modal { max-width: 480px; }
+  .settings-modal .help-text { font-size: 12px; color: #718096; margin-top: 4px; line-height: 1.5; }
+  .settings-modal .step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
+  .settings-modal .step-num { display: inline-block; background: #4299e1; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
+  .loading-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+    z-index: 150; align-items: center; justify-content: center;
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-box {
+    background: white; padding: 30px 40px; border-radius: 16px;
+    text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #4299e1;
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 600px) {
+    .header h1 { font-size: 18px; }
+    .toolbar { gap: 8px; }
+    .form-row { grid-template-columns: 1fr; }
+    td, th { padding: 9px 10px; }
+    .tab { padding: 12px 14px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📅</div>
+  <div>
+    <h1>予約管理システム（デモ版）</h1>
+    <div class="header-sub">サンプルデータで機能を体験できます</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📥 Excel出力</button>
+  </div>
+</div>
+
+<div style="background: linear-gradient(135deg,#e6fffa,#b2f5ea); border-left: 4px solid #319795; padding: 16px 20px; margin: 16px 24px; border-radius: 8px;">
+  <details>
+    <summary style="cursor:pointer; font-weight:700; color:#234e52; font-size:15px;">📖 使い方ガイド（クリックで展開）
+      <button onclick="event.preventDefault();event.stopPropagation();if(confirm('サンプルデータをリセットしますか？')){localStorage.removeItem('demo_reservation_data');location.reload();}" style="background:#718096;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:12px;">🔄 サンプルデータをリセット</button>
+    </summary>
+    <div style="margin-top:12px; font-size:13px; line-height:1.8; color:#2c5282;">
+      <b>■ タブ切替</b><br>
+      ・<b>予約者リスト</b>：オンライン予約一覧<br>
+      ・<b>キャンセル（メール）</b>：メールでキャンセル連絡があった予約<br>
+      ・<b>無断キャンセル</b>：来院されなかった予約（手動登録）<br><br>
+      <b>■ 便利機能</b><br>
+      ・🔁<b>再2</b>バッジ：同じ電話番号の再予約を検知。クリックでその人の履歴を検索<br>
+      ・予約リストの「無断」チェック：チェックを入れると無断キャンセルリストに自動登録<br>
+      ・キャンセル回数に応じて背景色が変化（3回以上=薄紫、4回以上=濃紫）<br>
+      ・無断キャンセル回数で赤く色分け（3回以上=濃い赤）<br>
+      ・列ヘッダーの↕アイコンでソート。日付・氏名・電話番号で並び替え可能<br>
+      ・検索欄の✕ボタンで検索クリア<br><br>
+      <b>■ 他院での使い方</b><br>
+      1. このファイルをコピーし「○○-reservation.html」にリネーム<br>
+      2. HTML内の「STORAGE_KEY」を「reservation_○○」に変更<br>
+      3. Google Cloud Consoleで院のGmailアカウントをテストユーザーに追加<br>
+      4. Gmailから自動取得される予約メールでデータが蓄積されます
+    </div>
+  </details>
+</div>
+
+<div style="background:#fff3cd; border:1px solid #ffc107; padding:10px 20px; margin:0 24px 16px; border-radius:6px; font-size:13px; color:#856404;">
+  ⚠️ <b>これはデモ版です。</b> 以下のサンプルデータで各機能をお試しください。実際の院で使用する場合は、Gmail/Drive連携版をご利用ください。
+</div>
+
+<div class="tab-bar">
+  <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト</button>
+  <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール）</button>
+  <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル</button>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-card blue-card stat-active" id="statCard-reservations" onclick="switchTab('reservations')"><div><div class="stat-num" id="stat-reservations">0</div><div>📋 予約件数</div></div></div>
+  <div class="stat-card orange-card" id="statCard-cancellations" onclick="switchTab('cancellations')"><div><div class="stat-num" id="stat-cancellations">0</div><div>✉️ キャンセル</div></div></div>
+  <div class="stat-card red-card" id="statCard-noshow" onclick="switchTab('noshow')"><div><div class="stat-num" id="stat-noshow">0</div><div>🚫 無断キャンセル</div></div></div>
+</div>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" class="search-input" id="searchInput" placeholder="名前・電話番号・日付で検索..." oninput="toggleClearBtn();render()">
+    <button class="search-clear" id="searchClear" onclick="document.getElementById('searchInput').value='';toggleClearBtn();render();">✕</button>
+  </div>
+  <div class="date-filter">
+    <input type="date" id="filterDateFrom" onchange="render()">
+    <span>〜</span>
+    <input type="date" id="filterDateTo" onchange="render()">
+  </div>
+  <button class="btn btn-primary" id="addNoshowBtn" onclick="openAddModal()" style="display:none">＋ 新規追加</button>
+</div>
+
+<!-- 予約者リスト -->
+<div class="table-wrap" id="panel-reservations">
+  <div class="table-container"><div class="table-scroll">
+    <table><thead><tr>
+      <th style="width:40px">#</th>
+      <th onclick="sortBy('datetime')">予約日時 <span class="sort-btn">↕</span></th>
+      <th>メニュー</th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
+      <th>メール</th>
+      <th>コメント</th>
+      <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center;white-space:nowrap">🚫 無断</th>
+      <th>操作</th>
+    </tr></thead><tbody id="tbody-reservations"></tbody></table>
+  </div>
+  <div class="empty-state" id="empty-reservations" style="display:none"><div class="icon">📋</div><p>予約データがありません<br><small>サンプルデータをリセットすると再表示されます</small></p></div>
+  <div class="table-footer"><span id="rowCount-reservations">0件</span><span style="color:#4299e1;font-weight:600;">デモ版 - 予約者リスト</span></div>
+</div></div>
+
+<!-- キャンセルリスト -->
+<div class="table-wrap" id="panel-cancellations" style="display:none">
+  <div class="table-container"><div class="table-scroll">
+    <table><thead><tr>
+      <th style="width:40px">#</th>
+      <th onclick="sortBy('datetime')">予約日時 <span class="sort-btn">↕</span></th>
+      <th>メニュー</th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
+      <th>メール</th>
+      <th>コメント</th>
+      <th onclick="sortBy('receivedAt')">キャンセル日時 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center">回数</th>
+      <th>操作</th>
+    </tr></thead><tbody id="tbody-cancellations"></tbody></table>
+  </div>
+  <div class="empty-state" id="empty-cancellations" style="display:none"><div class="icon">✉️</div><p>キャンセルデータがありません<br><small>サンプルデータをリセットすると再表示されます</small></p></div>
+  <div class="table-footer"><span id="rowCount-cancellations">0件</span><span style="color:#c05621;font-weight:600;">デモ版 - キャンセルリスト</span></div>
+</div></div>
+
+<!-- 無断キャンセル -->
+<div class="table-wrap" id="panel-noshow" style="display:none">
+  <div class="table-container"><div class="table-scroll">
+    <table><thead><tr>
+      <th style="width:40px">#</th>
+      <th onclick="sortBy('date')">日付 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('time')">時間 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
+      <th>メール</th>
+      <th>備考</th>
+      <th style="text-align:center" onclick="sortBy('count')">回数 <span class="sort-btn">↕</span></th>
+      <th>操作</th>
+    </tr></thead><tbody id="tbody-noshow"></tbody></table>
+  </div>
+  <div class="empty-state" id="empty-noshow" style="display:none"><div class="icon">🚫</div><p>無断キャンセルデータがありません<br><small>「＋ 新規追加」で手動登録できます</small></p></div>
+  <div class="table-footer"><span id="rowCount-noshow">0件</span><span style="color:#c53030;font-weight:600;">デモ版 - 無断キャンセル</span></div>
+</div></div>
+
+<!-- 無断キャンセル追加/編集モーダル -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">新規追加（無断キャンセル）</h2>
+    <div class="form-row">
+      <div class="form-group"><label>日付 *</label><input type="date" id="f-date" required></div>
+      <div class="form-group"><label>予約時間 *</label>
+        <select id="f-time"><option value="">選択してください</option>
+          <option>08:00</option><option>08:30</option><option>09:00</option><option>09:30</option>
+          <option>10:00</option><option>10:30</option><option>11:00</option><option>11:30</option>
+          <option>12:00</option><option>12:30</option><option>13:00</option><option>13:30</option>
+          <option>14:00</option><option>14:30</option><option>15:00</option><option>15:30</option>
+          <option>16:00</option><option>16:30</option><option>17:00</option><option>17:30</option>
+          <option>18:00</option><option>18:30</option><option>19:00</option><option>19:30</option><option>20:00</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>氏名 *</label><input type="text" id="f-name" placeholder="山田 太郎"></div>
+      <div class="form-group"><label>電話番号 *</label><input type="tel" id="f-phone" placeholder="09012345678"></div>
+    </div>
+    <div class="form-group"><label>メールアドレス</label><input type="email" id="f-email" placeholder="example@email.com"></div>
+    <div class="form-group"><label>備考</label><textarea id="f-note" placeholder="電話対応の記録など..."></textarea></div>
+    <div id="repeatWarning" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;font-size:13px;color:#856404;margin-bottom:4px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveRecord()" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 予約/キャンセル編集モーダル -->
+<div class="modal-backdrop" id="emailModal">
+  <div class="modal">
+    <h2 id="emailModalTitle">編集</h2>
+    <div class="form-row">
+      <div class="form-group"><label>予約日時</label><input type="text" id="ef-datetime" placeholder="2026-03-21 14:00"></div>
+      <div class="form-group"><label>メニュー</label><input type="text" id="ef-menu"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>氏名 *</label><input type="text" id="ef-name"></div>
+      <div class="form-group"><label>電話番号</label><input type="tel" id="ef-phone"></div>
+    </div>
+    <div class="form-group"><label>メールアドレス</label><input type="email" id="ef-email"></div>
+    <div class="form-group"><label>コメント</label><textarea id="ef-comment"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeEmailModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveEmailRecord()">更新する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let reservations = [], cancellations = [], noshows = [];
+let activeTab = 'reservations';
+let editId = null, sortKey = 'datetime', sortDir = -1;
+
+// ── Tab ─────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  ['reservations','cancellations','noshow'].forEach(t => {
+    document.getElementById('panel-' + t).style.display = (t === tab) ? '' : 'none';
+    const card = document.getElementById('statCard-' + t);
+    if (card) card.classList.toggle('stat-active', t === tab);
+  });
+  document.getElementById('addNoshowBtn').style.display = (tab === 'noshow') ? '' : 'none';
+  if (tab === 'noshow') { sortKey = 'date'; } else { sortKey = 'datetime'; }
+  sortDir = -1;
+  render();
+}
+
+// ── Sample Data (デモ用) ────────────────────────────────────────────────
+const SAMPLE_DATA_KEY = 'demo_reservation_data';
+function loadSampleData() {
+  const saved = localStorage.getItem(SAMPLE_DATA_KEY);
+  if (saved) {
+    try {
+      const d = JSON.parse(saved);
+      reservations = d.reservations || [];
+      cancellations = d.cancellations || [];
+      noshows = d.noshows || [];
+      return;
+    } catch(e) {}
+  }
+  // 初期サンプルデータ
+  reservations = [
+    { id: '100001', datetime: '2026-03-28 11:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '田中 太郎', phone: '09012345678', email: 'tanaka@example.com', comment: '肩こりがひどい', receivedAt: '2026-03-20 15:30', gmailMsgId: 'demo1' },
+    { id: '100002', datetime: '2026-03-25 10:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '田中太郎', phone: '09012345678', email: 'tanaka@example.com', comment: '肩こり 腰の痛み', receivedAt: '2026-02-15 09:00', gmailMsgId: 'demo2' },
+    { id: '100003', datetime: '2026-03-26 14:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '山田 花子', phone: '08098765432', email: 'yamada@example.com', comment: '腰痛で困っています', receivedAt: '2026-03-19 20:15', gmailMsgId: 'demo3' },
+    { id: '100004', datetime: '2026-03-27 16:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '佐藤 次郎', phone: '07011112222', email: 'sato@example.com', comment: '首の痛み', receivedAt: '2026-03-21 10:00', gmailMsgId: 'demo4' },
+    { id: '100005', datetime: '2026-03-29 13:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '鈴木 美咲', phone: '09033334444', email: 'suzuki@example.com', comment: '頭痛と眼精疲労', receivedAt: '2026-03-21 14:20', gmailMsgId: 'demo5' },
+    { id: '100006', datetime: '2026-03-24 15:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '中村 一郎', phone: '09055556666', email: 'nakamura@example.com', comment: '腰痛', receivedAt: '2026-03-18 11:30', gmailMsgId: 'demo6', movedToNoshow: true }
+  ];
+  cancellations = [
+    { id: '200001', datetime: '2026-03-30 10:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '高橋 健一', phone: '08077778888', email: 'takahashi@example.com', comment: '', receivedAt: '2026-03-22 08:00', gmailMsgId: 'democ1' },
+    { id: '200002', datetime: '2026-03-29 11:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '高橋 健一', phone: '08077778888', email: 'takahashi@example.com', comment: '', receivedAt: '2026-03-21 12:00', gmailMsgId: 'democ2' },
+    { id: '200003', datetime: '2026-03-28 14:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '高橋 健一', phone: '08077778888', email: 'takahashi@example.com', comment: '', receivedAt: '2026-03-20 10:00', gmailMsgId: 'democ3' },
+    { id: '200004', datetime: '2026-03-27 15:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '高橋 健一', phone: '08077778888', email: 'takahashi@example.com', comment: '', receivedAt: '2026-03-19 16:00', gmailMsgId: 'democ4' },
+    { id: '200005', datetime: '2026-03-26 10:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '伊藤 さくら', phone: '09099990000', email: 'ito@example.com', comment: '', receivedAt: '2026-03-20 09:00', gmailMsgId: 'democ5' },
+    { id: '200006', datetime: '2026-03-25 13:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '伊藤 さくら', phone: '09099990000', email: 'ito@example.com', comment: '', receivedAt: '2026-03-18 14:00', gmailMsgId: 'democ6' },
+    { id: '200007', datetime: '2026-03-24 16:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '伊藤 さくら', phone: '09099990000', email: 'ito@example.com', comment: '', receivedAt: '2026-03-17 11:00', gmailMsgId: 'democ7' },
+    { id: '200008', datetime: '2026-03-23 10:00', menu: '【期間限定価格】初回1,980円キャンペーン 1980円', name: '渡辺 健太', phone: '07088889999', email: 'watanabe@example.com', comment: '', receivedAt: '2026-03-16 15:00', gmailMsgId: 'democ8' }
+  ];
+  noshows = [
+    { id: 1, date: '2026-03-24', time: '15:00', name: '中村 一郎', phone: '09055556666', email: 'nakamura@example.com', note: '体調不良で来院されず', fromReservationId: '100006' },
+    { id: 2, date: '2026-03-15', time: '14:00', name: '中村 一郎', phone: '09055556666', email: 'nakamura@example.com', note: '', fromReservationId: '' },
+    { id: 3, date: '2026-03-10', time: '11:00', name: '中村 一郎', phone: '09055556666', email: 'nakamura@example.com', note: '', fromReservationId: '' },
+    { id: 4, date: '2026-03-05', time: '16:00', name: '小林 正 ', phone: '08011223344', email: 'kobayashi@example.com', note: '', fromReservationId: '' }
+  ];
+  saveSampleData();
+}
+function saveSampleData() {
+  localStorage.setItem(SAMPLE_DATA_KEY, JSON.stringify({ reservations, cancellations, noshows }));
+}
+
+// ── Counts ──────────────────────────────────────────────────────────────
+function getNoshowCounts() {
+  const c = {}; noshows.forEach(r => { c[r.phone] = (c[r.phone] || 0) + 1; }); return c;
+}
+function getCancelCounts(data) {
+  const c = {}; data.forEach(r => { if (r.phone) c[r.phone] = (c[r.phone] || 0) + 1; }); return c;
+}
+
+// ── Render ──────────────────────────────────────────────────────────────
+function toggleClearBtn() {
+  const v = document.getElementById('searchInput').value;
+  document.getElementById('searchClear').style.display = v ? 'block' : 'none';
+}
+function render() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const dateFrom = document.getElementById('filterDateFrom').value;
+  const dateTo = document.getElementById('filterDateTo').value;
+  if (activeTab === 'reservations') renderEmailTable(reservations, 'reservations', q, dateFrom, dateTo);
+  else if (activeTab === 'cancellations') renderEmailTable(cancellations, 'cancellations', q, dateFrom, dateTo);
+  else renderNoshowTable(q, dateFrom, dateTo);
+  document.getElementById('stat-reservations').textContent = reservations.length;
+  document.getElementById('stat-cancellations').textContent = cancellations.length;
+  document.getElementById('stat-noshow').textContent = noshows.length;
+}
+
+function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
+  const qNorm = q ? q.replace(/[\s\u3000]/g, '') : '';
+  let filtered = data.filter(r => {
+    if (q) {
+      const nameNorm = (r.name||'').replace(/[\s\u3000]/g, '').toLowerCase();
+      const match = nameNorm.includes(qNorm) || (r.phone||'').includes(q) ||
+        (r.datetime||'').includes(q) || (r.menu||'').toLowerCase().includes(q) ||
+        (r.email||'').toLowerCase().includes(q) || (r.comment||'').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (dateFrom || dateTo) {
+      const d = (r.datetime || '').substring(0, 10);
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
+    return true;
+  });
+  filtered.sort((a, b) => {
+    const va = a[sortKey] || '', vb = b[sortKey] || '';
+    if (va < vb) return -sortDir;
+    if (va > vb) return sortDir;
+    return 0;
+  });
+  const tbody = document.getElementById('tbody-' + tabId);
+  const empty = document.getElementById('empty-' + tabId);
+  const counts = getCancelCounts(data);
+  // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人
+  const repeatCounts = {};
+  const repeatByName = {};
+  const normName = (n) => (n||'').replace(/[\s　]/g, '').trim();
+  if (tabId === 'reservations') {
+    for (const rec of reservations) {
+      const ph = rec.phone || '';
+      if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
+      const nm = normName(rec.name);
+      if (nm) repeatByName[nm] = (repeatByName[nm] || 0) + 1;
+    }
+  }
+  if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; }
+  else {
+    empty.style.display = 'none';
+    tbody.innerHTML = filtered.map((r, i) => {
+      const cnt = r.phone ? (counts[r.phone] || 1) : 1;
+      const isCancelTab = (tabId === 'cancellations');
+      const isResTab = (tabId === 'reservations');
+      const rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
+      const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
+      const badgeCol = isCancelTab ? `<td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
+      // リピーターバッジ（予約リストのみ）
+      let repeatBadge = '';
+      if (isResTab) {
+        let repCnt = 0, searchKey = '';
+        if (r.phone) {
+          repCnt = repeatCounts[r.phone] || 0;
+          searchKey = r.phone;
+        } else if (normName(r.name)) {
+          repCnt = repeatByName[normName(r.name)] || 0;
+          searchKey = r.name;
+        }
+        if (repCnt >= 2) {
+          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${searchKey.replace(/'/g,"\\'")}';toggleClearBtn();render();">再${repCnt}</span>`;
+        }
+      }
+      // 予約者リストのみ: 無断キャンセルチェック列
+      let noshowCol = '';
+      if (isResTab) {
+        const alreadyMoved = r.movedToNoshow ? true : false;
+        if (alreadyMoved) {
+          noshowCol = `<td style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
+        } else {
+          noshowCol = `<td style="text-align:center"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></td>`;
+        }
+      }
+      return `<tr class="${rowClass}">
+      <td style="color:#a0aec0;font-size:12px">${i+1}</td>
+      <td class="date-cell">${esc(fmtDT(r.datetime))}</td>
+      <td class="menu-cell">${esc(r.menu)}</td>
+      <td class="name-cell">${esc(r.name)}${repeatBadge}</td>
+      <td class="phone-cell">${esc(r.phone)}</td>
+      <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
+      <td class="comment-cell">${esc(r.comment)}</td>
+      <td class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
+      ${noshowCol}${badgeCol}
+      <td><div class="actions-cell">
+        <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️</button>
+      </div></td>
+    </tr>`;
+    }).join('');
+  }
+  document.getElementById('rowCount-' + tabId).textContent = `${filtered.length}件 / 全${data.length}件`;
+}
+
+function renderNoshowTable(q, dateFrom, dateTo) {
+  const counts = getNoshowCounts();
+  let filtered = noshows.filter(r => {
+    if (q) {
+      const match = r.name.toLowerCase().includes(q) || r.phone.includes(q) ||
+        r.date.includes(q) || (r.note && r.note.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+    if (dateFrom && r.date < dateFrom) return false;
+    if (dateTo && r.date > dateTo) return false;
+    return true;
+  });
+  filtered.sort((a, b) => {
+    const va = sortKey === 'count' ? (counts[a.phone]||1) : (a[sortKey]||'');
+    const vb = sortKey === 'count' ? (counts[b.phone]||1) : (b[sortKey]||'');
+    if (va < vb) return -sortDir;
+    if (va > vb) return sortDir;
+    return 0;
+  });
+  const tbody = document.getElementById('tbody-noshow');
+  const empty = document.getElementById('empty-noshow');
+  if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; }
+  else {
+    empty.style.display = 'none';
+    tbody.innerHTML = filtered.map((r, i) => {
+      const cnt = counts[r.phone] || 1;
+      const rc = cnt >= 3 ? 'row-red' : cnt === 2 ? 'row-orange' : '';
+      const bc = cnt >= 3 ? 'badge-3' : cnt === 2 ? 'badge-2' : 'badge-1';
+      const dd = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
+      return `<tr class="${rc}">
+        <td style="color:#a0aec0;font-size:12px">${i+1}</td>
+        <td class="date-cell">${dd}</td><td>${r.time}</td>
+        <td class="name-cell">${esc(r.name)}</td>
+        <td class="phone-cell">${esc(r.phone)}</td>
+        <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
+        <td class="note-cell">${esc(r.note)}</td>
+        <td style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
+        <td><div class="actions-cell">
+          <button class="btn btn-outline btn-sm" onclick="openEditModal(${r.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRecord(${r.id})">🗑️</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('rowCount-noshow').textContent = `${filtered.length}件 / 全${noshows.length}件`;
+}
+
+function fmtDT(dt) {
+  if (!dt) return '';
+  const m = dt.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})/);
+  return m ? `${m[1]}年${m[2]}月${m[3]}日 ${m[4]}` : dt;
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function sortBy(key) {
+  if (sortKey === key) sortDir = -sortDir;
+  else { sortKey = key; sortDir = -1; }
+  render();
+}
+
+// ── Email Record Edit/Delete ─────────────────────────────────────────────
+let editEmailTab = null;
+let editEmailId = null;
+
+function openEditEmailModal(tabId, id) {
+  const data = tabId === 'reservations' ? reservations : cancellations;
+  const r = data.find(x => x.id === id);
+  if (!r) return;
+  editEmailTab = tabId;
+  editEmailId = id;
+  document.getElementById('emailModalTitle').textContent = tabId === 'reservations' ? '予約情報を編集' : 'キャンセル情報を編集';
+  document.getElementById('ef-datetime').value = r.datetime || '';
+  document.getElementById('ef-menu').value = r.menu || '';
+  document.getElementById('ef-name').value = r.name || '';
+  document.getElementById('ef-phone').value = r.phone || '';
+  document.getElementById('ef-email').value = r.email || '';
+  document.getElementById('ef-comment').value = r.comment || '';
+  document.getElementById('emailModal').classList.add('open');
+}
+
+function closeEmailModal() {
+  document.getElementById('emailModal').classList.remove('open');
+  editEmailTab = null;
+  editEmailId = null;
+}
+
+function saveEmailRecord() {
+  if (!editEmailTab || !editEmailId) return;
+  const data = editEmailTab === 'reservations' ? reservations : cancellations;
+  const idx = data.findIndex(x => x.id === editEmailId);
+  if (idx < 0) return;
+  data[idx].datetime = document.getElementById('ef-datetime').value.trim();
+  data[idx].menu = document.getElementById('ef-menu').value.trim();
+  data[idx].name = document.getElementById('ef-name').value.trim();
+  data[idx].phone = document.getElementById('ef-phone').value.trim();
+  data[idx].email = document.getElementById('ef-email').value.trim();
+  data[idx].comment = document.getElementById('ef-comment').value.trim();
+  saveSampleData();
+  closeEmailModal();
+  render();
+  showToast('更新しました ✓', 'success');
+}
+
+function deleteEmailRecord(tabId, id) {
+  const data = tabId === 'reservations' ? reservations : cancellations;
+  const r = data.find(x => x.id === id);
+  if (!r) return;
+  const label = tabId === 'reservations' ? '予約' : 'キャンセル';
+  if (!confirm(`「${r.name}」（${r.datetime}）の${label}データを削除しますか？`)) return;
+  if (tabId === 'reservations') {
+    reservations = reservations.filter(x => x.id !== id);
+  } else {
+    cancellations = cancellations.filter(x => x.id !== id);
+  }
+  saveSampleData();
+  render();
+  showToast('削除しました', '');
+}
+
+// ── Move Reservation to Noshow ───────────────────────────────────────────
+function moveToNoshow(reservationId, checkbox) {
+  const r = reservations.find(x => x.id === reservationId);
+  if (!r) { if (checkbox) checkbox.checked = false; return; }
+  // 既に登録済みか確認
+  const existingNoshow = noshows.filter(n => n.phone === r.phone);
+  const countAfter = existingNoshow.length + 1;
+  let msg = `「${r.name}」（${r.datetime}）を無断キャンセルリストに登録しますか？`;
+  if (existingNoshow.length > 0) {
+    msg += `\n\n⚠️ この電話番号は既に${existingNoshow.length}件登録済みです。追加後は合計${countAfter}回になります。`;
+  }
+  if (!confirm(msg)) { if (checkbox) checkbox.checked = false; return; }
+  // 予約日時を日付と時間に分割
+  let date = '', time = '';
+  if (r.datetime) {
+    const dtMatch = r.datetime.match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})/);
+    if (dtMatch) { date = dtMatch[1]; time = dtMatch[2]; }
+  }
+  // 無断キャンセルに追加（備考は空 → あとで手入力）
+  const newId = noshows.length > 0 ? Math.max(...noshows.map(n => n.id)) + 1 : 1;
+  noshows.push({
+    id: newId,
+    date: date,
+    time: time,
+    name: r.name || '',
+    phone: r.phone || '',
+    email: r.email || '',
+    note: '',
+    fromReservationId: r.id
+  });
+  // 予約レコードにフラグを付ける
+  r.movedToNoshow = true;
+  saveSampleData();
+  render();
+  showToast(`「${r.name}」を無断キャンセルリストに登録しました（${countAfter}回目）`, 'success');
+}
+
+// ── Noshow CRUD ─────────────────────────────────────────────────────────
+function openAddModal() {
+  editId = null;
+  document.getElementById('modalTitle').textContent = '新規追加（無断キャンセル）';
+  document.getElementById('saveBtn').textContent = '追加する';
+  clearForm();
+  document.getElementById('modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const r = noshows.find(x => x.id === id);
+  if (!r) return;
+  editId = id;
+  document.getElementById('modalTitle').textContent = '編集（無断キャンセル）';
+  document.getElementById('saveBtn').textContent = '更新する';
+  document.getElementById('f-date').value = r.date;
+  document.getElementById('f-time').value = r.time;
+  document.getElementById('f-name').value = r.name;
+  document.getElementById('f-phone').value = r.phone;
+  document.getElementById('f-email').value = r.email;
+  document.getElementById('f-note').value = r.note;
+  document.getElementById('repeatWarning').style.display = 'none';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); editId = null; }
+function clearForm() { ['f-date','f-time','f-name','f-phone','f-email','f-note'].forEach(id => document.getElementById(id).value = ''); document.getElementById('repeatWarning').style.display = 'none'; }
+
+document.getElementById('f-phone').addEventListener('input', function() {
+  const phone = this.value.trim();
+  if (!phone) { document.getElementById('repeatWarning').style.display = 'none'; return; }
+  const existing = noshows.filter(r => r.phone === phone && r.id !== editId);
+  const warn = document.getElementById('repeatWarning');
+  if (existing.length > 0) {
+    const names = [...new Set(existing.map(r => r.name))].join('、');
+    warn.style.display = 'block';
+    warn.innerHTML = `⚠️ この電話番号は既に <strong>${existing.length}件</strong> 登録済み（${names}）。追加後は合計 <strong>${existing.length + 1}回</strong>。`;
+  } else { warn.style.display = 'none'; }
+});
+
+function saveRecord() {
+  const date = document.getElementById('f-date').value;
+  const time = document.getElementById('f-time').value;
+  const name = document.getElementById('f-name').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+  if (!date || !name || !phone) { showToast('日付・氏名・電話番号は必須です', 'error'); return; }
+  if (editId) {
+    const idx = noshows.findIndex(r => r.id === editId);
+    if (idx >= 0) noshows[idx] = { ...noshows[idx], date, time, name, phone, email, note };
+    showToast('更新しました ✓', 'success');
+  } else {
+    const newId = noshows.length > 0 ? Math.max(...noshows.map(r => r.id)) + 1 : 1;
+    noshows.push({ id: newId, date, time, name, phone, email, note });
+    showToast('追加しました ✓', 'success');
+  }
+  saveSampleData(); closeModal(); render();
+}
+
+function deleteRecord(id) {
+  const r = noshows.find(x => x.id === id);
+  if (!r || !confirm(`「${r.name}」（${r.date}）を削除しますか？`)) return;
+  // 元の予約レコードの「登録済み」フラグを解除
+  if (r.fromReservationId) {
+    const orig = reservations.find(x => String(x.id) === String(r.fromReservationId));
+    if (orig) { orig.movedToNoshow = false; }
+  }
+  // fromReservationIdがない場合も電話番号+日付で照合して解除
+  if (!r.fromReservationId && r.phone && r.date) {
+    const orig = reservations.find(x => x.phone === r.phone && x.movedToNoshow && (x.datetime||'').startsWith(r.date));
+    if (orig) { orig.movedToNoshow = false; }
+  }
+  noshows = noshows.filter(x => x.id !== id);
+  saveSampleData(); render(); showToast('削除しました', '');
+}
+
+// ── Excel Export ────────────────────────────────────────────────────────
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  const today = new Date().toISOString().slice(0,10);
+  if (activeTab === 'reservations') {
+    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','受付日時'];
+    const rows = reservations.map(r => [r.id,r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt]);
+    const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
+    ws['!cols'] = [8,18,30,14,14,22,20,18].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, '予約者リスト');
+    XLSX.writeFile(wb, `予約者リストデモ_${today}.xlsx`);
+  } else if (activeTab === 'cancellations') {
+    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','キャンセル日時'];
+    const rows = cancellations.map(r => [r.id,r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt]);
+    const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
+    ws['!cols'] = [8,18,30,14,14,22,20,18].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, 'キャンセルリスト');
+    XLSX.writeFile(wb, `キャンセルリストデモ_${today}.xlsx`);
+  } else {
+    const counts = getNoshowCounts();
+    const h = ['日付','予約時間','氏名','電話番号','メール','備考','回数'];
+    const rows = noshows.map(r => [r.date,r.time,r.name,r.phone,r.email,r.note,counts[r.phone]||1]);
+    const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
+    ws['!cols'] = [14,10,14,14,22,30,10].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, '無断キャンセル');
+    XLSX.writeFile(wb, `無断キャンセルリストデモ_${today}.xlsx`);
+  }
+  showToast('Excelファイルを出力しました 📥', 'success');
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : '');
+  setTimeout(() => { t.className = 'toast'; }, 4000);
+}
+
+// ── Events ──────────────────────────────────────────────────────────────
+document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+document.getElementById('emailModal').addEventListener('click', function(e) { if (e.target === this) closeEmailModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeEmailModal(); }
+  if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveRecord();
+});
+
+// ── Footer ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  const footer = document.createElement('div');
+  footer.style.cssText = 'text-align:center; padding:20px; color:#a0aec0; font-size:12px; border-top:1px solid #e2e8f0; background:white; margin-top:24px;';
+  footer.textContent = 'デモ版 - サンプルデータでの動作確認用';
+  document.body.appendChild(footer);
+});
+
+// ── Init ────────────────────────────────────────────────────────────────
+loadSampleData();
+switchTab('reservations');
+render();
+</script>
+</body>
+</html>
