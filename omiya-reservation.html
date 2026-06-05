@@ -205,6 +205,125 @@
     td, th { padding: 9px 10px; }
     .tab { padding: 12px 14px; font-size: 13px; }
   }
+
+  /* ===== 機能拡張: 本日サマリー / 警告 / 過去 / 統計 / インポート / モバイル ===== */
+  .today-banner {
+    margin: 12px 24px 0; padding: 14px 18px;
+    background: linear-gradient(135deg, #ebf8ff 0%, #e6fffa 100%);
+    border: 1px solid #4299e1; border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(66,153,225,0.15);
+  }
+  .today-banner-header { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .today-banner-title { font-size: 14px; font-weight: 700; color: #2b6cb0; flex: 1; }
+  .today-banner-count { font-size: 22px; font-weight: 800; color: #2b6cb0; }
+  .today-toggle { font-size: 14px; color: #4299e1; transition: transform 0.2s; }
+  .today-toggle.collapsed { transform: rotate(-90deg); }
+  .today-list { margin-top: 12px; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+  .today-list.collapsed { display: none; }
+  .today-item {
+    display: grid; grid-template-columns: 60px 1.2fr 1.5fr auto; gap: 10px;
+    align-items: center; padding: 8px 12px; background: white; border-radius: 8px;
+    font-size: 13px; border-left: 3px solid #4299e1;
+  }
+  .today-item.today-past { opacity: 0.55; border-left-color: #a0aec0; }
+  .today-time { font-weight: 700; color: #2b6cb0; font-family: monospace; font-size: 14px; }
+  .today-name { font-weight: 600; color: #2d3748; }
+  .today-menu { color: #718096; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 過去無断キャンセル警告バッジ */
+  .badge-noshow-warn {
+    display: inline-block; background: #c53030; color: white; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 8px; margin-left: 4px; white-space: nowrap; vertical-align: middle;
+    cursor: help;
+  }
+  tr.row-warn-noshow { background: #fef5e7 !important; box-shadow: inset 3px 0 0 #c53030; }
+
+  /* 過去日付の行 */
+  tr.row-past { background: #fafbfc; }
+  tr.row-past td { color: #a0aec0; }
+  tr.row-past .name-cell { color: #718096; font-weight: 500; }
+  tr.row-past .actions-cell button { opacity: 0.7; }
+
+  /* 最終取得時刻 / 通知ボタン */
+  .last-fetch-info { font-size: 12px; color: #718096; margin-left: 4px; padding: 2px 8px; background: #f7fafc; border-radius: 6px; }
+  .last-fetch-info.fresh { color: #047857; background: #ecfdf5; }
+  .btn-notif { background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
+  .btn-notif.enabled { background: #ecfdf5; color: #047857; border-color: #6ee7b7; }
+
+  /* 統計タブ */
+  .tab.active[data-tab="stats"] { background: #6b46c1; border-color: #6b46c1; box-shadow: 0 -2px 8px rgba(107,70,193,0.3); }
+  .stat-card.purple-card { background: #f0e6ff; color: #6b46c1; border: 1px solid #d6bcfa; cursor: pointer; transition: all 0.2s; }
+  .stat-card.purple-card.stat-active { box-shadow: 0 0 0 3px rgba(107,70,193,0.3); }
+  .stats-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 16px 24px 0; }
+  .stats-summary-card { background: white; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid #4299e1; }
+  .stats-summary-card.orange { border-left-color: #c05621; }
+  .stats-summary-card.red { border-left-color: #c53030; }
+  .stats-summary-card.purple { border-left-color: #6b46c1; }
+  .stats-summary-card .label { font-size: 12px; color: #718096; margin-bottom: 4px; }
+  .stats-summary-card .value { font-size: 22px; font-weight: 800; color: #2d3748; }
+  .stats-summary-card .sub { font-size: 11px; color: #a0aec0; margin-top: 2px; }
+  .stats-table { width: 100%; border-collapse: collapse; }
+  .stats-table th { background: #f7fafc; padding: 12px 14px; text-align: left; font-size: 13px; color: #4a5568; border-bottom: 2px solid #e2e8f0; }
+  .stats-table td { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+  .stats-bar-visual { background: #edf2f7; border-radius: 4px; height: 6px; margin-top: 4px; overflow: hidden; max-width: 240px; }
+  .stats-bar-fill { background: linear-gradient(90deg, #4299e1, #6b46c1); height: 100%; transition: width 0.3s; }
+
+  /* インポートモーダル */
+  .btn-import { background: #ed8936; color: white; }
+  .btn-import:hover { background: #dd6b20; }
+  .import-options { display: flex; gap: 10px; margin-bottom: 14px; }
+  .import-option {
+    flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px;
+    cursor: pointer; text-align: center; font-size: 13px; font-weight: 600; color: #4a5568;
+    transition: all 0.2s; background: white;
+  }
+  .import-option.active { border-color: #4299e1; background: #ebf8ff; color: #2b6cb0; }
+  #importPreview table { font-size: 12px; }
+
+  /* モバイル: テーブル → カード化 */
+  @media (max-width: 768px) {
+    .table-wrap { padding: 8px 10px; }
+    .table-container { box-shadow: none; background: transparent; }
+    .table-scroll { overflow: visible; }
+    table thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; box-sizing: border-box; }
+    tbody tr {
+      background: white !important; margin-bottom: 10px; border-radius: 10px;
+      padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-bottom: none !important;
+    }
+    tbody tr.row-cancel-3 { background: #f0e6ff !important; }
+    tbody tr.row-cancel-4 { background: #e2d0f8 !important; }
+    tbody tr.row-orange { background: #fffaf0 !important; }
+    tbody tr.row-red { background: #fff5f5 !important; }
+    tbody tr.row-past { background: #f7fafc !important; opacity: 0.75; }
+    tbody tr.row-warn-noshow { background: #fef5e7 !important; }
+    tbody td { padding: 5px 0; border: none !important; min-height: 22px; display: flex; gap: 8px; align-items: flex-start; }
+    tbody td:empty { display: none; }
+    tbody td::before {
+      content: attr(data-label); font-weight: 700; color: #718096; font-size: 11px;
+      min-width: 76px; flex-shrink: 0; padding-top: 1px;
+    }
+    tbody td:not([data-label])::before { display: none; }
+    tbody td.actions-cell { justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0 !important; }
+    tbody td.actions-cell::before { display: none; }
+    .today-banner { margin: 8px 10px 0; padding: 10px 12px; }
+    .today-banner-count { font-size: 18px; }
+    .today-item { grid-template-columns: 50px 1fr; padding: 6px 8px; }
+    .today-item .today-menu { display: none; }
+    .stats-summary { padding: 8px 10px 0; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stats-summary-card { padding: 10px 12px; }
+    .stats-summary-card .value { font-size: 18px; }
+    .stats-table th, .stats-table td { padding: 8px 10px; font-size: 12px; }
+    .last-fetch-info { display: none; }
+    /* ヘッダーをモバイルで縦積み・折り返し可能に */
+    .header { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
+    .header h1 { font-size: 17px; white-space: nowrap; }
+    .header-icon { font-size: 26px; }
+    .header-right { margin-left: 0; width: 100%; flex-wrap: wrap; gap: 8px; }
+    .header-right .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 10px; }
+    .auth-bar { flex-wrap: wrap; padding: 8px 14px; }
+    .tab-bar { padding: 8px 10px 0; }
+  }
 </style>
 </head>
 <body>
@@ -216,6 +335,7 @@
     <div class="header-sub">予約・キャンセル・無断キャンセル管理</div>
   </div>
   <div class="header-right">
+    <button class="btn btn-outline" onclick="openImportModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📤 インポート</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📥 Excel出力</button>
     <button class="btn btn-outline" onclick="openSettingsModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">⚙️ 設定</button>
   </div>
@@ -224,6 +344,8 @@
 <div class="auth-bar" id="authBar">
   <span class="status-dot offline" id="statusDot"></span>
   <span class="sync-info" id="syncInfo">Google Drive: 未接続</span>
+  <span class="last-fetch-info" id="lastFetchInfo">最終取得: -</span>
+  <button class="btn btn-sm btn-notif" id="notifBtn" onclick="requestNotificationPermission()" title="新規予約をデスクトップ通知">🔔 通知</button>
   <button class="btn btn-sm btn-google" id="authBtn" onclick="handleAuth()">Googleサインイン</button>
   <button class="btn btn-sm btn-outline" id="syncBtn" onclick="syncFromDrive()" style="display:none">🔄 同期</button>
 </div>
@@ -232,12 +354,14 @@
   <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト</button>
   <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール）</button>
   <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル</button>
+  <button class="tab" data-tab="stats" onclick="switchTab('stats')">📊 統計</button>
 </div>
 
 <div class="stats-bar">
   <div class="stat-card blue-card stat-active" id="statCard-reservations" onclick="switchTab('reservations')"><div><div class="stat-num" id="stat-reservations">0</div><div>📋 予約件数</div></div></div>
   <div class="stat-card orange-card" id="statCard-cancellations" onclick="switchTab('cancellations')"><div><div class="stat-num" id="stat-cancellations">0</div><div>✉️ キャンセル</div></div></div>
   <div class="stat-card red-card" id="statCard-noshow" onclick="switchTab('noshow')"><div><div class="stat-num" id="stat-noshow">0</div><div>🚫 無断キャンセル</div></div></div>
+  <div class="stat-card purple-card" id="statCard-stats" onclick="switchTab('stats')"><div><div class="stat-num" id="stat-todayCount">0</div><div>📊 本日予約</div></div></div>
 </div>
 
 <div class="toolbar">
@@ -253,6 +377,17 @@
   </div>
   <button class="btn btn-mail" id="fetchMailBtn" onclick="fetchEmails()" style="display:none">📩 メール取得</button>
   <button class="btn btn-primary" id="addNoshowBtn" onclick="openAddModal()" style="display:none">＋ 新規追加</button>
+</div>
+
+<!-- 本日の予約サマリー -->
+<div class="today-banner" id="todaySummary" style="display:none">
+  <div class="today-banner-header" onclick="toggleTodayList()">
+    <span class="today-banner-title">🌞 本日の予約</span>
+    <span class="today-banner-count" id="todayCount">0</span>
+    <span style="font-size:13px;color:#4a5568">件</span>
+    <span class="today-toggle" id="todayToggle">▼</span>
+  </div>
+  <div class="today-list" id="todayList"></div>
 </div>
 
 <!-- 予約者リスト -->
@@ -313,6 +448,52 @@
   <div class="empty-state" id="empty-noshow" style="display:none"><div class="icon">🚫</div><p>無断キャンセルデータがありません<br><small>「＋ 新規追加」で手動登録できます</small></p></div>
   <div class="table-footer"><span id="rowCount-noshow">0件</span><span style="color:#c53030;font-weight:600;">大宮院 - 無断キャンセル</span></div>
 </div></div>
+
+<!-- 統計パネル -->
+<div id="panel-stats" style="display:none">
+  <div class="stats-summary" id="statsSummary"></div>
+  <div class="table-wrap">
+    <div class="table-container"><div class="table-scroll">
+      <table class="stats-table"><thead><tr>
+        <th>月</th>
+        <th>予約件数</th>
+        <th>キャンセル</th>
+        <th>無断キャンセル</th>
+        <th>キャンセル率</th>
+        <th>無断率</th>
+      </tr></thead><tbody id="stats-tbody"></tbody></table>
+    </div>
+    <div class="table-footer"><span id="rowCount-stats">0ヶ月</span><span style="color:#6b46c1;font-weight:600;">大宮院 - 月次レポート</span></div>
+  </div></div>
+</div>
+
+<!-- インポートモーダル -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal" style="max-width:640px">
+    <h2>📤 データインポート</h2>
+    <div style="font-size:13px;color:#718096;margin-bottom:14px;line-height:1.6">
+      Excel(.xlsx) または CSV ファイルから既存データを読み込みます。<br>
+      列名は「氏名」「電話番号」「予約日時」「日付」「時間」「メール」「メニュー」「コメント」「備考」を自動認識します。
+    </div>
+    <div class="form-group">
+      <label>インポート先</label>
+      <div class="import-options">
+        <div class="import-option active" data-type="reservations" onclick="selectImportType(this,'reservations')">📋 予約者リスト</div>
+        <div class="import-option" data-type="cancellations" onclick="selectImportType(this,'cancellations')">✉️ キャンセル</div>
+        <div class="import-option" data-type="noshow" onclick="selectImportType(this,'noshow')">🚫 無断キャンセル</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>ファイル選択</label>
+      <input type="file" id="importFile" accept=".xlsx,.xls,.csv" onchange="handleImportFile(this)">
+    </div>
+    <div id="importPreview" style="margin-top:14px;max-height:300px;overflow:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeImportModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="confirmImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
 
 <!-- 無断キャンセル追加/編集モーダル -->
 <div class="modal-backdrop" id="modal">
@@ -410,18 +591,51 @@ let activeTab = 'reservations';
 let editId = null, sortKey = 'datetime', sortDir = -1;
 let accessToken = null, driveFileId = null, tokenClient = null, isSignedIn = false;
 
+// ── Helpers: 正規化・日時判定 ───────────────────────────────────────────
+function normPhone(p) {
+  if (!p) return '';
+  return String(p)
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[-\s　ー－()（）]/g, '');
+}
+function normName(n) { return (n||'').replace(/[\s　]/g, '').trim(); }
+function isPastDateTime(dt) {
+  if (!dt) return false;
+  const m = dt.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}):(\d{2})/);
+  if (!m) return false;
+  return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]).getTime() < Date.now();
+}
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getNoshowPhoneCountMap() {
+  const m = {};
+  noshows.forEach(n => { const p = normPhone(n.phone); if (p) m[p] = (m[p]||0)+1; });
+  return m;
+}
+function getNoshowNameCountMap() {
+  const m = {};
+  noshows.forEach(n => { const k = normName(n.name); if (k) m[k] = (m[k]||0)+1; });
+  return m;
+}
+
 // ── Tab ─────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  ['reservations','cancellations','noshow'].forEach(t => {
-    document.getElementById('panel-' + t).style.display = (t === tab) ? '' : 'none';
+  ['reservations','cancellations','noshow','stats'].forEach(t => {
+    const p = document.getElementById('panel-' + t);
+    if (p) p.style.display = (t === tab) ? '' : 'none';
     const card = document.getElementById('statCard-' + t);
     if (card) card.classList.toggle('stat-active', t === tab);
   });
+  // 本日サマリーは予約者リストの上にだけ表示
+  const today = document.getElementById('todaySummary');
+  if (today) today.style.display = (tab === 'reservations') ? '' : 'none';
   document.getElementById('addNoshowBtn').style.display = (tab === 'noshow') ? '' : 'none';
-  document.getElementById('fetchMailBtn').style.display = isSignedIn ? '' : 'none';
-  if (tab === 'noshow') { sortKey = 'date'; } else { sortKey = 'datetime'; }
+  document.getElementById('fetchMailBtn').style.display = (isSignedIn && tab !== 'stats') ? '' : 'none';
+  if (tab === 'noshow') { sortKey = 'date'; } else if (tab !== 'stats') { sortKey = 'datetime'; }
   sortDir = -1;
   render();
 }
@@ -609,14 +823,19 @@ async function autoFetchEmails() {
       fetchGmailMessages(q1, true, 10),
       fetchGmailMessages(q2, true, 10)
     ]);
+    const beforeResLen = reservations.length;
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
     localStorage.setItem('lastFetchTime_omiya', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
+    localStorage.setItem('lastFetchAt_omiya', String(Date.now()));
+    updateLastFetchInfo();
     if (newRes > 0 || newCan > 0) {
       reservations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
       cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
       saveData(); render();
       showToast(`自動取得: 予約${newRes}件、キャンセル${newCan}件`, 'success');
+      const sample = reservations.length > beforeResLen ? reservations[0].name : '';
+      notifyNew(newRes, newCan, sample);
     }
   } catch(e) { console.error('Auto fetch error:', e); }
   isFetching = false;
@@ -637,13 +856,18 @@ async function fetchEmails() {
     if (fetchCancelled) return;
     const canMsg = await fetchGmailMessages(q2, false, 20, 20);
     if (fetchCancelled) return;
+    const beforeResLen = reservations.length;
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
     localStorage.setItem('lastFetchTime_omiya', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
+    localStorage.setItem('lastFetchAt_omiya', String(Date.now()));
+    updateLastFetchInfo();
     reservations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
     cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
     saveData(); render(); hideLoading();
     showToast(`予約${newRes}件、キャンセル${newCan}件を取得（合計: ${reservations.length}/${cancellations.length}件）`, 'success');
+    const sample = reservations.length > beforeResLen ? reservations[0].name : '';
+    notifyNew(newRes, newCan, sample);
   } catch(e) {
     hideLoading();
     if (!fetchCancelled) showToast('メール取得エラー: ' + e.message, 'error');
@@ -856,10 +1080,10 @@ function saveSettings() {
 
 // ── Counts ──────────────────────────────────────────────────────────────
 function getNoshowCounts() {
-  const c = {}; noshows.forEach(r => { c[r.phone] = (c[r.phone] || 0) + 1; }); return c;
+  const c = {}; noshows.forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; }); return c;
 }
 function getCancelCounts(data) {
-  const c = {}; data.forEach(r => { if (r.phone) c[r.phone] = (c[r.phone] || 0) + 1; }); return c;
+  const c = {}; data.forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; }); return c;
 }
 
 // ── Render ──────────────────────────────────────────────────────────────
@@ -873,7 +1097,9 @@ function render() {
   const dateTo = document.getElementById('filterDateTo').value;
   if (activeTab === 'reservations') renderEmailTable(reservations, 'reservations', q, dateFrom, dateTo);
   else if (activeTab === 'cancellations') renderEmailTable(cancellations, 'cancellations', q, dateFrom, dateTo);
+  else if (activeTab === 'stats') renderStats();
   else renderNoshowTable(q, dateFrom, dateTo);
+  renderTodaySummary();
   document.getElementById('stat-reservations').textContent = reservations.length;
   document.getElementById('stat-cancellations').textContent = cancellations.length;
   document.getElementById('stat-noshow').textContent = noshows.length;
@@ -884,7 +1110,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   let filtered = data.filter(r => {
     if (q) {
       const nameNorm = (r.name||'').replace(/[\s\u3000]/g, '').toLowerCase();
-      const match = nameNorm.includes(qNorm) || (r.phone||'').includes(q) ||
+      const phoneNorm = normPhone(r.phone);
+      const match = nameNorm.includes(qNorm) || phoneNorm.includes(qNorm) || (r.phone||'').includes(q) ||
         (r.datetime||'').includes(q) || (r.menu||'').toLowerCase().includes(q) ||
         (r.email||'').toLowerCase().includes(q) || (r.comment||'').toLowerCase().includes(q);
       if (!match) return false;
@@ -905,13 +1132,14 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
   const counts = getCancelCounts(data);
+  const noshowPhoneMap = getNoshowPhoneCountMap();
+  const noshowNameMap = getNoshowNameCountMap();
   // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人
   const repeatCounts = {};
   const repeatByName = {};
-  const normName = (n) => (n||'').replace(/[\s　]/g, '').trim();
   if (tabId === 'reservations') {
     for (const rec of reservations) {
-      const ph = rec.phone || '';
+      const ph = normPhone(rec.phone);
       if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
       const nm = normName(rec.name);
       if (nm) repeatByName[nm] = (repeatByName[nm] || 0) + 1;
@@ -921,25 +1149,31 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   else {
     empty.style.display = 'none';
     tbody.innerHTML = filtered.map((r, i) => {
-      const cnt = r.phone ? (counts[r.phone] || 1) : 1;
+      const pn = normPhone(r.phone);
+      const nn = normName(r.name);
+      const cnt = pn ? (counts[pn] || 1) : 1;
       const isCancelTab = (tabId === 'cancellations');
       const isResTab = (tabId === 'reservations');
-      const rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
+      // 過去無断キャンセル者の警告（予約リストのみ）
+      const nsByPhone = pn ? (noshowPhoneMap[pn] || 0) : 0;
+      const nsByName = nn ? (noshowNameMap[nn] || 0) : 0;
+      const nsCnt = Math.max(nsByPhone, nsByName);
+      const noshowWarn = (isResTab && nsCnt > 0) ? ` <span class="badge-noshow-warn" title="過去の無断キャンセル ${nsCnt}回">⚠️無断${nsCnt}</span>` : '';
+      // 過去日付判定（予約のみ）
+      const isPast = isResTab && isPastDateTime(r.datetime);
+      let rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
+      if (isResTab && nsCnt > 0) rowClass = 'row-warn-noshow';
+      if (isPast) rowClass = (rowClass ? rowClass + ' ' : '') + 'row-past';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
-      const badgeCol = isCancelTab ? `<td style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
+      const badgeCol = isCancelTab ? `<td data-label="回数" style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
       // リピーターバッジ（予約リストのみ）
       let repeatBadge = '';
       if (isResTab) {
         let repCnt = 0, searchKey = '';
-        if (r.phone) {
-          repCnt = repeatCounts[r.phone] || 0;
-          searchKey = r.phone;
-        } else if (normName(r.name)) {
-          repCnt = repeatByName[normName(r.name)] || 0;
-          searchKey = r.name;
-        }
+        if (pn) { repCnt = repeatCounts[pn] || 0; searchKey = r.phone; }
+        else if (nn) { repCnt = repeatByName[nn] || 0; searchKey = r.name; }
         if (repCnt >= 2) {
-          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${searchKey.replace(/'/g,"\\'")}';toggleClearBtn();render();">再${repCnt}</span>`;
+          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${(searchKey||'').replace(/'/g,"\\'")}';toggleClearBtn();render();">再${repCnt}</span>`;
         }
       }
       // 予約者リストのみ: 無断キャンセルチェック列
@@ -947,22 +1181,23 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (isResTab) {
         const alreadyMoved = r.movedToNoshow ? true : false;
         if (alreadyMoved) {
-          noshowCol = `<td style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
+          noshowCol = `<td data-label="🚫無断" style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
         } else {
-          noshowCol = `<td style="text-align:center"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></td>`;
+          noshowCol = `<td data-label="🚫無断" style="text-align:center"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></td>`;
         }
       }
+      const recvLabel = isCancelTab ? 'キャンセル日時' : '受付日時';
       return `<tr class="${rowClass}">
       <td style="color:#a0aec0;font-size:12px">${i+1}</td>
-      <td class="date-cell">${esc(fmtDT(r.datetime))}</td>
-      <td class="menu-cell">${esc(r.menu)}</td>
-      <td class="name-cell">${esc(r.name)}${repeatBadge}</td>
-      <td class="phone-cell">${esc(r.phone)}</td>
-      <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
-      <td class="comment-cell">${esc(r.comment)}</td>
-      <td class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
+      <td data-label="予約日時" class="date-cell">${esc(fmtDT(r.datetime))}</td>
+      <td data-label="メニュー" class="menu-cell">${esc(r.menu)}</td>
+      <td data-label="氏名" class="name-cell">${esc(r.name)}${repeatBadge}${noshowWarn}</td>
+      <td data-label="電話" class="phone-cell">${esc(r.phone)}</td>
+      <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
+      <td data-label="コメント" class="comment-cell">${esc(r.comment)}</td>
+      <td data-label="${recvLabel}" class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
       ${noshowCol}${badgeCol}
-      <td><div class="actions-cell">
+      <td class="actions-cell"><div style="display:flex;gap:5px">
         <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️</button>
       </div></td>
@@ -974,10 +1209,11 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
 
 function renderNoshowTable(q, dateFrom, dateTo) {
   const counts = getNoshowCounts();
+  const qNorm = q ? q.replace(/[\s　]/g, '') : '';
   let filtered = noshows.filter(r => {
     if (q) {
-      const match = r.name.toLowerCase().includes(q) || r.phone.includes(q) ||
-        r.date.includes(q) || (r.note && r.note.toLowerCase().includes(q));
+      const match = (r.name||'').toLowerCase().includes(q) || (r.phone||'').includes(q) || normPhone(r.phone).includes(qNorm) ||
+        (r.date||'').includes(q) || (r.note && r.note.toLowerCase().includes(q));
       if (!match) return false;
     }
     if (dateFrom && r.date < dateFrom) return false;
@@ -985,8 +1221,8 @@ function renderNoshowTable(q, dateFrom, dateTo) {
     return true;
   });
   filtered.sort((a, b) => {
-    const va = sortKey === 'count' ? (counts[a.phone]||1) : (a[sortKey]||'');
-    const vb = sortKey === 'count' ? (counts[b.phone]||1) : (b[sortKey]||'');
+    const va = sortKey === 'count' ? (counts[normPhone(a.phone)]||1) : (a[sortKey]||'');
+    const vb = sortKey === 'count' ? (counts[normPhone(b.phone)]||1) : (b[sortKey]||'');
     if (va < vb) return -sortDir;
     if (va > vb) return sortDir;
     return 0;
@@ -997,19 +1233,19 @@ function renderNoshowTable(q, dateFrom, dateTo) {
   else {
     empty.style.display = 'none';
     tbody.innerHTML = filtered.map((r, i) => {
-      const cnt = counts[r.phone] || 1;
+      const cnt = counts[normPhone(r.phone)] || 1;
       const rc = cnt >= 3 ? 'row-red' : cnt === 2 ? 'row-orange' : '';
       const bc = cnt >= 3 ? 'badge-3' : cnt === 2 ? 'badge-2' : 'badge-1';
       const dd = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
       return `<tr class="${rc}">
         <td style="color:#a0aec0;font-size:12px">${i+1}</td>
-        <td class="date-cell">${dd}</td><td>${r.time}</td>
-        <td class="name-cell">${esc(r.name)}</td>
-        <td class="phone-cell">${esc(r.phone)}</td>
-        <td style="font-size:13px;color:#718096">${esc(r.email)}</td>
-        <td class="note-cell">${esc(r.note)}</td>
-        <td style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
-        <td><div class="actions-cell">
+        <td data-label="日付" class="date-cell">${dd}</td><td data-label="時間">${esc(r.time)}</td>
+        <td data-label="氏名" class="name-cell">${esc(r.name)}</td>
+        <td data-label="電話" class="phone-cell">${esc(r.phone)}</td>
+        <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
+        <td data-label="備考" class="note-cell">${esc(r.note)}</td>
+        <td data-label="回数" style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
+        <td class="actions-cell"><div style="display:flex;gap:5px">
           <button class="btn btn-outline btn-sm" onclick="openEditModal(${r.id})">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="deleteRecord(${r.id})">🗑️</button>
         </div></td>
@@ -1017,6 +1253,94 @@ function renderNoshowTable(q, dateFrom, dateTo) {
     }).join('');
   }
   document.getElementById('rowCount-noshow').textContent = `${filtered.length}件 / 全${noshows.length}件`;
+}
+
+// ── 本日の予約サマリー ──────────────────────────────────────────────────
+let todayListCollapsed = false;
+function toggleTodayList() {
+  todayListCollapsed = !todayListCollapsed;
+  document.getElementById('todayList').classList.toggle('collapsed', todayListCollapsed);
+  document.getElementById('todayToggle').classList.toggle('collapsed', todayListCollapsed);
+}
+function renderTodaySummary() {
+  const banner = document.getElementById('todaySummary');
+  if (!banner) return;
+  const today = todayStr();
+  const list = reservations
+    .filter(r => (r.datetime||'').substring(0,10) === today)
+    .sort((a,b) => (a.datetime||'').localeCompare(b.datetime||''));
+  document.getElementById('todayCount').textContent = list.length;
+  const tc = document.getElementById('stat-todayCount');
+  if (tc) tc.textContent = list.length;
+  const cont = document.getElementById('todayList');
+  if (list.length === 0) {
+    cont.innerHTML = `<div style="padding:8px 12px;color:#718096;font-size:13px;background:white;border-radius:8px">本日の予約はありません</div>`;
+  } else {
+    const noshowPhoneMap = getNoshowPhoneCountMap();
+    const noshowNameMap = getNoshowNameCountMap();
+    cont.innerHTML = list.map(r => {
+      const m = (r.datetime||'').match(/(\d{1,2}:\d{2})/);
+      const time = m ? m[1] : '--:--';
+      const past = isPastDateTime(r.datetime);
+      const pn = normPhone(r.phone), nn = normName(r.name);
+      const nsCnt = Math.max(pn ? (noshowPhoneMap[pn]||0) : 0, nn ? (noshowNameMap[nn]||0) : 0);
+      const warn = nsCnt > 0 ? ` <span class="badge-noshow-warn">⚠️無断${nsCnt}</span>` : '';
+      return `<div class="today-item${past ? ' today-past' : ''}">
+        <span class="today-time">${time}</span>
+        <span class="today-name">${esc(r.name)}${warn}</span>
+        <span class="today-menu">${esc(r.menu)}</span>
+        <span style="font-size:12px;color:#718096" class="phone-cell">${esc(r.phone)}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ── 月次統計レポート ────────────────────────────────────────────────────
+function renderStats() {
+  const months = {};
+  const add = (key, field, dt) => {
+    const ym = (dt||'').substring(0,7);
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    if (!months[ym]) months[ym] = { res:0, can:0, ns:0 };
+    months[ym][field]++;
+  };
+  reservations.forEach(r => add(r, 'res', r.datetime));
+  cancellations.forEach(r => add(r, 'can', r.datetime));
+  noshows.forEach(r => add(r, 'ns', r.date));
+  const keys = Object.keys(months).sort().reverse();
+  // サマリーカード（全期間合計）
+  const totRes = reservations.length, totCan = cancellations.length, totNs = noshows.length;
+  const grand = totRes + totCan;
+  const canRate = grand > 0 ? ((totCan / grand) * 100).toFixed(1) : '0.0';
+  const nsRate = grand > 0 ? ((totNs / grand) * 100).toFixed(1) : '0.0';
+  document.getElementById('statsSummary').innerHTML = `
+    <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div></div>
+    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%</div></div>
+    <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div></div>
+    <div class="stats-summary-card purple"><div class="label">📊 対象月数</div><div class="value">${keys.length}</div></div>`;
+  const maxRes = Math.max(1, ...keys.map(k => months[k].res));
+  const tbody = document.getElementById('stats-tbody');
+  if (keys.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#a0aec0;padding:40px">データがありません</td></tr>`;
+  } else {
+    tbody.innerHTML = keys.map(k => {
+      const m = months[k];
+      const base = m.res + m.can;
+      const cr = base > 0 ? ((m.can / base) * 100).toFixed(1) : '0.0';
+      const nr = base > 0 ? ((m.ns / base) * 100).toFixed(1) : '0.0';
+      const ym = k.replace(/(\d{4})-(\d{2})/, '$1年$2月');
+      const barW = Math.round((m.res / maxRes) * 100);
+      return `<tr>
+        <td data-label="月" style="font-weight:700;color:#2d3748">${ym}</td>
+        <td data-label="予約">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
+        <td data-label="キャンセル" style="color:#c05621">${m.can}</td>
+        <td data-label="無断" style="color:#c53030">${m.ns}</td>
+        <td data-label="ｷｬﾝｾﾙ率">${cr}%</td>
+        <td data-label="無断率">${nr}%</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('rowCount-stats').textContent = `${keys.length}ヶ月`;
 }
 
 function fmtDT(dt) {
@@ -1236,6 +1560,146 @@ function exportExcel() {
   showToast('Excelファイルを出力しました 📥', 'success');
 }
 
+// ── デスクトップ通知 ────────────────────────────────────────────────────
+function updateNotifBtn() {
+  const btn = document.getElementById('notifBtn');
+  if (!btn || !('Notification' in window)) { if (btn) btn.style.display='none'; return; }
+  if (Notification.permission === 'granted') { btn.classList.add('enabled'); btn.textContent = '🔔 通知ON'; }
+  else { btn.classList.remove('enabled'); btn.textContent = '🔔 通知'; }
+}
+function requestNotificationPermission() {
+  if (!('Notification' in window)) { showToast('このブラウザは通知に対応していません', 'error'); return; }
+  if (Notification.permission === 'granted') { showToast('通知は既に有効です', 'success'); updateNotifBtn(); return; }
+  Notification.requestPermission().then(p => {
+    updateNotifBtn();
+    if (p === 'granted') { showToast('デスクトップ通知を有効にしました 🔔', 'success'); try { new Notification('予約管理システム 大宮', { body: '新規予約・キャンセル時に通知します' }); } catch(e){} }
+    else showToast('通知が許可されませんでした', '');
+  });
+}
+function notifyNew(newRes, newCan, sampleName) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (newRes <= 0 && newCan <= 0) return;
+  const parts = [];
+  if (newRes > 0) parts.push(`予約${newRes}件`);
+  if (newCan > 0) parts.push(`キャンセル${newCan}件`);
+  try {
+    const n = new Notification('📅 大宮: 新着 ' + parts.join('・'), {
+      body: sampleName ? `例: ${sampleName} 他` : '新しいデータを取得しました',
+      tag: 'reservation-omiya'
+    });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch(e) {}
+}
+
+// ── 最終取得時刻の表示 ──────────────────────────────────────────────────
+function updateLastFetchInfo() {
+  const el = document.getElementById('lastFetchInfo');
+  if (!el) return;
+  const ts = localStorage.getItem('lastFetchAt_omiya');
+  if (!ts) { el.textContent = '最終取得: -'; el.classList.remove('fresh'); return; }
+  const diff = Date.now() - parseInt(ts);
+  const min = Math.floor(diff / 60000);
+  let txt;
+  if (min < 1) txt = 'たった今';
+  else if (min < 60) txt = `${min}分前`;
+  else if (min < 1440) txt = `${Math.floor(min/60)}時間前`;
+  else txt = `${Math.floor(min/1440)}日前`;
+  el.textContent = '最終取得: ' + txt;
+  el.classList.toggle('fresh', min < 70);
+}
+
+// ── インポート（CSV / Excel） ───────────────────────────────────────────
+let importType = 'reservations';
+let importParsed = [];
+function openImportModal() {
+  importParsed = [];
+  document.getElementById('importFile').value = '';
+  document.getElementById('importPreview').innerHTML = '';
+  document.getElementById('importModal').classList.add('open');
+}
+function closeImportModal() { document.getElementById('importModal').classList.remove('open'); }
+function selectImportType(el, type) {
+  importType = type;
+  document.querySelectorAll('.import-option').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  if (document.getElementById('importFile').files.length) handleImportFile(document.getElementById('importFile'));
+}
+const IMPORT_FIELD_MAP = {
+  '氏名':'name','名前':'name','お名前':'name',
+  '電話番号':'phone','電話':'phone','tel':'phone','phone':'phone',
+  '予約日時':'datetime','日時':'datetime',
+  '日付':'date','時間':'time','予約時間':'time',
+  'メール':'email','メールアドレス':'email','email':'email','mail':'email',
+  'メニュー':'menu','コメント':'comment','備考':'note','メモ':'note',
+  '受付日時':'receivedAt','キャンセル日時':'receivedAt','id':'id','ID':'id'
+};
+function normalizeImportRow(obj) {
+  const out = {};
+  for (const key in obj) {
+    const f = IMPORT_FIELD_MAP[String(key).trim()] || IMPORT_FIELD_MAP[String(key).trim().toLowerCase()];
+    if (f) out[f] = obj[key] != null ? String(obj[key]).trim() : '';
+  }
+  // date+time → datetime を補完
+  if (!out.datetime && out.date) out.datetime = out.date + (out.time ? ' ' + out.time : '');
+  // datetime → date/time を補完（無断キャンセル用）
+  if (out.datetime && (!out.date || !out.time)) {
+    const m = out.datetime.match(/(\d{4}-\d{1,2}-\d{1,2})[\sT]*(\d{1,2}:\d{2})?/);
+    if (m) { if (!out.date) out.date = m[1]; if (!out.time && m[2]) out.time = m[2]; }
+  }
+  return out;
+}
+function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      importParsed = rows.map(normalizeImportRow).filter(r => r.name || r.phone);
+      renderImportPreview();
+    } catch(err) {
+      document.getElementById('importPreview').innerHTML = `<div style="color:#c53030;font-size:13px">読み込みエラー: ${esc(err.message)}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderImportPreview() {
+  const cont = document.getElementById('importPreview');
+  if (importParsed.length === 0) { cont.innerHTML = `<div style="color:#c53030;font-size:13px">有効な行が見つかりませんでした（氏名か電話番号の列が必要です）</div>`; return; }
+  const cols = importType === 'noshow' ? ['date','time','name','phone','email','note'] : ['datetime','menu','name','phone','email','comment'];
+  const head = cols.map(c => `<th style="padding:4px 8px;background:#f7fafc;text-align:left">${c}</th>`).join('');
+  const body = importParsed.slice(0, 8).map(r => `<tr>${cols.map(c => `<td style="padding:4px 8px;border-top:1px solid #f0f0f0">${esc(r[c]||'')}</td>`).join('')}</tr>`).join('');
+  cont.innerHTML = `<div style="font-size:13px;font-weight:700;color:#2b6cb0;margin-bottom:6px">プレビュー: ${importParsed.length}件（先頭8件表示）</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+function confirmImport() {
+  if (importParsed.length === 0) { showToast('インポートするデータがありません', 'error'); return; }
+  let added = 0;
+  if (importType === 'noshow') {
+    let nextId = noshows.length > 0 ? Math.max(...noshows.map(n => Number(n.id)||0)) + 1 : 1;
+    importParsed.forEach(r => {
+      noshows.push({ id: nextId++, date: r.date||'', time: r.time||'', name: r.name||'', phone: r.phone||'', email: r.email||'', note: r.note||'' });
+      added++;
+    });
+  } else {
+    const list = importType === 'reservations' ? reservations : cancellations;
+    importParsed.forEach(r => {
+      const id = r.id || ('imp_' + normPhone(r.phone) + '_' + (r.datetime||'').replace(/\D/g,''));
+      if (list.some(x => String(x.id) === String(id))) return;
+      list.push({ id, datetime: r.datetime||'', menu: r.menu||'', name: r.name||'', phone: r.phone||'', email: r.email||'', comment: r.comment||'', receivedAt: r.receivedAt||'', type: importType === 'reservations' ? 'reservation' : 'cancellation' });
+      added++;
+    });
+    list.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+  }
+  saveData();
+  closeImportModal();
+  render();
+  showToast(`${added}件をインポートしました ✓`, 'success');
+}
+
 // ── Toast / Loading ─────────────────────────────────────────────────────
 function showToast(msg, type) {
   const t = document.getElementById('toast');
@@ -1252,8 +1716,9 @@ function hideLoading() { document.getElementById('loadingOverlay').classList.rem
 document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 document.getElementById('emailModal').addEventListener('click', function(e) { if (e.target === this) closeEmailModal(); });
 document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) closeSettingsModal(); });
+document.getElementById('importModal').addEventListener('click', function(e) { if (e.target === this) closeImportModal(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); }
+  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); }
   if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveRecord();
 });
 
@@ -1311,6 +1776,9 @@ saveToDrive = async function() {
 loadData();
 switchTab('reservations');
 render();
+updateNotifBtn();
+updateLastFetchInfo();
+setInterval(updateLastFetchInfo, 60 * 1000); // 1分ごとに「○分前」表示を更新
 function tryInitGIS() {
   if (typeof google !== 'undefined' && google.accounts) initGIS();
   else setTimeout(tryInitGIS, 500);
