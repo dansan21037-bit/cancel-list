@@ -132,6 +132,7 @@
   .badge-c4 { background: #b794f4; color: #322659; }
   .badge-repeat { background: #c53030; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; white-space: nowrap; vertical-align: middle; }
   .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: #e53e3e; }
+  .sameday-check { width: 20px; height: 20px; cursor: pointer; accent-color: #b7791f; }
   .noshow-check:disabled { cursor: default; opacity: 0.6; }
   .noshow-checked-label { font-size: 11px; color: #c53030; font-weight: 700; }
   .name-cell { font-weight: 600; }
@@ -213,6 +214,31 @@
     border: 1px solid #4299e1; border-radius: 12px;
     box-shadow: 0 2px 8px rgba(66,153,225,0.15);
   }
+  /* 要注意客アラートバナー */
+  .caution-banner {
+    margin: 12px 24px 0; padding: 14px 18px;
+    background: linear-gradient(135deg, #fff5f5 0%, #fffaf0 100%);
+    border: 2px solid #e53e3e; border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(229,62,62,0.2);
+  }
+  .caution-banner-header { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .caution-icon { font-size: 20px; }
+  .caution-title { font-size: 14px; font-weight: 800; color: #c53030; flex: 1; }
+  .caution-count { font-size: 22px; font-weight: 800; color: #c53030; }
+  .caution-banner-header .today-toggle { color: #e53e3e; }
+  .caution-list { margin-top: 12px; display: grid; gap: 6px; max-height: 300px; overflow-y: auto; padding-right: 4px; }
+  .caution-list.collapsed { display: none; }
+  .caution-item {
+    display: grid; grid-template-columns: 92px 1.4fr auto auto; gap: 10px;
+    align-items: center; padding: 8px 12px; background: white; border-radius: 8px;
+    font-size: 13px; border-left: 4px solid #e53e3e; cursor: pointer;
+  }
+  .caution-item.sev-amber { border-left-color: #d69e2e; }
+  .caution-item:hover { background: #fff5f5; }
+  .caution-when { font-weight: 700; color: #c53030; font-family: monospace; font-size: 12px; }
+  .caution-name { font-weight: 700; color: #2d3748; }
+  .caution-badges { display: flex; gap: 4px; white-space: nowrap; }
+  .caution-phone { font-size: 12px; color: #718096; font-family: monospace; text-align: right; }
   .today-banner-header { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
   .today-banner-title { font-size: 14px; font-weight: 700; color: #2b6cb0; flex: 1; }
   .today-banner-count { font-size: 22px; font-weight: 800; color: #2b6cb0; }
@@ -339,6 +365,10 @@
     .today-banner-count { font-size: 18px; }
     .today-item { grid-template-columns: 50px 1fr; padding: 6px 8px; }
     .today-item .today-menu { display: none; }
+    .caution-banner { margin: 8px 10px 0; padding: 10px 12px; }
+    .caution-count { font-size: 18px; }
+    .caution-item { grid-template-columns: 1fr auto; gap: 6px; padding: 7px 9px; }
+    .caution-item .caution-phone { display: none; }
     .stats-summary { padding: 8px 10px 0; grid-template-columns: 1fr 1fr; gap: 8px; }
     .stats-summary-card { padding: 10px 12px; }
     .stats-summary-card .value { font-size: 18px; }
@@ -412,6 +442,18 @@
   <button class="btn btn-primary" id="addSamedayBtn" onclick="openSamedayModal()" style="display:none">＋ 当日キャンセル追加</button>
 </div>
 
+<!-- 要注意客アラート -->
+<div class="caution-banner" id="cautionBanner" style="display:none">
+  <div class="caution-banner-header" onclick="toggleCautionList()">
+    <span class="caution-icon">🚨</span>
+    <span class="caution-title">要注意のお客様の予約</span>
+    <span class="caution-count" id="cautionCount">0</span>
+    <span style="font-size:13px">件</span>
+    <span class="today-toggle" id="cautionToggle">▼</span>
+  </div>
+  <div class="caution-list" id="cautionList"></div>
+</div>
+
 <!-- 本日の予約サマリー -->
 <div class="today-banner" id="todaySummary" style="display:none">
   <div class="today-banner-header" onclick="toggleTodayList()">
@@ -435,6 +477,7 @@
       <th>メール</th>
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center;white-space:nowrap">🟠 当日</th>
       <th style="text-align:center;white-space:nowrap">🚫 無断</th>
       <th>操作</th>
     </tr></thead><tbody id="tbody-reservations"></tbody></table>
@@ -993,6 +1036,7 @@ async function autoFetchEmails() {
       fetchGmailMessages(q2, true, 30, 100)
     ]);
     const beforeResLen = reservations.length;
+    const beforeIds = new Set(reservations.map(x => x.id));
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
     localStorage.setItem('lastFetchTime_ichihara', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
@@ -1006,6 +1050,7 @@ async function autoFetchEmails() {
       showToast(`自動取得: 予約${newRes}件、キャンセル${newCan}件` + (dupN > 0 ? ` ／ ⚠️同日同名 ${dupN}組あり` : ''), 'success');
       const sample = reservations.length > beforeResLen ? reservations[0].name : '';
       notifyNew(newRes, newCan, sample);
+      alertNewCaution(getNewCautionAlerts(beforeIds));
     }
   } catch(e) { console.error('Auto fetch error:', e); }
   isFetching = false;
@@ -1027,6 +1072,7 @@ async function fetchEmails() {
     const canMsg = await fetchGmailMessages(q2, false, 60, 200);
     if (fetchCancelled) return;
     const beforeResLen = reservations.length;
+    const beforeIds = new Set(reservations.map(x => x.id));
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
     localStorage.setItem('lastFetchTime_ichihara', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
@@ -1038,6 +1084,7 @@ async function fetchEmails() {
     showToast(`予約${newRes}件、キャンセル${newCan}件を取得（合計: ${reservations.length}/${cancellations.length}件）`, 'success');
     const sample = reservations.length > beforeResLen ? reservations[0].name : '';
     notifyNew(newRes, newCan, sample);
+    alertNewCaution(getNewCautionAlerts(beforeIds));
     const dupN = getDupGroupCount();
     if (dupN > 0) setTimeout(() => showToast(`⚠️ 同日に同名の予約が ${dupN} 組あります。重複の可能性を確認してください（本日分は上部サマリーで色付き表示）`, 'error'), 800);
   } catch(e) {
@@ -1317,6 +1364,7 @@ function render() {
   else if (activeTab === 'stats') renderStats();
   else renderNoshowTable(q, dateFrom, dateTo);
   renderTodaySummary();
+  renderCautionBanner();
   document.getElementById('stat-reservations').textContent = reservations.length;
   document.getElementById('stat-cancellations').textContent = cancellations.length;
   document.getElementById('stat-noshow').textContent = noshows.length;
@@ -1405,6 +1453,15 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
           repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${(searchKey||'').replace(/'/g,"\\'")}';toggleClearBtn();render();">再${repCnt}</span>`;
         }
       }
+      // 予約者リストのみ: 当日キャンセルチェック列
+      let samedayCol = '';
+      if (isResTab) {
+        if (r.movedToSameday) {
+          samedayCol = `<td data-label="🟠当日" style="text-align:center"><span class="noshow-checked-label" style="color:#b7791f">✓ 登録済</span></td>`;
+        } else {
+          samedayCol = `<td data-label="🟠当日" style="text-align:center"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}', this)" title="当日キャンセルに登録（電話キャンセル等）"></td>`;
+        }
+      }
       // 予約者リストのみ: 無断キャンセルチェック列
       let noshowCol = '';
       if (isResTab) {
@@ -1425,7 +1482,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
       <td data-label="コメント" class="comment-cell">${esc(r.comment)}</td>
       <td data-label="${recvLabel}" class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
-      ${noshowCol}${badgeCol}
+      ${samedayCol}${noshowCol}${badgeCol}
       <td class="actions-cell"><div style="display:flex;gap:5px">
         <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️</button>
@@ -1585,8 +1642,98 @@ function saveSameday() {
 function deleteSameday(id) {
   const r = samedayManual.find(x => x.id === id);
   if (!r || !confirm(`「${r.name}」（${r.date}）の当日キャンセル(手動)を削除しますか？`)) return;
+  // 予約リストから登録したものは、元の予約のチェックを解除
+  if (r.fromReservationId) {
+    const orig = reservations.find(x => String(x.id) === String(r.fromReservationId));
+    if (orig) orig.movedToSameday = false;
+  }
   samedayManual = samedayManual.filter(x => x.id !== id);
   saveData(); render(); showToast('削除しました', '');
+}
+
+// ── 要注意客アラート(無断/当日キャンセル履歴のある予約者) ────────────
+// 今日以降の予約のうち、過去に無断 or 当日キャンセルが1回でもある人を抽出
+function getCautionReservations() {
+  const today = todayStr();
+  const nsP = getNoshowPhoneCountMap(), nsN = getNoshowNameCountMap();
+  const sdP = getSamedayPhoneCountMap(), sdN = getSamedayNameCountMap();
+  const out = [];
+  reservations.forEach(r => {
+    const d = (r.datetime || '').substring(0, 10);
+    if (!d || d < today) return; // 今日以降のみ
+    const pn = normPhone(r.phone), nn = normName(r.name);
+    const ns = Math.max(pn ? (nsP[pn]||0) : 0, nn ? (nsN[nn]||0) : 0);
+    const sd = Math.max(pn ? (sdP[pn]||0) : 0, nn ? (sdN[nn]||0) : 0);
+    if (ns > 0 || sd > 0) out.push({ r, ns, sd, d });
+  });
+  out.sort((a, b) => (a.r.datetime||'').localeCompare(b.r.datetime||''));
+  return out;
+}
+// 取得時アラート用: 新規に入った今日以降の予約のうち要注意客を返す
+function getNewCautionAlerts(beforeIds) {
+  const nsP = getNoshowPhoneCountMap(), nsN = getNoshowNameCountMap();
+  const sdP = getSamedayPhoneCountMap(), sdN = getSamedayNameCountMap();
+  const today = todayStr();
+  const out = [];
+  reservations.forEach(r => {
+    if (beforeIds.has(r.id)) return;
+    const d = (r.datetime || '').substring(0, 10);
+    if (!d || d < today) return;
+    const pn = normPhone(r.phone), nn = normName(r.name);
+    const ns = Math.max(pn ? (nsP[pn]||0) : 0, nn ? (nsN[nn]||0) : 0);
+    const sd = Math.max(pn ? (sdP[pn]||0) : 0, nn ? (sdN[nn]||0) : 0);
+    if (ns > 0 || sd > 0) out.push({ r, ns, sd });
+  });
+  return out;
+}
+function alertNewCaution(alerts) {
+  if (!alerts || alerts.length === 0) return;
+  const names = alerts.slice(0, 3).map(a => {
+    const tags = [];
+    if (a.ns > 0) tags.push(`無断${a.ns}`);
+    if (a.sd > 0) tags.push(`当日${a.sd}`);
+    return `${a.r.name}（${tags.join('・')}）`;
+  }).join('、');
+  const more = alerts.length > 3 ? ` 他${alerts.length - 3}件` : '';
+  setTimeout(() => showToast(`🚨 要注意のお客様が予約しました: ${names}${more}`, 'error'), 1200);
+  if (('Notification' in window) && Notification.permission === 'granted') {
+    try {
+      const n = new Notification('🚨 要注意のお客様が予約', { body: names + more, tag: 'caution-' + STORAGE_KEY });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch(e) {}
+  }
+}
+let cautionListCollapsed = false;
+function toggleCautionList() {
+  cautionListCollapsed = !cautionListCollapsed;
+  document.getElementById('cautionList').classList.toggle('collapsed', cautionListCollapsed);
+  document.getElementById('cautionToggle').classList.toggle('collapsed', cautionListCollapsed);
+}
+function renderCautionBanner() {
+  const banner = document.getElementById('cautionBanner');
+  if (!banner) return;
+  // 予約者リストタブのときだけ表示
+  if (activeTab !== 'reservations') { banner.style.display = 'none'; return; }
+  const list = getCautionReservations();
+  if (list.length === 0) { banner.style.display = 'none'; return; }
+  banner.style.display = '';
+  document.getElementById('cautionCount').textContent = list.length;
+  const cont = document.getElementById('cautionList');
+  cont.innerHTML = list.map(o => {
+    const r = o.r;
+    const m = (r.datetime||'').match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})?/);
+    const when = m ? `${m[2]}/${m[3]}${m[4] ? ' ' + m[4] : ''}` : (r.datetime||'');
+    const sev = o.ns > 0 ? '' : ' sev-amber';
+    const nsB = o.ns > 0 ? `<span class="badge-noshow-warn">⚠️無断${o.ns}</span>` : '';
+    const sdB = o.sd > 0 ? `<span class="badge-sameday-warn">🟠当日${o.sd}</span>` : '';
+    const key = (r.phone || r.name || '').replace(/'/g, "\\'");
+    return `<div class="caution-item${sev}" onclick="document.getElementById('searchInput').value='${key}';toggleClearBtn();render();">
+      <span class="caution-when">${esc(when)}</span>
+      <span class="caution-name">${esc(r.name)}</span>
+      <span class="caution-badges">${nsB}${sdB}</span>
+      <span class="caution-phone">${esc(r.phone)}</span>
+    </div>`;
+  }).join('');
 }
 
 // ── 本日の予約サマリー ──────────────────────────────────────────────────
@@ -1794,6 +1941,39 @@ function moveToNoshow(reservationId, checkbox) {
   saveData();
   render();
   showToast(`「${r.name}」を無断キャンセルリストに登録しました（${countAfter}回目）`, 'success');
+}
+
+// ── 予約 → 当日キャンセル（電話キャンセル等をチェックで登録） ────────────
+function moveToSameday(reservationId, checkbox) {
+  const r = reservations.find(x => x.id === reservationId);
+  if (!r) { if (checkbox) checkbox.checked = false; return; }
+  const pn = normPhone(r.phone);
+  const already = getSamedayCounts()[pn] || 0;
+  const countAfter = already + 1;
+  let msg = `「${r.name}」（${r.datetime}）を当日キャンセルに登録しますか？\n（電話など、メール以外のキャンセル用）`;
+  if (already > 0) msg += `\n\n🟠 この電話番号は当日キャンセルが既に${already}回。追加後は合計${countAfter}回になります。`;
+  if (!confirm(msg)) { if (checkbox) checkbox.checked = false; return; }
+  // 予約日時を日付と時間に分割
+  let date = '', time = '';
+  if (r.datetime) {
+    const dtMatch = r.datetime.match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})/);
+    if (dtMatch) { date = dtMatch[1]; time = dtMatch[2]; }
+  }
+  const newId = 'sd_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+  samedayManual.push({
+    id: newId,
+    date: date,
+    time: time,
+    name: r.name || '',
+    phone: r.phone || '',
+    email: r.email || '',
+    note: '電話など（予約リストから登録）',
+    fromReservationId: r.id
+  });
+  r.movedToSameday = true;
+  saveData();
+  render();
+  showToast(`「${r.name}」を当日キャンセルに登録しました（${countAfter}回目）`, 'success');
 }
 
 // ── Noshow CRUD ─────────────────────────────────────────────────────────
