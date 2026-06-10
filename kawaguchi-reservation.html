@@ -815,11 +815,22 @@ function dupLevelFor(r, map) {
   const samePhone = others.some(g => myPhone && normPhone(g.phone) === myPhone);
   return samePhone ? 'dup' : 'samename';
 }
-// 予約全体の「同日同名」グループ数（案C: 取込時の注意喚起カウント）
+// 予約全体の「同日同名」グループ数（一覧表示・バッジ用）
 function getDupGroupCount() {
   const map = buildDupGroups(reservations);
   let n = 0;
   for (const k in map) if (map[k].length >= 2) n++;
+  return n;
+}
+// 今回の取得で新しく入った予約が関与する「同日同名」グループ数だけを数える
+// （過去分の同名同日で毎回警告が出てしまうのを防ぐ）
+function getNewDupGroupCount(beforeIds) {
+  const map = buildDupGroups(reservations);
+  let n = 0;
+  for (const k in map) {
+    const grp = map[k];
+    if (grp.length >= 2 && grp.some(r => !beforeIds.has(r.id))) n++;
+  }
   return n;
 }
 
@@ -1046,7 +1057,7 @@ async function autoFetchEmails() {
       reservations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
       cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
       saveData(); render();
-      const dupN = getDupGroupCount();
+      const dupN = getNewDupGroupCount(beforeIds);
       showToast(`自動取得: 予約${newRes}件、キャンセル${newCan}件` + (dupN > 0 ? ` ／ ⚠️同日同名 ${dupN}組あり` : ''), 'success');
       const sample = reservations.length > beforeResLen ? reservations[0].name : '';
       notifyNew(newRes, newCan, sample);
@@ -1085,8 +1096,8 @@ async function fetchEmails() {
     const sample = reservations.length > beforeResLen ? reservations[0].name : '';
     notifyNew(newRes, newCan, sample);
     alertNewCaution(getNewCautionAlerts(beforeIds));
-    const dupN = getDupGroupCount();
-    if (dupN > 0) setTimeout(() => showToast(`⚠️ 同日に同名の予約が ${dupN} 組あります。重複の可能性を確認してください（本日分は上部サマリーで色付き表示）`, 'error'), 800);
+    const dupN = getNewDupGroupCount(beforeIds);
+    if (dupN > 0) setTimeout(() => showToast(`⚠️ 今回の取得で同日・同名の予約が ${dupN} 組見つかりました。重複の可能性を確認してください（一覧の🔁/👥バッジ参照）`, 'error'), 800);
   } catch(e) {
     hideLoading();
     if (!fetchCancelled) showToast('メール取得エラー: ' + e.message, 'error');
