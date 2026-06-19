@@ -383,6 +383,34 @@
     .auth-bar { flex-wrap: wrap; padding: 8px 14px; }
     .tab-bar { padding: 8px 10px 0; }
   }
+
+  /* ===== 表示モード手動切替(カード強制 / 表強制) ===== */
+  /* カード強制: 画面幅に関わらずカード型 */
+  body.force-card table thead { display: none; }
+  body.force-card table, body.force-card tbody, body.force-card tr, body.force-card td { display: block; width: 100%; box-sizing: border-box; }
+  body.force-card .table-container { box-shadow: none; background: transparent; }
+  body.force-card .table-scroll { overflow: visible; }
+  body.force-card tbody tr { background: white !important; margin-bottom: 10px; border-radius: 10px; padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-bottom: none !important; }
+  body.force-card tbody tr.row-cancel-3 { background: #f0e6ff !important; }
+  body.force-card tbody tr.row-cancel-4 { background: #e2d0f8 !important; }
+  body.force-card tbody tr.row-warn-noshow { background: #fef5e7 !important; }
+  body.force-card tbody tr.row-dup { background: #fff5f5 !important; }
+  body.force-card tbody tr.row-samename { background: #fffbeb !important; }
+  body.force-card tbody td { padding: 5px 0; border: none !important; min-height: 22px; display: flex; gap: 8px; align-items: flex-start; }
+  body.force-card tbody td:empty { display: none; }
+  body.force-card tbody td::before { content: attr(data-label); font-weight: 700; color: #718096; font-size: 11px; min-width: 76px; flex-shrink: 0; padding-top: 1px; }
+  body.force-card tbody td:not([data-label])::before { display: none; }
+  body.force-card tbody td.actions-cell { justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0 !important; }
+  /* 表強制: スマホでもカード化せず表のまま(横スクロール) */
+  @media (max-width: 768px) {
+    body.force-table table { display: table; }
+    body.force-table table thead { display: table-header-group; }
+    body.force-table tbody { display: table-row-group; }
+    body.force-table tr { display: table-row; }
+    body.force-table td { display: table-cell; width: auto; }
+    body.force-table tbody td::before { display: none; }
+    body.force-table .table-scroll { overflow-x: auto; }
+  }
 </style>
 </head>
 <body>
@@ -404,6 +432,8 @@
   <span class="status-dot offline" id="statusDot"></span>
   <span class="sync-info" id="syncInfo">Google Drive: 未接続</span>
   <span class="last-fetch-info" id="lastFetchInfo">最終取得: -</span>
+  <button class="btn btn-sm btn-outline" id="fontBtn" onclick="cycleFontSize()" title="文字サイズを変更(標準/大/特大)">🔤 標準</button>
+  <button class="btn btn-sm btn-outline" id="viewBtn" onclick="cycleViewMode()" title="表示モード(自動/カード/表)を切替">▦ 自動</button>
   <button class="btn btn-sm btn-notif" id="notifBtn" onclick="requestNotificationPermission()" title="新規予約をデスクトップ通知">🔔 通知</button>
   <button class="btn btn-sm btn-google" id="authBtn" onclick="handleAuth()">Googleサインイン</button>
   <button class="btn btn-sm btn-outline" id="syncBtn" onclick="syncFromDrive()" style="display:none">🔄 同期</button>
@@ -857,6 +887,12 @@ function switchTab(tab) {
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────
+// トークンは約1時間で失効する。先回り更新＋サイレント更新で再認証ポップアップを抑止する。
+let tokenExpiresAt = 0;       // アクセストークンの失効予定時刻(ミリ秒)
+let refreshTimer = null;      // 先回り更新タイマー
+let isInitialAuth = false;    // true=ユーザー操作の初回サインイン / false=裏での更新
+let tokenRefreshResolve = null; // サイレント更新の完了を待つためのresolver
+
 function initGIS() {
   const clientId = localStorage.getItem('google_client_id');
   if (!clientId) return;
@@ -868,13 +904,53 @@ function initGIS() {
 }
 
 async function handleTokenResponse(resp) {
-  if (resp.error) { showToast('サインイン失敗: ' + resp.error, 'error'); return; }
+  if (resp.error) {
+    // サイレント更新の失敗時はポップアップを出さず、次の機会に再試行
+    if (isInitialAuth) showToast('サインイン失敗: ' + resp.error, 'error');
+    else console.warn('サイレント更新に失敗:', resp.error);
+    if (tokenRefreshResolve) { tokenRefreshResolve(false); tokenRefreshResolve = null; }
+    return;
+  }
   accessToken = resp.access_token;
+  const sec = resp.expires_in ? parseInt(resp.expires_in) : 3600;
+  tokenExpiresAt = Date.now() + sec * 1000;
   isSignedIn = true;
   updateAuthUI();
-  await loadFromDrive();
-  // Drive同期後、自動でメール取得
-  autoFetchEmails();
+  scheduleTokenRefresh();
+  if (tokenRefreshResolve) { tokenRefreshResolve(true); tokenRefreshResolve = null; }
+  // 初回サインイン時だけ、Drive読込→メール取得を実行(更新時は再実行しない)
+  if (isInitialAuth) {
+    isInitialAuth = false;
+    await loadFromDrive();
+    autoFetchEmails();
+  }
+}
+
+// 失効の5分前に自動でサイレント更新を予約
+function scheduleTokenRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  let delay = tokenExpiresAt - Date.now() - 5 * 60 * 1000;
+  if (delay < 30000) delay = 30000; // 最低30秒後
+  refreshTimer = setTimeout(() => { if (isSignedIn) silentRefresh(); }, delay);
+}
+
+// 同意画面を出さずにトークンを再発行(ログイン中＆同意済みなら無音)
+function silentRefresh() {
+  if (!tokenClient) return Promise.resolve(false);
+  return new Promise(resolve => {
+    tokenRefreshResolve = resolve;
+    isInitialAuth = false;
+    try { tokenClient.requestAccessToken({ prompt: '' }); }
+    catch(e) { tokenRefreshResolve = null; resolve(false); }
+  });
+}
+
+// 通信の直前に呼ぶ:失効間近なら先に更新してから処理を続行
+async function ensureFreshToken() {
+  if (!isSignedIn || !tokenClient) return;
+  if (Date.now() > tokenExpiresAt - 60000) { // 失効1分前以降なら更新
+    await silentRefresh();
+  }
 }
 
 function handleAuth() {
@@ -882,13 +958,14 @@ function handleAuth() {
   const clientId = localStorage.getItem('google_client_id');
   if (!clientId) { showToast('先にClient IDを設定してください', 'error'); openSettingsModal(); return; }
   if (!tokenClient) initGIS();
-  if (tokenClient) tokenClient.requestAccessToken();
+  if (tokenClient) { isInitialAuth = true; tokenClient.requestAccessToken(); }
   else showToast('Google APIの読み込みを待っています...', 'error');
 }
 
 function signOut() {
+  if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
   if (accessToken) { try { google.accounts.oauth2.revoke(accessToken); } catch(e) {} }
-  accessToken = null; isSignedIn = false; driveFileId = null; tokenClient = null;
+  accessToken = null; isSignedIn = false; driveFileId = null; tokenExpiresAt = 0;
   updateAuthUI();
   showToast('サインアウトしました', '');
 }
@@ -917,6 +994,7 @@ function updateAuthUI() {
 // ── Drive Operations ────────────────────────────────────────────────────
 async function loadFromDrive() {
   if (!accessToken) return;
+  await ensureFreshToken();
   try {
     document.getElementById('syncInfo').textContent = 'Google Drive: 読み込み中...';
     const folderId = localStorage.getItem('google_folder_id') || DEFAULT_FOLDER_ID;
@@ -958,6 +1036,7 @@ async function loadFromDrive() {
 
 async function saveToDrive() {
   if (!accessToken) return;
+  await ensureFreshToken();
   try {
     const content = JSON.stringify({ reservations, cancellations, noshows, samedayManual });
     if (driveFileId) {
@@ -1039,6 +1118,7 @@ async function autoFetchEmails() {
   isFetching = true;
   fetchCancelled = false;
   try {
+    await ensureFreshToken();
     const afterDate = getSearchDate('lastFetchTime_ichihara', '2025/06/01');
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
@@ -1075,6 +1155,7 @@ async function fetchEmails() {
   fetchCancelled = false;
   showLoading('メールを検索中...');
   try {
+    await ensureFreshToken();
     const afterDate = getSearchDate('lastFetchTime_ichihara', '2025/06/01');
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
@@ -1116,6 +1197,7 @@ async function fullRescan() {
   fetchCancelled = false;
   showLoading('全期間を再走査中...');
   try {
+    await ensureFreshToken();
     const after = startDate.trim();
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + after;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + after;
@@ -2297,6 +2379,7 @@ function startAutoSync() {
 
 async function autoLoadFromDrive() {
   if (!accessToken || !driveFileId) return;
+  await ensureFreshToken();
   try {
     const fileResp = await fetch(
       `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime&supportsAllDrives=true`,
@@ -2333,12 +2416,49 @@ saveToDrive = async function() {
   localStorage.setItem('lastSyncTime_ichihara', String(Date.now()));
 };
 
+// ── 表示調整(文字サイズ / 表示モード) ──────────────────────────────────
+const FONT_LEVELS = [{ k:'標準', z:1 }, { k:'大', z:1.2 }, { k:'特大', z:1.4 }];
+function applyFontSize() {
+  let i = parseInt(localStorage.getItem('viewZoom_ichihara') || '0', 10);
+  if (isNaN(i) || i < 0 || i >= FONT_LEVELS.length) i = 0;
+  const lv = FONT_LEVELS[i];
+  document.body.style.zoom = lv.z;
+  const b = document.getElementById('fontBtn');
+  if (b) b.textContent = '🔤 ' + lv.k;
+}
+function cycleFontSize() {
+  let i = parseInt(localStorage.getItem('viewZoom_ichihara') || '0', 10);
+  if (isNaN(i)) i = 0;
+  i = (i + 1) % FONT_LEVELS.length;
+  localStorage.setItem('viewZoom_ichihara', String(i));
+  applyFontSize();
+}
+const VIEW_MODES = ['auto', 'card', 'table'];
+const VIEW_LABEL = { auto:'自動', card:'カード', table:'表' };
+function applyViewMode() {
+  const m = localStorage.getItem('viewMode_ichihara') || 'auto';
+  document.body.classList.remove('force-card', 'force-table');
+  if (m === 'card') document.body.classList.add('force-card');
+  else if (m === 'table') document.body.classList.add('force-table');
+  const b = document.getElementById('viewBtn');
+  if (b) b.textContent = '▦ ' + (VIEW_LABEL[m] || '自動');
+}
+function cycleViewMode() {
+  const m = localStorage.getItem('viewMode_ichihara') || 'auto';
+  const next = VIEW_MODES[(VIEW_MODES.indexOf(m) + 1) % VIEW_MODES.length];
+  localStorage.setItem('viewMode_ichihara', next);
+  applyViewMode();
+  showToast('表示モード: ' + VIEW_LABEL[next], '');
+}
+
 // ── Init ────────────────────────────────────────────────────────────────
 loadData();
 switchTab('reservations');
 render();
 updateNotifBtn();
 updateLastFetchInfo();
+applyFontSize();
+applyViewMode();
 setInterval(updateLastFetchInfo, 60 * 1000); // 1分ごとに「○分前」表示を更新
 function tryInitGIS() {
   if (typeof google !== 'undefined' && google.accounts) initGIS();
