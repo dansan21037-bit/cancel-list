@@ -891,6 +891,7 @@ function switchTab(tab) {
 let tokenExpiresAt = 0;       // アクセストークンの失効予定時刻(ミリ秒)
 let refreshTimer = null;      // 先回り更新タイマー
 let isInitialAuth = false;    // true=ユーザー操作の初回サインイン / false=裏での更新
+let isRestoreAuth = false;    // true=ページ再読込時の自動復元(失敗してもポップアップ/エラーを出さない)
 let tokenRefreshResolve = null; // サイレント更新の完了を待つためのresolver
 
 function initGIS() {
@@ -905,25 +906,43 @@ function initGIS() {
 
 async function handleTokenResponse(resp) {
   if (resp.error) {
-    // サイレント更新の失敗時はポップアップを出さず、次の機会に再試行
+    // 初回サインインの失敗だけ通知。更新/自動復元の失敗は無音(ポップアップを出さない)
     if (isInitialAuth) showToast('サインイン失敗: ' + resp.error, 'error');
-    else console.warn('サイレント更新に失敗:', resp.error);
+    else console.warn('トークン取得に失敗(無音):', resp.error);
+    isInitialAuth = false; isRestoreAuth = false;
     if (tokenRefreshResolve) { tokenRefreshResolve(false); tokenRefreshResolve = null; }
+    updateAuthUI(); // 復元失敗時はUIを未ログインに戻す
     return;
   }
   accessToken = resp.access_token;
   const sec = resp.expires_in ? parseInt(resp.expires_in) : 3600;
   tokenExpiresAt = Date.now() + sec * 1000;
   isSignedIn = true;
+  localStorage.setItem('wasSignedIn_kawaguchi', '1'); // 次回読込時の自動復元フラグ
   updateAuthUI();
   scheduleTokenRefresh();
   if (tokenRefreshResolve) { tokenRefreshResolve(true); tokenRefreshResolve = null; }
-  // 初回サインイン時だけ、Drive読込→メール取得を実行(更新時は再実行しない)
-  if (isInitialAuth) {
-    isInitialAuth = false;
+  // 初回サインイン or 自動復元のときだけ Drive読込→メール取得(更新時は再実行しない)
+  const doFullLoad = isInitialAuth || isRestoreAuth;
+  isInitialAuth = false; isRestoreAuth = false;
+  if (doFullLoad) {
     await loadFromDrive();
     autoFetchEmails();
   }
+}
+
+// ページ再読込時、前回ログインしていれば裏でトークンを取り直す(ポップアップなし)
+function tryRestoreSession() {
+  if (isSignedIn) return;
+  const clientId = localStorage.getItem('google_client_id');
+  if (!clientId || localStorage.getItem('wasSignedIn_kawaguchi') !== '1') return;
+  if (!tokenClient) initGIS();
+  if (!tokenClient) return;
+  isRestoreAuth = true;
+  const info = document.getElementById('syncInfo');
+  if (info) info.textContent = 'ログインを復元中...';
+  try { tokenClient.requestAccessToken({ prompt: '' }); }
+  catch(e) { isRestoreAuth = false; updateAuthUI(); }
 }
 
 // 失効の5分前に自動でサイレント更新を予約
@@ -966,6 +985,7 @@ function signOut() {
   if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
   if (accessToken) { try { google.accounts.oauth2.revoke(accessToken); } catch(e) {} }
   accessToken = null; isSignedIn = false; driveFileId = null; tokenExpiresAt = 0;
+  localStorage.removeItem('wasSignedIn_kawaguchi'); // 自動復元を止める(手動サインアウト)
   updateAuthUI();
   showToast('サインアウトしました', '');
 }
@@ -2461,7 +2481,7 @@ applyFontSize();
 applyViewMode();
 setInterval(updateLastFetchInfo, 60 * 1000); // 1分ごとに「○分前」表示を更新
 function tryInitGIS() {
-  if (typeof google !== 'undefined' && google.accounts) initGIS();
+  if (typeof google !== 'undefined' && google.accounts) { initGIS(); tryRestoreSession(); }
   else setTimeout(tryInitGIS, 500);
 }
 tryInitGIS();
