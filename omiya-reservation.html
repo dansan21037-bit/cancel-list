@@ -272,11 +272,20 @@
   tr.row-past .name-cell { color: #718096; font-weight: 500; }
   tr.row-past .actions-cell button { opacity: 0.7; }
 
+  /* キャンセル済みの予約(メールでキャンセル済み) */
+  tr.row-cancelled { background: #f7fafc; }
+  tr.row-cancelled .name-cell, tr.row-cancelled .date-cell, tr.row-cancelled .menu-cell { text-decoration: line-through; color: #a0aec0; }
+  .tag-cancelled { display:inline-block; background:#e2e8f0; color:#4a5568; font-size:10px; font-weight:700; padding:2px 6px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; text-decoration:none; }
+
   /* 最終取得時刻 / 通知ボタン */
   .last-fetch-info { font-size: 12px; color: #718096; margin-left: 4px; padding: 2px 8px; background: #f7fafc; border-radius: 6px; }
   .last-fetch-info.fresh { color: #047857; background: #ecfdf5; }
   .btn-notif { background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
   .btn-notif.enabled { background: #ecfdf5; color: #047857; border-color: #6ee7b7; }
+  /* 前回ログイン再開ボタン: ワンタップで済むことが伝わるよう目立たせる */
+  .btn-resume { background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; font-weight: 700; animation: resumePulse 2s ease-in-out infinite; }
+  .btn-resume:hover { background: #d1fae5; }
+  @keyframes resumePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.35); } 50% { box-shadow: 0 0 0 5px rgba(16,185,129,0); } }
 
   /* 当日キャンセルタブ */
   .tab.active[data-tab="sameday"] { background: #b7791f; border-color: #b7791f; box-shadow: 0 -2px 8px rgba(183,121,31,0.3); }
@@ -435,6 +444,7 @@
   <button class="btn btn-sm btn-outline" id="fontBtn" onclick="cycleFontSize()" title="文字サイズを変更(標準/大/特大)">🔤 標準</button>
   <button class="btn btn-sm btn-outline" id="viewBtn" onclick="cycleViewMode()" title="表示モード(自動/カード/表)を切替">▦ 自動</button>
   <button class="btn btn-sm btn-notif" id="notifBtn" onclick="requestNotificationPermission()" title="新規予約をデスクトップ通知">🔔 通知</button>
+  <button class="btn btn-sm btn-resume" id="resumeBtn" onclick="resumeSession()" style="display:none" title="前回のログインをワンタップで再開します">🔄 前回のログインを再開</button>
   <button class="btn btn-sm btn-google" id="authBtn" onclick="handleAuth()">Googleサインイン</button>
   <button class="btn btn-sm btn-outline" id="syncBtn" onclick="syncFromDrive()" style="display:none">🔄 同期</button>
 </div>
@@ -635,7 +645,7 @@
           <option>12:00</option><option>12:30</option><option>13:00</option><option>13:30</option>
           <option>14:00</option><option>14:30</option><option>15:00</option><option>15:30</option>
           <option>16:00</option><option>16:30</option><option>17:00</option><option>17:30</option>
-          <option>18:00</option><option>18:30</option><option>19:00</option><option>19:30</option><option>20:00</option>
+          <option>18:00</option><option>18:30</option><option>19:00</option><option>19:30</option><option>20:00</option><option>20:30</option><option>21:00</option>
         </select>
       </div>
     </div>
@@ -667,7 +677,7 @@
           <option>12:00</option><option>12:30</option><option>13:00</option><option>13:30</option>
           <option>14:00</option><option>14:30</option><option>15:00</option><option>15:30</option>
           <option>16:00</option><option>16:30</option><option>17:00</option><option>17:30</option>
-          <option>18:00</option><option>18:30</option><option>19:00</option><option>19:30</option><option>20:00</option>
+          <option>18:00</option><option>18:30</option><option>19:00</option><option>19:30</option><option>20:00</option><option>20:30</option><option>21:00</option>
         </select>
       </div>
     </div>
@@ -798,7 +808,12 @@ function getSamedayList() {
       note: c.comment || '', datetime: c.datetime || ''
     };
   });
-  const manual = samedayManual.map(s => Object.assign({ source: 'manual' }, s));
+  // 手動登録後に同一の出来事のキャンセルメールが届くと二重計上されるため、
+  // 自動(メール)分と「電話番号+日付」が一致する手動分は表示・集計から除外する
+  const autoKeys = new Set(auto.map(a => normPhone(a.phone) + '|' + a.date).filter(k => k !== '|'));
+  const manual = samedayManual
+    .filter(s => !autoKeys.has(normPhone(s.phone) + '|' + s.date))
+    .map(s => Object.assign({ source: 'manual' }, s));
   return auto.concat(manual);
 }
 function getSamedayCounts() {
@@ -844,13 +859,6 @@ function dupLevelFor(r, map) {
   const others = group.filter(g => g !== r);
   const samePhone = others.some(g => myPhone && normPhone(g.phone) === myPhone);
   return samePhone ? 'dup' : 'samename';
-}
-// 予約全体の「同日同名」グループ数（一覧表示・バッジ用）
-function getDupGroupCount() {
-  const map = buildDupGroups(reservations);
-  let n = 0;
-  for (const k in map) if (map[k].length >= 2) n++;
-  return n;
 }
 // 今回の取得で新しく入った予約が関与する「同日同名」グループ数だけを数える
 // （過去分の同名同日で毎回警告が出てしまうのを防ぐ）
@@ -900,29 +908,47 @@ function initGIS() {
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId, scope: DRIVE_SCOPES, callback: handleTokenResponse,
+      error_callback: handleTokenClientError,
     });
   } catch(e) { console.error('GIS init error:', e); }
 }
 
+// requestAccessToken自体が失敗した場合のハンドラ(ポップアップブロック等)。
+// callbackのresp.errorより前の段階で発火するため、これがないと復元中のまま画面が固まる。
+let restoreTimeoutTimer = null;
+function handleTokenClientError(err) {
+  console.warn('トークンリクエストエラー:', err && err.type);
+  if (restoreTimeoutTimer) { clearTimeout(restoreTimeoutTimer); restoreTimeoutTimer = null; }
+  // 初回サインイン・再開ボタンのクリックはユーザー操作起点なので失敗を通知する。
+  // (裏の定期更新silentRefreshだけはユーザー操作を伴わないため引き続き無音)
+  const wasUserInitiated = isInitialAuth || isRestoreAuth;
+  isInitialAuth = false; isRestoreAuth = false;
+  if (tokenRefreshResolve) { tokenRefreshResolve(false); tokenRefreshResolve = null; }
+  updateAuthUI();
+  if (wasUserInitiated) showToast('サインインできませんでした。ポップアップがブロックされていないか確認してください', 'error');
+}
+
 async function handleTokenResponse(resp) {
+  if (restoreTimeoutTimer) { clearTimeout(restoreTimeoutTimer); restoreTimeoutTimer = null; }
   if (resp.error) {
-    // 初回サインインの失敗だけ通知。更新/自動復元の失敗は無音(ポップアップを出さない)
-    if (isInitialAuth) showToast('サインイン失敗: ' + resp.error, 'error');
+    // 初回サインイン・再開ボタンのクリックはユーザー操作起点なので失敗を通知する。
+    const wasUserInitiated = isInitialAuth || isRestoreAuth;
+    if (wasUserInitiated) showToast('サインイン失敗: ' + resp.error, 'error');
     else console.warn('トークン取得に失敗(無音):', resp.error);
     isInitialAuth = false; isRestoreAuth = false;
     if (tokenRefreshResolve) { tokenRefreshResolve(false); tokenRefreshResolve = null; }
-    updateAuthUI(); // 復元失敗時はUIを未ログインに戻す
+    updateAuthUI(); // 失敗時はUIを未ログインに戻す(前回ログインを再開ボタンも再表示される)
     return;
   }
   accessToken = resp.access_token;
   const sec = resp.expires_in ? parseInt(resp.expires_in) : 3600;
   tokenExpiresAt = Date.now() + sec * 1000;
   isSignedIn = true;
-  localStorage.setItem('wasSignedIn_omiya', '1'); // 次回読込時の自動復元フラグ
+  localStorage.setItem('wasSignedIn_omiya', '1'); // 次回読込時に「再開」ボタンを出すためのフラグ
   updateAuthUI();
   scheduleTokenRefresh();
   if (tokenRefreshResolve) { tokenRefreshResolve(true); tokenRefreshResolve = null; }
-  // 初回サインイン or 自動復元のときだけ Drive読込→メール取得(更新時は再実行しない)
+  // 初回サインイン or 再開ボタン経由のときだけ Drive読込→メール取得(定期更新時は再実行しない)
   const doFullLoad = isInitialAuth || isRestoreAuth;
   isInitialAuth = false; isRestoreAuth = false;
   if (doFullLoad) {
@@ -931,18 +957,30 @@ async function handleTokenResponse(resp) {
   }
 }
 
-// ページ再読込時、前回ログインしていれば裏でトークンを取り直す(ポップアップなし)
-function tryRestoreSession() {
+// 「前回のログインを再開」ボタンのクリックハンドラ。
+// ページ読込時に自動実行すると、ユーザー操作を伴わないためブラウザにポップアップを
+// ブロックされる(GSI LOGGERの "Failed to open popup window" エラーの原因)。
+// このボタンはユーザーの明示的なクリックから呼ばれるため、ポップアップはブロックされない。
+function resumeSession() {
   if (isSignedIn) return;
   const clientId = localStorage.getItem('google_client_id');
-  if (!clientId || localStorage.getItem('wasSignedIn_omiya') !== '1') return;
+  if (!clientId) { showToast('先にClient IDを設定してください', 'error'); openSettingsModal(); return; }
   if (!tokenClient) initGIS();
-  if (!tokenClient) return;
+  if (!tokenClient) { showToast('Google APIの読み込みを待っています...', 'error'); return; }
   isRestoreAuth = true;
-  const info = document.getElementById('syncInfo');
-  if (info) info.textContent = 'ログインを復元中...';
+  const btn = document.getElementById('resumeBtn');
+  if (btn) btn.textContent = '🔄 再開中...';
+  // コールバックが一切返らない場合の保険(諦めてボタン表示に戻す)
+  if (restoreTimeoutTimer) clearTimeout(restoreTimeoutTimer);
+  restoreTimeoutTimer = setTimeout(() => {
+    restoreTimeoutTimer = null;
+    if (isRestoreAuth) { isRestoreAuth = false; updateAuthUI(); }
+  }, 8000);
   try { tokenClient.requestAccessToken({ prompt: '' }); }
-  catch(e) { isRestoreAuth = false; updateAuthUI(); }
+  catch(e) {
+    if (restoreTimeoutTimer) { clearTimeout(restoreTimeoutTimer); restoreTimeoutTimer = null; }
+    isRestoreAuth = false; updateAuthUI();
+  }
 }
 
 // 失効の5分前に自動でサイレント更新を予約
@@ -954,14 +992,20 @@ function scheduleTokenRefresh() {
 }
 
 // 同意画面を出さずにトークンを再発行(ログイン中＆同意済みなら無音)
+// 進行中の更新を1つのPromiseとして共有する: 先回りタイマーと通信前チェックが
+// ほぼ同時に走ると、2件目がresolverを上書きして1件目が永久に解決されなくなる
+// (以後の取得/保存が固まる)ため、既に進行中ならそれを返して二重発行を防ぐ。
+let inFlightRefresh = null;
 function silentRefresh() {
   if (!tokenClient) return Promise.resolve(false);
-  return new Promise(resolve => {
-    tokenRefreshResolve = resolve;
+  if (inFlightRefresh) return inFlightRefresh;
+  inFlightRefresh = new Promise(resolve => {
+    tokenRefreshResolve = (ok) => { inFlightRefresh = null; resolve(ok); };
     isInitialAuth = false;
     try { tokenClient.requestAccessToken({ prompt: '' }); }
-    catch(e) { tokenRefreshResolve = null; resolve(false); }
+    catch(e) { tokenRefreshResolve = null; inFlightRefresh = null; resolve(false); }
   });
+  return inFlightRefresh;
 }
 
 // 通信の直前に呼ぶ:失効間近なら先に更新してから処理を続行
@@ -994,18 +1038,27 @@ function updateAuthUI() {
   const dot = document.getElementById('statusDot');
   const info = document.getElementById('syncInfo');
   const btn = document.getElementById('authBtn');
+  const resumeBtn = document.getElementById('resumeBtn');
   const syncBtn = document.getElementById('syncBtn');
   const fetchBtn = document.getElementById('fetchMailBtn');
   const rescanBtn = document.getElementById('rescanBtn');
   if (isSignedIn) {
     dot.className = 'status-dot online'; info.textContent = 'Google: 接続中';
     btn.textContent = 'サインアウト'; btn.className = 'btn btn-sm btn-outline';
+    if (resumeBtn) resumeBtn.style.display = 'none';
     syncBtn.style.display = '';
     fetchBtn.style.display = (activeTab !== 'stats') ? '' : 'none';
     if (rescanBtn) rescanBtn.style.display = (activeTab !== 'stats') ? '' : 'none';
   } else {
     dot.className = 'status-dot offline'; info.textContent = 'Google: 未接続';
     btn.textContent = 'Googleサインイン'; btn.className = 'btn btn-sm btn-google';
+    // 前回ログイン済みフラグがあれば「再開」ボタンを表示(クリック起点なのでポップアップがブロックされない)
+    if (resumeBtn) {
+      const clientId = localStorage.getItem('google_client_id');
+      const wasSignedIn = localStorage.getItem('wasSignedIn_omiya') === '1';
+      resumeBtn.style.display = (clientId && wasSignedIn) ? '' : 'none';
+      resumeBtn.textContent = '🔄 前回のログインを再開';
+    }
     syncBtn.style.display = 'none'; fetchBtn.style.display = 'none';
     if (rescanBtn) rescanBtn.style.display = 'none';
   }
@@ -1054,9 +1107,41 @@ async function loadFromDrive() {
   }
 }
 
+// 保存直前に最新のDriveデータを取得し、他端末が追加した分を失わないようマージする。
+// (完全な競合解決ではなく「配列への追加が同時に起きても消えない」ための対策。
+//  同一IDの記録が両方にある場合はこちらの端末の内容を優先する)
+async function mergeWithRemoteBeforeSave() {
+  if (!driveFileId) return; // 新規作成時はマージ対象がない
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    const resp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media&supportsAllDrives=true`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, signal: ctrl.signal }
+    );
+    clearTimeout(timer);
+    if (!resp.ok) return; // 取得できなければローカルの内容のまま保存(従来動作)
+    const remote = await resp.json();
+    reservations = mergeById(remote.reservations, reservations);
+    cancellations = mergeById(remote.cancellations, cancellations);
+    noshows = mergeById(remote.noshows, noshows);
+    samedayManual = mergeById(remote.samedayManual, samedayManual);
+  } catch(e) { /* タイムアウト等はローカルの内容のまま保存 */ }
+}
+// remote(他端末保存分を含む可能性)とlocal(この端末が保存しようとしている内容)をID単位で統合。
+// 同じIDが両方にあればlocalを優先、remoteにしかないもの(=他端末が追加)は残す。
+function mergeById(remoteList, localList) {
+  if (!Array.isArray(remoteList)) return localList;
+  const map = new Map();
+  remoteList.forEach(x => { if (x && x.id != null) map.set(String(x.id), x); });
+  localList.forEach(x => { if (x && x.id != null) map.set(String(x.id), x); });
+  return Array.from(map.values());
+}
+
 async function saveToDrive() {
   if (!accessToken) return;
   await ensureFreshToken();
+  await mergeWithRemoteBeforeSave();
   try {
     const content = JSON.stringify({ reservations, cancellations, noshows, samedayManual });
     if (driveFileId) {
@@ -1106,16 +1191,26 @@ async function processEmails(messages, type) {
   const list = type === 'reservation' ? reservations : cancellations;
   for (const msg of messages) {
     const parsed = parser(msg.body);
-    if (parsed && parsed.menu && parsed.menu.includes('1980')) {
-      parsed.gmailMsgId = msg.id;
-      const existing = list.find(r => r.id === parsed.id);
-      if (!existing) {
-        list.push(parsed); count++;
-      } else if (!existing.datetime && parsed.datetime) {
-        // 既存データが空欄なら更新
-        Object.assign(existing, parsed);
-        count++;
-      }
+    if (!parsed) continue;
+    const menuOk = parsed.menu && parsed.menu.includes('1980');
+    // キャンセルメールは、既存の予約とIDが一致すればメニュー欄の解析失敗でも受理する
+    // (取りこぼし防止。無関係な件まで拾わないようreservation側の存在を条件にする)
+    const relaxedOk = type === 'cancellation' && reservations.some(r => r.id === parsed.id);
+    if (!menuOk && !relaxedOk) continue;
+    parsed.gmailMsgId = msg.id;
+    const existing = list.find(r => r.id === parsed.id);
+    if (!existing) {
+      list.push(parsed); count++;
+    } else if (!existing.datetime && parsed.datetime) {
+      // 既存データが空欄なら更新
+      Object.assign(existing, parsed);
+      count++;
+    }
+    // キャンセルメール到着時、対応する予約に「キャンセル済み」フラグを付与
+    // (予約リスト・本日サマリー・要注意アラートに反映させるため)
+    if (type === 'cancellation') {
+      const origRes = reservations.find(r => r.id === parsed.id);
+      if (origRes && !origRes.cancelledAt) origRes.cancelledAt = parsed.receivedAt || parsed.datetime || '1';
     }
   }
   return count;
@@ -1146,7 +1241,6 @@ async function autoFetchEmails() {
       fetchGmailMessages(q1, true, 30, 100),
       fetchGmailMessages(q2, true, 30, 100)
     ]);
-    const beforeResLen = reservations.length;
     const beforeIds = new Set(reservations.map(x => x.id));
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
@@ -1159,7 +1253,9 @@ async function autoFetchEmails() {
       saveData(); render();
       const dupN = getNewDupGroupCount(beforeIds);
       showToast(`自動取得: 予約${newRes}件、キャンセル${newCan}件` + (dupN > 0 ? ` ／ ⚠️同日同名 ${dupN}組あり` : ''), 'success');
-      const sample = reservations.length > beforeResLen ? reservations[0].name : '';
+      // 通知に出す例示名は「実際に新規追加された予約」から選ぶ(最新日時の予約とは限らないため)
+      const newlyAdded = reservations.find(r => !beforeIds.has(r.id));
+      const sample = newlyAdded ? newlyAdded.name : '';
       notifyNew(newRes, newCan, sample);
       alertNewCaution(getNewCautionAlerts(beforeIds));
     }
@@ -1183,7 +1279,6 @@ async function fetchEmails() {
     if (fetchCancelled) return;
     const canMsg = await fetchGmailMessages(q2, false, 60, 200);
     if (fetchCancelled) return;
-    const beforeResLen = reservations.length;
     const beforeIds = new Set(reservations.map(x => x.id));
     const newRes = await processEmails(resMsg, 'reservation');
     const newCan = await processEmails(canMsg, 'cancellation');
@@ -1194,7 +1289,9 @@ async function fetchEmails() {
     cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
     saveData(); render(); hideLoading();
     showToast(`予約${newRes}件、キャンセル${newCan}件を取得（合計: ${reservations.length}/${cancellations.length}件）`, 'success');
-    const sample = reservations.length > beforeResLen ? reservations[0].name : '';
+    // 通知に出す例示名は「実際に新規追加された予約」から選ぶ(最新日時の予約とは限らないため)
+    const newlyAdded = reservations.find(r => !beforeIds.has(r.id));
+    const sample = newlyAdded ? newlyAdded.name : '';
     notifyNew(newRes, newCan, sample);
     alertNewCaution(getNewCautionAlerts(beforeIds));
     const dupN = getNewDupGroupCount(beforeIds);
@@ -1467,6 +1564,14 @@ function toggleClearBtn() {
   const v = document.getElementById('searchInput').value;
   document.getElementById('searchClear').style.display = v ? 'block' : 'none';
 }
+// バッジ/行クリックで検索欄に絞り込みキーを反映する共通ハンドラ。
+// data-search-key属性から値を読むため、氏名・電話にどんな文字が含まれてもonclick文字列を汚染しない。
+function searchByBadge(el) {
+  const key = el.getAttribute('data-search-key') || '';
+  document.getElementById('searchInput').value = key;
+  toggleClearBtn();
+  render();
+}
 function render() {
   const q = document.getElementById('searchInput').value.toLowerCase().trim();
   const dateFrom = document.getElementById('filterDateFrom').value;
@@ -1486,11 +1591,12 @@ function render() {
 
 function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const qNorm = q ? q.replace(/[\s\u3000]/g, '') : '';
+  const qPhoneNorm = q ? normPhone(q) : ''; // phone search: strip hyphens etc from the query too, to match normPhone(r.phone)
   let filtered = data.filter(r => {
     if (q) {
       const nameNorm = (r.name||'').replace(/[\s\u3000]/g, '').toLowerCase();
       const phoneNorm = normPhone(r.phone);
-      const match = nameNorm.includes(qNorm) || phoneNorm.includes(qNorm) || (r.phone||'').includes(q) ||
+      const match = nameNorm.includes(qNorm) || (qPhoneNorm && phoneNorm.includes(qPhoneNorm)) || (r.phone||'').includes(q) ||
         (r.datetime||'').includes(q) || (r.menu||'').toLowerCase().includes(q) ||
         (r.email||'').toLowerCase().includes(q) || (r.comment||'').toLowerCase().includes(q);
       if (!match) return false;
@@ -1536,6 +1642,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const cnt = pn ? (counts[pn] || 1) : 1;
       const isCancelTab = (tabId === 'cancellations');
       const isResTab = (tabId === 'reservations');
+      const isCancelled = isResTab && !!r.cancelledAt;
       // 過去無断キャンセル者の警告（予約リストのみ）
       const nsByPhone = pn ? (noshowPhoneMap[pn] || 0) : 0;
       const nsByName = nn ? (noshowNameMap[nn] || 0) : 0;
@@ -1554,6 +1661,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (dupLv === 'dup') rowClass = (rowClass ? rowClass + ' ' : '') + 'row-dup';
       else if (dupLv === 'samename') rowClass = (rowClass ? rowClass + ' ' : '') + 'row-samename';
       if (isPast) rowClass = (rowClass ? rowClass + ' ' : '') + 'row-past';
+      if (isCancelled) rowClass = (rowClass ? rowClass + ' ' : '') + 'row-cancelled';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
       const badgeCol = isCancelTab ? `<td data-label="回数" style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
       // リピーターバッジ（予約リストのみ）
@@ -1563,34 +1671,39 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         if (pn) { repCnt = repeatCounts[pn] || 0; searchKey = r.phone; }
         else if (nn) { repCnt = repeatByName[nn] || 0; searchKey = r.name; }
         if (repCnt >= 2) {
-          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" onclick="document.getElementById('searchInput').value='${(searchKey||'').replace(/'/g,"\\'")}';toggleClearBtn();render();">再${repCnt}</span>`;
+          repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" data-search-key="${esc(searchKey||'')}" onclick="searchByBadge(this)">再${repCnt}</span>`;
         }
       }
-      // 予約者リストのみ: 当日キャンセルチェック列
+      // 予約者リストのみ: 当日キャンセルチェック列(キャンセル済みは対象外)
       let samedayCol = '';
       if (isResTab) {
-        if (r.movedToSameday) {
+        if (isCancelled) {
+          samedayCol = `<td data-label="🟠当日" style="text-align:center;color:#cbd5e0" title="既にキャンセル済みのため対象外">—</td>`;
+        } else if (r.movedToSameday) {
           samedayCol = `<td data-label="🟠当日" style="text-align:center"><span class="noshow-checked-label" style="color:#b7791f">✓ 登録済</span></td>`;
         } else {
           samedayCol = `<td data-label="🟠当日" style="text-align:center"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}', this)" title="当日キャンセルに登録（電話キャンセル等）"></td>`;
         }
       }
-      // 予約者リストのみ: 無断キャンセルチェック列
+      // 予約者リストのみ: 無断キャンセルチェック列(キャンセル済み=事前連絡ありのため対象外)
       let noshowCol = '';
       if (isResTab) {
         const alreadyMoved = r.movedToNoshow ? true : false;
-        if (alreadyMoved) {
+        if (isCancelled) {
+          noshowCol = `<td data-label="🚫無断" style="text-align:center;color:#cbd5e0" title="既にキャンセル済み(事前連絡あり)のため対象外">—</td>`;
+        } else if (alreadyMoved) {
           noshowCol = `<td data-label="🚫無断" style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
         } else {
           noshowCol = `<td data-label="🚫無断" style="text-align:center"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></td>`;
         }
       }
+      const cancelledTag = isCancelled ? ` <span class="tag-cancelled">キャンセル済</span>` : '';
       const recvLabel = isCancelTab ? 'キャンセル日時' : '受付日時';
       return `<tr class="${rowClass}">
       <td style="color:#a0aec0;font-size:12px">${i+1}</td>
       <td data-label="予約日時" class="date-cell">${esc(fmtDT(r.datetime))}</td>
       <td data-label="メニュー" class="menu-cell">${esc(r.menu)}</td>
-      <td data-label="氏名" class="name-cell">${esc(r.name)}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}</td>
+      <td data-label="氏名" class="name-cell">${esc(r.name)}${cancelledTag}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}</td>
       <td data-label="電話" class="phone-cell">${esc(r.phone)}</td>
       <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
       <td data-label="コメント" class="comment-cell">${esc(r.comment)}</td>
@@ -1689,7 +1802,7 @@ function renderSamedayTable(q, dateFrom, dateTo) {
       const isAuto = r.source === 'auto';
       const tag = isAuto ? `<span class="tag-auto">✉️メール</span>` : `<span class="tag-manual">📞手動</span>`;
       const actions = isAuto
-        ? `<button class="btn btn-outline btn-sm" title="キャンセルタブで編集" onclick="switchTab('cancellations');document.getElementById('searchInput').value='${(r.phone||r.name||'').replace(/'/g,"\\'")}';toggleClearBtn();render();">🔍</button>`
+        ? `<button class="btn btn-outline btn-sm" title="キャンセルタブで編集" data-search-key="${esc(r.phone||r.name||'')}" onclick="switchTab('cancellations');searchByBadge(this)">🔍</button>`
         : `<button class="btn btn-outline btn-sm" onclick="openSamedayModal('${r.id}')">✏️</button>
            <button class="btn btn-danger btn-sm" onclick="deleteSameday('${r.id}')">🗑️</button>`;
       return `<tr class="${rc}">
@@ -1772,6 +1885,7 @@ function getCautionReservations() {
   const sdP = getSamedayPhoneCountMap(), sdN = getSamedayNameCountMap();
   const out = [];
   reservations.forEach(r => {
+    if (r.cancelledAt) return; // キャンセル済みは「来る予定」から除外
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today) return; // 今日以降のみ
     const pn = normPhone(r.phone), nn = normName(r.name);
@@ -1789,7 +1903,7 @@ function getNewCautionAlerts(beforeIds) {
   const today = todayStr();
   const out = [];
   reservations.forEach(r => {
-    if (beforeIds.has(r.id)) return;
+    if (beforeIds.has(r.id) || r.cancelledAt) return;
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today) return;
     const pn = normPhone(r.phone), nn = normName(r.name);
@@ -1839,8 +1953,8 @@ function renderCautionBanner() {
     const sev = o.ns > 0 ? '' : ' sev-amber';
     const nsB = o.ns > 0 ? `<span class="badge-noshow-warn">⚠️無断${o.ns}</span>` : '';
     const sdB = o.sd > 0 ? `<span class="badge-sameday-warn">🟠当日${o.sd}</span>` : '';
-    const key = (r.phone || r.name || '').replace(/'/g, "\\'");
-    return `<div class="caution-item${sev}" onclick="document.getElementById('searchInput').value='${key}';toggleClearBtn();render();">
+    const key = r.phone || r.name || '';
+    return `<div class="caution-item${sev}" data-search-key="${esc(key)}" onclick="searchByBadge(this)">
       <span class="caution-when">${esc(when)}</span>
       <span class="caution-name">${esc(r.name)}</span>
       <span class="caution-badges">${nsB}${sdB}</span>
@@ -1861,7 +1975,7 @@ function renderTodaySummary() {
   if (!banner) return;
   const today = todayStr();
   const list = reservations
-    .filter(r => (r.datetime||'').substring(0,10) === today)
+    .filter(r => (r.datetime||'').substring(0,10) === today && !r.cancelledAt)
     .sort((a,b) => (a.datetime||'').localeCompare(b.datetime||''));
   document.getElementById('todayCount').textContent = list.length;
   const tc = document.getElementById('stat-todayCount');
@@ -2013,6 +2127,9 @@ function deleteEmailRecord(tabId, id) {
     reservations = reservations.filter(x => x.id !== id);
   } else {
     cancellations = cancellations.filter(x => x.id !== id);
+    // 対応する予約の「キャンセル済み」フラグも解除(誤登録の取り消しに対応)
+    const origRes = reservations.find(x => x.id === id);
+    if (origRes) origRes.cancelledAt = null;
   }
   saveData();
   render();
@@ -2337,10 +2454,15 @@ function renderImportPreview() {
 }
 function confirmImport() {
   if (importParsed.length === 0) { showToast('インポートするデータがありません', 'error'); return; }
-  let added = 0;
+  let added = 0, skipped = 0;
   if (importType === 'noshow') {
     let nextId = noshows.length > 0 ? Math.max(...noshows.map(n => Number(n.id)||0)) + 1 : 1;
     importParsed.forEach(r => {
+      // 重複防止: 電話番号+日付+氏名(正規化)が一致する既存レコードがあればスキップ
+      // (同じファイルの再インポートや、範囲が重なるエクスポートの取り込みで二重登録されるのを防ぐ)
+      const pn = normPhone(r.phone), nn = normName(r.name), d = r.date || '';
+      const isDup = pn && noshows.some(n => normPhone(n.phone) === pn && normName(n.name) === nn && (n.date||'') === d);
+      if (isDup) { skipped++; return; }
       noshows.push({ id: nextId++, date: r.date||'', time: r.time||'', name: r.name||'', phone: r.phone||'', email: r.email||'', note: r.note||'' });
       added++;
     });
@@ -2348,7 +2470,7 @@ function confirmImport() {
     const list = importType === 'reservations' ? reservations : cancellations;
     importParsed.forEach(r => {
       const id = r.id || ('imp_' + normPhone(r.phone) + '_' + (r.datetime||'').replace(/\D/g,''));
-      if (list.some(x => String(x.id) === String(id))) return;
+      if (list.some(x => String(x.id) === String(id))) { skipped++; return; }
       list.push({ id, datetime: r.datetime||'', menu: r.menu||'', name: r.name||'', phone: r.phone||'', email: r.email||'', comment: r.comment||'', receivedAt: r.receivedAt||'', type: importType === 'reservations' ? 'reservation' : 'cancellation' });
       added++;
     });
@@ -2357,14 +2479,28 @@ function confirmImport() {
   saveData();
   closeImportModal();
   render();
-  showToast(`${added}件をインポートしました ✓`, 'success');
+  const skipMsg = skipped > 0 ? `(重複${skipped}件はスキップ)` : '';
+  showToast(`${added}件をインポートしました ✓ ${skipMsg}`, 'success');
 }
 
 // ── Toast / Loading ─────────────────────────────────────────────────────
+// トーストをキュー化: 短時間に複数呼ばれても上書きで消えず、順番に表示する
+let toastQueue = [];
+let toastShowing = false;
 function showToast(msg, type) {
+  toastQueue.push({ msg, type });
+  processToastQueue();
+}
+function processToastQueue() {
+  if (toastShowing || toastQueue.length === 0) return;
+  toastShowing = true;
+  const { msg, type } = toastQueue.shift();
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : '');
-  setTimeout(() => { t.className = 'toast'; }, 4000);
+  setTimeout(() => {
+    t.className = 'toast';
+    setTimeout(() => { toastShowing = false; processToastQueue(); }, 300);
+  }, 4000);
 }
 function showLoading(text) {
   document.getElementById('loadingText').textContent = text || 'メールを取得中...';
@@ -2479,9 +2615,12 @@ updateNotifBtn();
 updateLastFetchInfo();
 applyFontSize();
 applyViewMode();
+updateAuthUI(); // Google読み込み待ちの間も「前回のログインを再開」ボタンをすぐ出す
 setInterval(updateLastFetchInfo, 60 * 1000); // 1分ごとに「○分前」表示を更新
 function tryInitGIS() {
-  if (typeof google !== 'undefined' && google.accounts) { initGIS(); tryRestoreSession(); }
+  // 自動でrequestAccessTokenを呼ぶとユーザー操作を伴わずブラウザにポップアップをブロック
+  // されるため、ここでは初期化とボタン表示の更新のみ行う(実際の再開はresumeSessionのクリック時)
+  if (typeof google !== 'undefined' && google.accounts) { initGIS(); updateAuthUI(); }
   else setTimeout(tryInitGIS, 500);
 }
 tryInitGIS();
