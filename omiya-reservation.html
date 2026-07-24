@@ -7,8 +7,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+  /* ==== カラートークン(意味ベース) ====
+     危険danger/注意caution/注意(強)caution-strong/情報info/中立neutral/良好positive の6分類。
+     以後、状態を表す色は極力ハードコード値でなくこの変数を参照する。
+     ダークモードは body.dark-mode 側で同名変数を上書きするだけで全体に反映される。 */
+  :root {
+    --color-danger: #c53030;         --color-danger-tint: #fc8181;         --color-danger-text: #822727;         --color-danger-bg: #fff5f5;
+    --color-caution: #c05621;        --color-caution-tint: #fbd38d;        --color-caution-text: #7b341e;        --color-caution-bg: #fffaf0;
+    --color-caution-strong: #b7791f; --color-caution-strong-tint: #f6ad55; --color-caution-strong-text: #7b341e; --color-caution-strong-bg: #fdecc8;
+    --color-info: #2b6cb0;           --color-info-tint: #ebf8ff;           --color-info-text: #2b6cb0;
+    --color-neutral: #4a5568;        --color-neutral-strong: #718096;      --color-neutral-muted: #a0aec0;       --color-neutral-tint: #e2e8f0; --color-neutral-bg: #f7fafc;
+    --color-positive: #2f855a;       --color-positive-tint: #c6f6d5;       --color-positive-text: #22543d;       --color-positive-bg: #f0fff4;
+    --color-accent-purple: #6b46c1;  --color-accent-purple-tint: #f0e6ff;  /* 統計タブ専用アクセント(意味色ではない) */
+    --color-zebra-tint: #f8fafc;
+    --tap-min: 44px;
+    /* ページ構造トークン(ダークモード用) */
+    --color-bg: #f0f2f5; --color-text: #333; --color-surface: #ffffff;
+  }
+  body.dark-mode {
+    --color-bg: #16181d; --color-text: #e2e8f0; --color-surface: #22252b;
+    --color-danger: #fc8181;         --color-danger-tint: #742a2a;         --color-danger-text: #fed7d7;         --color-danger-bg: #2d1b1b;
+    --color-caution: #f6ad55;        --color-caution-tint: #7b341e;        --color-caution-text: #feebc8;        --color-caution-bg: #2d2114;
+    --color-caution-strong: #f6ad55; --color-caution-strong-tint: #7b341e; --color-caution-strong-text: #feebc8; --color-caution-strong-bg: #332412;
+    --color-info: #63b3ed;           --color-info-tint: #1a365d;           --color-info-text: #bee3f8;
+    --color-neutral: #cbd5e0;        --color-neutral-strong: #a0aec0;      --color-neutral-muted: #718096;       --color-neutral-tint: #2d3748; --color-neutral-bg: #262b33;
+    --color-positive: #68d391;       --color-positive-tint: #22543d;       --color-positive-text: #c6f6d5;       --color-positive-bg: #16281f;
+    --color-accent-purple: #9f7aea;  --color-accent-purple-tint: #322659;
+    --color-zebra-tint: #1c2027;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+    background: var(--color-bg); color: var(--color-text); min-height: 100vh;
+    transition: background-color .2s ease, color .2s ease;
+  }
+  body.dark-mode { color-scheme: dark; }
   .header {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     color: white; padding: 20px 24px; display: flex; align-items: center; gap: 16px;
@@ -29,31 +62,41 @@
   .btn-google { background: #4285f4; color: white; }
   .btn-google:hover { background: #3367d6; }
   .tab-bar {
-    display: flex; background: #f7fafc; border-bottom: 2px solid #e2e8f0;
+    display: flex; background: var(--color-neutral-bg); border-bottom: 2px solid var(--color-neutral-tint);
     padding: 8px 24px 0; overflow-x: auto; gap: 6px;
   }
   .tab {
-    padding: 12px 22px; border: 2px solid #e2e8f0; border-bottom: none;
-    background: #edf2f7; cursor: pointer;
-    font-size: 14px; font-weight: 700; color: #718096; font-family: inherit;
+    padding: 12px 22px; border: 2px solid var(--color-neutral-tint); border-bottom: none;
+    background: var(--color-neutral-bg); cursor: pointer; display: flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 700; color: var(--color-neutral-strong); font-family: inherit;
     border-radius: 10px 10px 0 0; white-space: nowrap;
     transition: all 0.2s; position: relative; top: 2px;
   }
-  .tab:hover { color: #4a5568; background: #e2e8f0; }
-  .tab.active { color: white; background: #2b6cb0; border-color: #2b6cb0; box-shadow: 0 -2px 8px rgba(43,108,176,0.3); }
-  .tab.active[data-tab="cancellations"] { background: #c05621; border-color: #c05621; box-shadow: 0 -2px 8px rgba(192,86,33,0.3); }
-  .tab.active[data-tab="noshow"] { background: #c53030; border-color: #c53030; box-shadow: 0 -2px 8px rgba(197,48,48,0.3); }
-  .stats-bar {
-    display: flex; gap: 12px; padding: 16px 24px; background: white;
-    border-bottom: 1px solid #e2e8f0; flex-wrap: wrap;
+  .tab:hover { color: var(--color-neutral); background: var(--color-neutral-tint); }
+  .tab.active { color: white; background: var(--color-info); border-color: var(--color-info); box-shadow: 0 -2px 8px rgba(43,108,176,0.3); }
+  .tab.active[data-tab="cancellations"] { background: var(--color-caution); border-color: var(--color-caution); box-shadow: 0 -2px 8px rgba(192,86,33,0.3); }
+  .tab.active[data-tab="noshow"] { background: var(--color-danger); border-color: var(--color-danger); box-shadow: 0 -2px 8px rgba(197,48,48,0.3); }
+  .tab-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+    font-size: 12px; font-weight: 800; line-height: 1;
   }
+  .tab:not(.active) .tab-badge { background: var(--color-neutral-tint); color: var(--color-neutral); }
+  .tab.active .tab-badge { background: rgba(255,255,255,0.28); color: #fff; }
+  .stats-bar {
+    display: flex; gap: 12px; padding: 16px 24px; background: var(--color-surface);
+    border-bottom: 1px solid var(--color-neutral-tint); flex-wrap: wrap;
+  }
+  /* タブに件数バッジを内蔵したため、stats-bar自体は使わなくなった(HTML側で削除済み)。
+     万一残っていても表示されないよう保険で非表示にしておく */
+  .stats-bar { display: none; }
   .stat-card {
     display: flex; align-items: center; gap: 10px; padding: 10px 16px;
     border-radius: 10px; font-size: 14px; font-weight: 600; min-width: 130px;
   }
-  .stat-card.blue-card { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; cursor: pointer; transition: all 0.2s; }
-  .stat-card.orange-card { background: #fffaf0; color: #c05621; border: 1px solid #fbd38d; cursor: pointer; transition: all 0.2s; }
-  .stat-card.red-card { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; cursor: pointer; transition: all 0.2s; }
+  .stat-card.blue-card { background: var(--color-info-tint); color: var(--color-info); border: 1px solid var(--color-info); cursor: pointer; transition: all 0.2s; }
+  .stat-card.orange-card { background: var(--color-caution-bg); color: var(--color-caution); border: 1px solid var(--color-caution-tint); cursor: pointer; transition: all 0.2s; }
+  .stat-card.red-card { background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid var(--color-danger-tint); cursor: pointer; transition: all 0.2s; }
   .stat-card:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
   .stat-card.stat-active { box-shadow: 0 0 0 3px rgba(66,153,225,0.4); transform: translateY(-1px); }
   .stat-card.orange-card.stat-active { box-shadow: 0 0 0 3px rgba(192,86,33,0.3); }
@@ -71,7 +114,7 @@
   }
   .search-input:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
   .search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #a0aec0; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 13px; line-height: 20px; text-align: center; cursor: pointer; display: none; padding: 0; }
-  .search-clear:hover { background: #e53e3e; }
+  .search-clear:hover { background: var(--color-danger); }
   .btn {
     padding: 9px 16px; border: none; border-radius: 8px; font-size: 14px;
     font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.2s;
@@ -90,62 +133,93 @@
   .date-filter { display: flex; align-items: center; gap: 6px; font-size: 13px; }
   .date-filter input[type="date"] { width: auto; padding: 6px 10px; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px; }
   .table-wrap { padding: 16px 24px; }
-  .table-container { background: white; border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); overflow: hidden; }
-  .table-scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  thead tr { background: #f7fafc; }
+  .table-container { background: var(--color-surface); border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); }
+  /* thead を sticky にするため、table-scroll/table-container に overflow-y の制約を持たせない
+     (overflow:hidden を持つとページ全体スクロールへの追従が壊れるため意図的に外している) */
+  .table-scroll { overflow-x: auto; border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+  thead tr { background: var(--color-neutral-bg); }
   th {
-    padding: 12px 14px; text-align: left; font-weight: 700; color: #4a5568;
-    font-size: 13px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+    padding: 14px 14px; text-align: left; font-weight: 700; color: var(--color-neutral);
+    font-size: 13px; border-bottom: 2px solid var(--color-neutral-tint); white-space: nowrap;
     user-select: none;
+    position: sticky; top: 0; z-index: 5; background: var(--color-neutral-bg);
   }
   th[onclick] {
     cursor: pointer; transition: all 0.15s;
   }
-  th[onclick]:hover { color: #2b6cb0; background: #ebf8ff; }
+  th[onclick]:hover { color: var(--color-info); background: var(--color-info-tint); }
   th .sort-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 20px; height: 20px; border-radius: 4px; background: #edf2f7;
-    font-size: 10px; margin-left: 4px; vertical-align: middle; color: #718096;
+    width: 20px; height: 20px; border-radius: 4px; background: var(--color-neutral-tint);
+    font-size: 10px; margin-left: 4px; vertical-align: middle; color: var(--color-neutral-strong);
     transition: all 0.15s;
   }
-  th[onclick]:hover .sort-btn { background: #bee3f8; color: #2b6cb0; }
-  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+  th[onclick]:hover .sort-btn { background: var(--color-info-tint); color: var(--color-info); }
+  tbody tr { border-bottom: 1px solid var(--color-neutral-tint); transition: background 0.15s; }
   tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: #f7fafc !important; }
-  td { padding: 11px 14px; vertical-align: middle; }
-  /* 無断キャンセル用（オレンジ/赤） */
-  tr.row-orange { background: #fffaf0; }
-  tr.row-red { background: #fff5f5; }
-  /* キャンセルリスト用（青紫/濃紫） */
-  tr.row-cancel-3 { background: #f0e6ff; }
-  tr.row-cancel-4 { background: #e2d0f8; }
+  /* 縞模様。状態色を持つ行(row-*)では:not()により無効化し、状態色が必ず優先される */
+  tbody tr:nth-child(even):not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
+    :not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red)
+    :not(.row-sameday-2):not(.row-sameday-3) {
+    background: var(--color-zebra-tint);
+  }
+  tbody tr:hover { background: var(--color-neutral-bg) !important; }
+  td { padding: 13px 14px; vertical-align: middle; }
+  /* 無断キャンセル用（意味カラー: 注意=オレンジ / 危険=赤） */
+  tr.row-orange { border-left: 4px solid var(--color-caution) !important; background: var(--color-caution-bg) !important; }
+  tr.row-red    { border-left: 4px solid var(--color-danger)  !important; background: var(--color-danger-bg)  !important; }
+  /* キャンセルリスト用累積回数（注意=3回 / 危険=4回以上） */
+  tr.row-cancel-3 { border-left: 4px solid var(--color-caution) !important; background: var(--color-caution-bg) !important; }
+  tr.row-cancel-4 { border-left: 4px solid var(--color-danger)  !important; background: var(--color-danger-bg)  !important; }
   .badge {
     display: inline-flex; align-items: center; justify-content: center;
     width: 26px; height: 26px; border-radius: 50%; font-weight: 800; font-size: 13px;
   }
-  .badge-1 { background: #e2e8f0; color: #4a5568; }
-  .badge-2 { background: #fbd38d; color: #744210; }
-  .badge-3 { background: #fc8181; color: #822727; }
-  /* キャンセルリスト用バッジ */
-  .badge-c3 { background: #d6bcfa; color: #44337a; }
-  .badge-c4 { background: #b794f4; color: #322659; }
-  .badge-repeat { background: #c53030; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; white-space: nowrap; vertical-align: middle; }
-  .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: #e53e3e; }
-  .sameday-check { width: 20px; height: 20px; cursor: pointer; accent-color: #b7791f; }
+  .badge-1 { background: var(--color-neutral-tint); color: var(--color-neutral); }
+  .badge-2 { background: var(--color-caution-tint); color: var(--color-caution-text); }
+  .badge-3 { background: var(--color-danger-tint);  color: var(--color-danger-text); }
+  /* キャンセルリスト用バッジ(旧:紫 → 注意/危険の意味色へ統合) */
+  .badge-c3 { background: var(--color-caution-tint); color: var(--color-caution-text); }
+  .badge-c4 { background: var(--color-danger-tint);  color: var(--color-danger-text); }
+  /* リピーターは「良い客」を示す良好色(旧: 危険色の赤だったのを是正) */
+  .badge-repeat { background: var(--color-positive); color: #fff; font-size: 12px; padding: 2px 6px; border-radius: 8px; white-space: nowrap; vertical-align: middle; }
+  .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: var(--color-danger); }
+  .sameday-check { width: 20px; height: 20px; cursor: pointer; accent-color: var(--color-caution-strong); }
   .noshow-check:disabled { cursor: default; opacity: 0.6; }
-  .noshow-checked-label { font-size: 11px; color: #c53030; font-weight: 700; }
+  .noshow-checked-label { font-size: 11px; color: var(--color-danger); font-weight: 700; }
   .name-cell { font-weight: 600; }
-  .phone-cell { font-family: monospace; color: #2b6cb0; font-size: 13px; }
-  .date-cell { white-space: nowrap; color: #4a5568; }
-  .note-cell { color: #718096; font-size: 13px; max-width: 260px; }
-  .menu-cell { font-size: 13px; max-width: 280px; color: #4a5568; }
-  .comment-cell { font-size: 12px; max-width: 150px; color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .comment-cell:hover { white-space: normal; overflow: visible; position: relative; z-index: 10; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
+  .name-cell .name-primary { font-weight: 600; }
+  .name-cell .name-email {
+    font-weight: 400; font-size: 11px; color: var(--color-neutral-muted); margin-top: 1px;
+    max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  tr.row-cancelled .name-cell .name-email { text-decoration: line-through; }
+  /* モバイルカード先頭ヘッダー用セル(デスクトップ表表示では非表示。カード表示時のみ.card-header-cell側で表示切替) */
+  .card-header-cell { display: none; }
+  .row-index-cell { color: var(--color-neutral-muted); font-size: 12px; }
+  /* 注意列: バッジ類を氏名から分離して表示 */
+  .caution-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; max-width: 220px; font-size: 12px; }
+  .caution-cell:empty::after { content: '—'; color: var(--color-neutral-muted); }
+  tr.row-past .caution-cell { opacity: 0.8; }
+  /* 電話番号のtel:リンク(発信可能。見た目は通常テキストに近い) */
+  a.tel-link { color: inherit; text-decoration: none; font: inherit; -webkit-tap-highlight-color: rgba(66,153,225,0.15); }
+  a.tel-link:active { opacity: 0.55; }
+  .phone-cell { font-family: monospace; color: var(--color-info); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .date-cell { white-space: nowrap; color: var(--color-neutral); font-variant-numeric: tabular-nums; }
+  .note-cell { color: var(--color-neutral-strong); font-size: 13px; max-width: 260px; }
+  .menu-cell { font-size: 13px; max-width: 280px; color: var(--color-neutral); }
+  .comment-cell { font-size: 12px; max-width: 150px; color: var(--color-neutral-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .comment-cell:hover, .comment-cell.expanded { white-space: normal; overflow: visible; position: relative; z-index: 10; background: var(--color-surface); box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
   .actions-cell { display: flex; gap: 5px; }
-  .empty-state { text-align: center; padding: 60px 20px; color: #a0aec0; }
-  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--color-neutral); }
+  .empty-state .icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 88px; height: 88px; border-radius: 50%; background: var(--color-info-tint);
+    font-size: 40px; margin: 0 auto 16px; line-height: 1;
+  }
   .empty-state p { font-size: 15px; }
+  .empty-state small { color: var(--color-neutral-strong); }
   .table-footer {
     padding: 10px 14px; background: #f7fafc; border-top: 1px solid #e2e8f0;
     font-size: 13px; color: #718096; display: flex; justify-content: space-between; align-items: center;
@@ -161,7 +235,7 @@
     max-height: 90vh; overflow-y: auto;
   }
   @keyframes modalIn { from { opacity:0; transform: translateY(-20px) scale(0.97); } to { opacity:1; transform: none; } }
-  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: #1a202c; }
+  .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--color-text); }
   .form-group { margin-bottom: 16px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   label { display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 5px; }
@@ -182,36 +256,82 @@
   .toast.success { background: #276749; }
   .toast.error { background: #9b2c2c; }
   .settings-modal { max-width: 480px; }
-  .settings-modal .help-text { font-size: 12px; color: #718096; margin-top: 4px; line-height: 1.5; }
+  .settings-modal .help-text { font-size: 12px; color: var(--color-neutral-strong); margin-top: 4px; line-height: 1.5; }
   .settings-modal .step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
   .settings-modal .step-num { display: inline-block; background: #4299e1; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
   /* バッジ凡例モーダル */
   .legend-section { margin-bottom: 20px; }
-  .legend-section h3 { font-size: 14px; font-weight: 700; color: #2d3748; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #f0f0f0; }
+  .legend-section h3 { font-size: 14px; font-weight: 700; color: var(--color-text); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--color-neutral-tint); }
   .legend-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 9px; font-size: 13px; line-height: 1.5; }
   .legend-row .badge, .legend-row [class^="badge-"], .legend-row [class^="tag-"] { flex-shrink: 0; }
-  .legend-desc { color: #4a5568; margin-left: 2px; }
+  .legend-desc { color: var(--color-neutral); margin-left: 2px; }
   .legend-swatch { display: inline-block; width: 32px; height: 20px; border-radius: 4px; flex-shrink: 0; }
   .loading-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(2px);
     z-index: 150; align-items: center; justify-content: center;
   }
   .loading-overlay.show { display: flex; }
   .loading-box {
-    background: white; padding: 30px 40px; border-radius: 16px;
-    text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    background: var(--color-surface); padding: 30px 40px; border-radius: 16px;
+    text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3); min-width: 220px;
   }
   .spinner {
-    width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #4299e1;
-    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+    width: 40px; height: 40px; border: 4px solid var(--color-neutral-tint); border-top-color: var(--color-info);
+    border-right-color: var(--color-info);
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  #loadingText { color: var(--color-text); font-weight: 600; font-size: 14px; margin-bottom: 10px; }
+  .loading-box::after {
+    content: ''; display: block; height: 6px; width: 100%; margin-top: 2px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--color-info-tint) 25%, var(--color-info) 37%, var(--color-info-tint) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
   @media (max-width: 600px) {
     .header h1 { font-size: 18px; }
     .toolbar { gap: 8px; }
     .form-row { grid-template-columns: 1fr; }
     td, th { padding: 9px 10px; }
     .tab { padding: 12px 14px; font-size: 13px; }
+  }
+
+  /* ヘッダー4ボタンをモバイルで「⋯」ドロップダウンに集約(デスクトップは現状のまま並ぶ) */
+  .header-more { position: relative; display: contents; }
+  .header-more-btn { display: none; }
+  .header-more-menu { display: contents; }
+  @media (max-width: 768px) {
+    .header-more { display: block; margin-left: auto; }
+    .header-more-btn { display: inline-flex; min-width: var(--tap-min); min-height: var(--tap-min); justify-content: center; font-size: 18px; }
+    .header-more-menu {
+      display: none; position: absolute; right: 0; top: calc(100% + 6px);
+      flex-direction: column; gap: 6px; min-width: 210px; z-index: 50;
+      background: #1a1a2e; border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .header-more-menu.open { display: flex; }
+    .header-more-menu .btn { width: 100%; justify-content: flex-start; }
+  }
+
+  /* モバイル下部固定タブ(任意ON/OFF切替) */
+  .mobile-bottom-nav { display: none; }
+  @media (max-width: 768px) {
+    body.bottom-nav-on .mobile-bottom-nav {
+      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+      background: var(--color-surface); border-top: 1px solid var(--color-neutral-tint); box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+      padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    }
+    body.bottom-nav-on { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+    body.bottom-nav-on .toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+    .mobile-bottom-nav .bottom-nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; padding: 6px 2px; border: none; border-radius: 10px;
+      background: transparent; color: var(--color-neutral-strong); font-size: 10px; font-weight: 700;
+      top: 0; white-space: normal;
+    }
+    .mobile-bottom-nav .bottom-nav-item .bni-icon { font-size: 18px; }
   }
 
   /* ===== 機能拡張: 本日サマリー / 警告 / 過去 / 統計 / インポート / モバイル ===== */
@@ -225,128 +345,134 @@
   .caution-banner {
     margin: 12px 24px 0; padding: 14px 18px;
     background: linear-gradient(135deg, #fff5f5 0%, #fffaf0 100%);
-    border: 2px solid #e53e3e; border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(229,62,62,0.2);
+    border: 2px solid var(--color-danger); border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(197,48,48,0.2);
   }
   .caution-banner-header { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
   .caution-icon { font-size: 20px; }
-  .caution-title { font-size: 14px; font-weight: 800; color: #c53030; flex: 1; }
-  .caution-count { font-size: 22px; font-weight: 800; color: #c53030; }
-  .caution-banner-header .today-toggle { color: #e53e3e; }
+  .caution-title { font-size: 14px; font-weight: 800; color: var(--color-danger); flex: 1; }
+  .caution-count { font-size: 22px; font-weight: 800; color: var(--color-danger); }
+  .caution-banner-header .today-toggle { color: var(--color-danger); }
   .caution-list { margin-top: 12px; display: grid; gap: 6px; max-height: 300px; overflow-y: auto; padding-right: 4px; }
   .caution-list.collapsed { display: none; }
   .caution-item {
     display: grid; grid-template-columns: 92px 1.4fr auto auto; gap: 10px;
-    align-items: center; padding: 8px 12px; background: white; border-radius: 8px;
-    font-size: 13px; border-left: 4px solid #e53e3e; cursor: pointer;
+    align-items: center; padding: 8px 12px; background: var(--color-surface); border-radius: 8px;
+    font-size: 13px; border-left: 4px solid var(--color-danger); cursor: pointer;
   }
-  .caution-item.sev-amber { border-left-color: #d69e2e; }
-  .caution-item:hover { background: #fff5f5; }
-  .caution-when { font-weight: 700; color: #c53030; font-family: monospace; font-size: 12px; }
-  .caution-name { font-weight: 700; color: #2d3748; }
+  .caution-item.sev-amber { border-left-color: var(--color-caution); }
+  .caution-item:hover { background: var(--color-danger-bg); }
+  .caution-item.sev-amber:hover { background: var(--color-caution-bg); }
+  .caution-when { font-weight: 700; color: var(--color-danger); font-family: monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .caution-name { font-weight: 700; color: var(--color-text); }
   .caution-badges { display: flex; gap: 4px; white-space: nowrap; }
-  .caution-phone { font-size: 12px; color: #718096; font-family: monospace; text-align: right; }
+  .caution-phone { font-size: 12px; color: var(--color-neutral-strong); font-family: monospace; text-align: right; }
   .today-banner-header { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
-  .today-banner-title { font-size: 14px; font-weight: 700; color: #2b6cb0; flex: 1; }
-  .today-banner-count { font-size: 22px; font-weight: 800; color: #2b6cb0; }
-  .today-toggle { font-size: 14px; color: #4299e1; transition: transform 0.2s; }
+  .today-banner-title { font-size: 14px; font-weight: 700; color: var(--color-info); flex: 1; }
+  .today-banner-count { font-size: 22px; font-weight: 800; color: var(--color-info); }
+  .today-toggle { font-size: 14px; color: var(--color-info); transition: transform 0.2s; }
   .today-toggle.collapsed { transform: rotate(-90deg); }
   .today-list { margin-top: 12px; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
   .today-list.collapsed { display: none; }
   .today-item {
     display: grid; grid-template-columns: 60px 1.2fr 1.5fr auto; gap: 10px;
-    align-items: center; padding: 8px 12px; background: white; border-radius: 8px;
-    font-size: 13px; border-left: 3px solid #4299e1;
+    align-items: center; padding: 8px 12px; background: var(--color-surface); border-radius: 8px;
+    font-size: 13px; border-left: 3px solid var(--color-info);
   }
-  .today-item.today-past { opacity: 0.55; border-left-color: #a0aec0; }
-  .today-item.today-dup { border-left-color: #c53030; background: #fff5f5; }
-  .today-item.today-samename { border-left-color: #d69e2e; background: #fffbeb; }
-  .today-time { font-weight: 700; color: #2b6cb0; font-family: monospace; font-size: 14px; }
-  .today-name { font-weight: 600; color: #2d3748; }
-  .today-menu { color: #718096; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .today-item.today-past { opacity: 0.55; border-left-color: var(--color-neutral-muted); }
+  .today-item.today-dup { border-left-color: var(--color-danger); background: var(--color-danger-bg); }
+  .today-item.today-samename { border-left-color: var(--color-caution); background: var(--color-caution-bg); }
+  .today-time { font-weight: 700; color: var(--color-info); font-family: monospace; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .today-name { font-weight: 600; color: var(--color-text); }
+  .today-menu { color: var(--color-neutral-strong); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* 過去無断キャンセル警告バッジ */
+  /* 過去無断キャンセル警告バッジ(危険) */
   .badge-noshow-warn {
-    display: inline-block; background: #c53030; color: white; font-size: 10px; font-weight: 700;
-    padding: 2px 6px; border-radius: 8px; margin-left: 4px; white-space: nowrap; vertical-align: middle;
+    display: inline-block; background: var(--color-danger); color: white; font-size: 12px; font-weight: 700;
+    padding: 3px 7px; border-radius: 8px; margin-left: 4px; white-space: nowrap; vertical-align: middle;
     cursor: help;
   }
-  tr.row-warn-noshow { background: #fef5e7 !important; box-shadow: inset 3px 0 0 #c53030; }
+  tr.row-warn-noshow { border-left: 4px solid var(--color-danger) !important; background: var(--color-danger-bg) !important; }
 
-  /* 過去日付の行 */
-  tr.row-past { background: #fafbfc; }
-  tr.row-past td { color: #a0aec0; }
-  tr.row-past .name-cell { color: #718096; font-weight: 500; }
+  /* 過去日付の行(色を持たない修飾レイヤー。状態色と共存できる) */
+  tr.row-past td { color: var(--color-neutral-muted); }
+  tr.row-past .name-cell { color: var(--color-neutral-strong); font-weight: 500; }
   tr.row-past .actions-cell button { opacity: 0.7; }
 
-  /* キャンセル済みの予約(メールでキャンセル済み) */
-  tr.row-cancelled { background: #f7fafc; }
-  tr.row-cancelled .name-cell, tr.row-cancelled .date-cell, tr.row-cancelled .menu-cell { text-decoration: line-through; color: #a0aec0; }
-  .tag-cancelled { display:inline-block; background:#e2e8f0; color:#4a5568; font-size:10px; font-weight:700; padding:2px 6px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; text-decoration:none; }
+  /* キャンセル済みの予約(メールでキャンセル済み。同じく色を持たない修飾レイヤー) */
+  tr.row-cancelled .name-cell, tr.row-cancelled .date-cell, tr.row-cancelled .menu-cell { text-decoration: line-through; color: var(--color-neutral-muted); }
+  .tag-cancelled { display:inline-block; background: var(--color-neutral-tint); color: var(--color-neutral); font-size:12px; font-weight:700; padding:3px 7px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; text-decoration:none; }
 
-  /* キャンセル区分タグ(振替/当日/通常) */
-  .tag-furikae { display:inline-block; background:#e9d8fd; color:#553c9a; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
-  .tag-kubun-sameday { display:inline-block; background:#feebc8; color:#9c4221; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
-  .tag-kubun-normal { display:inline-block; background:#e2e8f0; color:#4a5568; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
+  /* キャンセル区分タグ(振替=情報/当日=注意/通常=中立) */
+  .tag-furikae { display:inline-block; background: var(--color-info-tint); color: var(--color-info-text); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
+  .tag-kubun-sameday { display:inline-block; background: var(--color-caution-tint); color: var(--color-caution-text); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
+  .tag-kubun-normal { display:inline-block; background: var(--color-neutral-tint); color: var(--color-neutral); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
 
   /* リマインドチェック */
-  .remind-check { width: 18px; height: 18px; cursor: pointer; accent-color: #3182ce; }
-  .remind-date { font-size: 10px; color: #718096; margin-top: 2px; white-space: nowrap; }
+  .remind-check { width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-info); }
+  .remind-date { font-size: 12px; color: var(--color-neutral-strong); margin-top: 2px; white-space: nowrap; }
+  .remind-pill-group { display: inline-flex; gap: 4px; vertical-align: middle; margin-left: 2px; }
+  .remind-pill {
+    display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; line-height: 1;
+    padding: 3px 7px; border-radius: 10px; white-space: nowrap; border: 1px solid transparent;
+  }
+  .remind-pill.is-done { background: var(--color-positive-tint); color: var(--color-positive-text); border-color: var(--color-positive); }
+  .remind-pill.is-pending { background: transparent; color: var(--color-neutral-muted); border-color: var(--color-neutral-muted); border-style: dashed; }
 
   /* 最終取得時刻 / 通知ボタン */
-  .last-fetch-info { font-size: 12px; color: #718096; margin-left: 4px; padding: 2px 8px; background: #f7fafc; border-radius: 6px; }
-  .last-fetch-info.fresh { color: #047857; background: #ecfdf5; }
-  .btn-notif { background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
-  .btn-notif.enabled { background: #ecfdf5; color: #047857; border-color: #6ee7b7; }
+  .last-fetch-info { font-size: 12px; color: var(--color-neutral-strong); margin-left: 4px; padding: 2px 8px; background: var(--color-neutral-bg); border-radius: 6px; }
+  .last-fetch-info.fresh { color: var(--color-positive-text); background: var(--color-positive-bg); }
+  .btn-notif { background: var(--color-neutral-bg); color: var(--color-neutral); border: 1px solid var(--color-neutral-tint); }
+  .btn-notif.enabled { background: var(--color-positive-bg); color: var(--color-positive-text); border-color: var(--color-positive); }
   /* 前回ログイン再開ボタン: ワンタップで済むことが伝わるよう目立たせる */
-  .btn-resume { background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; font-weight: 700; animation: resumePulse 2s ease-in-out infinite; }
-  .btn-resume:hover { background: #d1fae5; }
+  .btn-resume { background: var(--color-positive-bg); color: var(--color-positive-text); border: 1px solid var(--color-positive); font-weight: 700; animation: resumePulse 2s ease-in-out infinite; }
+  .btn-resume:hover { background: var(--color-positive-tint); }
   @keyframes resumePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.35); } 50% { box-shadow: 0 0 0 5px rgba(16,185,129,0); } }
 
-  /* 当日キャンセルタブ */
-  .tab.active[data-tab="sameday"] { background: #b7791f; border-color: #b7791f; box-shadow: 0 -2px 8px rgba(183,121,31,0.3); }
-  .stat-card.amber-card { background: #fffbeb; color: #b7791f; border: 1px solid #fbd38d; cursor: pointer; transition: all 0.2s; }
+  /* 当日キャンセルタブ(意味色=注意(強)) */
+  .tab.active[data-tab="sameday"] { background: var(--color-caution-strong); border-color: var(--color-caution-strong); box-shadow: 0 -2px 8px rgba(183,121,31,0.3); }
+  .stat-card.amber-card { background: var(--color-caution-strong-bg); color: var(--color-caution-strong); border: 1px solid var(--color-caution-strong-tint); cursor: pointer; transition: all 0.2s; }
   .stat-card.amber-card.stat-active { box-shadow: 0 0 0 3px rgba(183,121,31,0.3); }
-  /* 当日キャンセル回数の段階表示 */
-  tr.row-sameday-2 { background: #fffbeb; }
-  tr.row-sameday-3 { background: #fdecc8; }
-  .badge-sd2 { background: #fbd38d; color: #92400e; }
-  .badge-sd3 { background: #f6ad55; color: #7b341e; }
+  /* 当日キャンセル回数の段階表示(注意/注意・強) */
+  tr.row-sameday-2 { border-left: 4px solid var(--color-caution)        !important; background: var(--color-caution-bg)        !important; }
+  tr.row-sameday-3 { border-left: 4px solid var(--color-caution-strong) !important; background: var(--color-caution-strong-bg) !important; }
+  .badge-sd2 { background: var(--color-caution-tint);        color: var(--color-caution-text); }
+  .badge-sd3 { background: var(--color-caution-strong-tint); color: var(--color-caution-strong-text); }
   .badge-sameday-warn {
-    display: inline-block; background: #b7791f; color: white; font-size: 10px; font-weight: 700;
-    padding: 2px 6px; border-radius: 8px; margin-left: 4px; white-space: nowrap; vertical-align: middle; cursor: help;
+    display: inline-block; background: var(--color-caution-strong); color: white; font-size: 12px; font-weight: 700;
+    padding: 3px 7px; border-radius: 8px; margin-left: 4px; white-space: nowrap; vertical-align: middle; cursor: help;
   }
-  .tag-auto { display:inline-block; background:#ebf8ff; color:#2b6cb0; font-size:11px; padding:1px 7px; border-radius:8px; }
-  .tag-manual { display:inline-block; background:#f0fff4; color:#276749; font-size:11px; padding:1px 7px; border-radius:8px; }
-  /* 同日・同名の重複/同名検出バッジ */
+  .tag-auto { display:inline-block; background: var(--color-info-tint); color: var(--color-info-text); font-size:11px; padding:1px 7px; border-radius:8px; }
+  .tag-manual { display:inline-block; background: var(--color-neutral-tint); color: var(--color-neutral); font-size:11px; padding:1px 7px; border-radius:8px; }
+  /* 同日・同名の重複/同名検出バッジ(重複=危険/同名別人?=注意) */
   .badge-dup {
-    display:inline-block; background:#c53030; color:#fff; font-size:10px; font-weight:700;
-    padding:2px 6px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; cursor:help;
+    display:inline-block; background: var(--color-danger); color:#fff; font-size:12px; font-weight:700;
+    padding:3px 7px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; cursor:help;
   }
   .badge-samename {
-    display:inline-block; background:#d69e2e; color:#fff; font-size:10px; font-weight:700;
-    padding:2px 6px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; cursor:help;
+    display:inline-block; background: var(--color-caution); color:#fff; font-size:12px; font-weight:700;
+    padding:3px 7px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; cursor:help;
   }
-  tr.row-dup { background:#fff5f5 !important; box-shadow: inset 3px 0 0 #c53030; }
-  tr.row-samename { background:#fffbeb !important; box-shadow: inset 3px 0 0 #d69e2e; }
+  tr.row-dup      { border-left: 4px solid var(--color-danger)  !important; background: var(--color-danger-bg)  !important; }
+  tr.row-samename { border-left: 4px solid var(--color-caution) !important; background: var(--color-caution-bg) !important; }
 
-  /* 統計タブ */
-  .tab.active[data-tab="stats"] { background: #6b46c1; border-color: #6b46c1; box-shadow: 0 -2px 8px rgba(107,70,193,0.3); }
-  .stat-card.purple-card { background: #f0e6ff; color: #6b46c1; border: 1px solid #d6bcfa; cursor: pointer; transition: all 0.2s; }
+  /* 統計タブ(紫は統計専用アクセント。意味色トークンとは独立) */
+  .tab.active[data-tab="stats"] { background: var(--color-accent-purple); border-color: var(--color-accent-purple); box-shadow: 0 -2px 8px rgba(107,70,193,0.3); }
+  .stat-card.purple-card { background: var(--color-accent-purple-tint); color: var(--color-accent-purple); border: 1px solid var(--color-accent-purple); cursor: pointer; transition: all 0.2s; }
   .stat-card.purple-card.stat-active { box-shadow: 0 0 0 3px rgba(107,70,193,0.3); }
   .stats-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 16px 24px 0; }
-  .stats-summary-card { background: white; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid #4299e1; }
-  .stats-summary-card.orange { border-left-color: #c05621; }
-  .stats-summary-card.red { border-left-color: #c53030; }
-  .stats-summary-card.purple { border-left-color: #6b46c1; }
-  .stats-summary-card .label { font-size: 12px; color: #718096; margin-bottom: 4px; }
-  .stats-summary-card .value { font-size: 22px; font-weight: 800; color: #2d3748; }
-  .stats-summary-card .sub { font-size: 11px; color: #a0aec0; margin-top: 2px; }
+  .stats-summary-card { background: var(--color-surface); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid var(--color-info); }
+  .stats-summary-card.orange { border-left-color: var(--color-caution); }
+  .stats-summary-card.red { border-left-color: var(--color-danger); }
+  .stats-summary-card.purple { border-left-color: var(--color-accent-purple); }
+  .stats-summary-card .label { font-size: 12px; color: var(--color-neutral-strong); margin-bottom: 4px; }
+  .stats-summary-card .value { font-size: 22px; font-weight: 800; color: var(--color-text); }
+  .stats-summary-card .sub { font-size: 11px; color: var(--color-neutral-strong); margin-top: 2px; }
   .stats-table { width: 100%; border-collapse: collapse; }
-  .stats-table th { background: #f7fafc; padding: 12px 14px; text-align: left; font-size: 13px; color: #4a5568; border-bottom: 2px solid #e2e8f0; }
-  .stats-table td { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
-  .stats-bar-visual { background: #edf2f7; border-radius: 4px; height: 6px; margin-top: 4px; overflow: hidden; max-width: 240px; }
-  .stats-bar-fill { background: linear-gradient(90deg, #4299e1, #6b46c1); height: 100%; transition: width 0.3s; }
+  .stats-table th { background: var(--color-neutral-bg); padding: 12px 14px; text-align: left; font-size: 13px; color: var(--color-neutral); border-bottom: 2px solid var(--color-neutral-tint); }
+  .stats-table td { padding: 12px 14px; border-bottom: 1px solid var(--color-neutral-tint); font-size: 14px; }
+  .stats-bar-visual { background: var(--color-neutral-tint); border-radius: 4px; height: 6px; margin-top: 4px; overflow: hidden; max-width: 240px; }
+  .stats-bar-fill { background: linear-gradient(90deg, var(--color-info), var(--color-accent-purple)); height: 100%; transition: width 0.3s; }
 
   /* インポートモーダル */
   .btn-import { background: #ed8936; color: white; }
@@ -357,7 +483,7 @@
     cursor: pointer; text-align: center; font-size: 13px; font-weight: 600; color: #4a5568;
     transition: all 0.2s; background: white;
   }
-  .import-option.active { border-color: #4299e1; background: #ebf8ff; color: #2b6cb0; }
+  .import-option.active { border-color: var(--color-info); background: var(--color-info-tint); color: var(--color-info-text); }
   #importPreview table { font-size: 12px; }
 
   /* モバイル: テーブル → カード化 */
@@ -368,32 +494,40 @@
     table thead { display: none; }
     table, tbody, tr, td { display: block; width: 100%; box-sizing: border-box; }
     tbody tr {
-      background: white !important; margin-bottom: 10px; border-radius: 10px;
+      background: var(--color-surface); margin-bottom: 10px; border-radius: 10px;
       padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-bottom: none !important;
     }
-    tbody tr.row-cancel-3 { background: #f0e6ff !important; }
-    tbody tr.row-cancel-4 { background: #e2d0f8 !important; }
-    tbody tr.row-orange { background: #fffaf0 !important; }
-    tbody tr.row-red { background: #fff5f5 !important; }
-    tbody tr.row-past { background: #f7fafc !important; opacity: 0.75; }
-    tbody tr.row-warn-noshow { background: #fef5e7 !important; }
+    /* 状態色(row-*)は !important 付きのグローバル定義がそのまま優先されるため、
+       ここで個別に上書きする必要はない(以前はこの一覧に無いクラスの色が消えるバグがあった) */
     tbody td { padding: 5px 0; border: none !important; min-height: 22px; display: flex; gap: 8px; align-items: flex-start; }
     tbody td:empty { display: none; }
     tbody td::before {
-      content: attr(data-label); font-weight: 700; color: #718096; font-size: 11px;
+      content: attr(data-label); font-weight: 700; color: var(--color-neutral-strong); font-size: 12px;
       min-width: 76px; flex-shrink: 0; padding-top: 1px;
     }
     tbody td:not([data-label])::before { display: none; }
-    tbody td.actions-cell { justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0 !important; }
+    tbody td.actions-cell { justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-neutral-tint) !important; }
     tbody td.actions-cell::before { display: none; }
+    /* モバイルカード先頭のヘッダー行(時刻+氏名を大きく表示) */
+    tbody td.row-index-cell { display: none; }
+    tbody td.card-header-cell {
+      display: flex !important; align-items: baseline; gap: 10px;
+      padding: 0 0 8px !important; margin-bottom: 6px; border-bottom: 1px solid var(--color-neutral-tint);
+    }
+    .card-header-cell .ch-time { font-weight: 800; font-size: 17px; font-family: monospace; color: var(--color-info); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .card-header-cell .ch-name { font-weight: 800; font-size: 15px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #panel-cancellations .card-header-cell .ch-time { color: var(--color-caution); }
+    #panel-noshow .card-header-cell .ch-time { color: var(--color-danger); }
+    #panel-sameday .card-header-cell .ch-time { color: var(--color-caution-strong); }
     .today-banner { margin: 8px 10px 0; padding: 10px 12px; }
     .today-banner-count { font-size: 18px; }
     .today-item { grid-template-columns: 50px 1fr; padding: 6px 8px; }
     .today-item .today-menu { display: none; }
+    .today-item .phone-cell { grid-column: 1 / -1; padding-top: 2px; }
     .caution-banner { margin: 8px 10px 0; padding: 10px 12px; }
     .caution-count { font-size: 18px; }
     .caution-item { grid-template-columns: 1fr auto; gap: 6px; padding: 7px 9px; }
-    .caution-item .caution-phone { display: none; }
+    .caution-item .caution-phone { display: block; grid-column: 1 / -1; text-align: left; border-top: 1px dashed var(--color-danger-tint); margin-top: 4px; padding-top: 4px; }
     .stats-summary { padding: 8px 10px 0; grid-template-columns: 1fr 1fr; gap: 8px; }
     .stats-summary-card { padding: 10px 12px; }
     .stats-summary-card .value { font-size: 18px; }
@@ -407,6 +541,12 @@
     .header-right .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 10px; }
     .auth-bar { flex-wrap: wrap; padding: 8px 14px; }
     .tab-bar { padding: 8px 10px 0; }
+    /* タップ領域拡大(44px目安) */
+    label.tap-check { width: var(--tap-min); height: var(--tap-min); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .noshow-check, .sameday-check { width: 24px; height: 24px; }
+    .remind-check { width: 22px; height: 22px; }
+    td.actions-cell .btn.btn-sm { min-width: var(--tap-min); min-height: var(--tap-min); padding: 10px; font-size: 16px; justify-content: center; }
+    a.tel-link { display: inline-flex; align-items: center; min-height: var(--tap-min); padding: 10px 6px; margin: -10px -6px; }
   }
 
   /* ===== 表示モード手動切替(カード強制 / 表強制) ===== */
@@ -415,17 +555,22 @@
   body.force-card table, body.force-card tbody, body.force-card tr, body.force-card td { display: block; width: 100%; box-sizing: border-box; }
   body.force-card .table-container { box-shadow: none; background: transparent; }
   body.force-card .table-scroll { overflow: visible; }
-  body.force-card tbody tr { background: white !important; margin-bottom: 10px; border-radius: 10px; padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-bottom: none !important; }
-  body.force-card tbody tr.row-cancel-3 { background: #f0e6ff !important; }
-  body.force-card tbody tr.row-cancel-4 { background: #e2d0f8 !important; }
-  body.force-card tbody tr.row-warn-noshow { background: #fef5e7 !important; }
-  body.force-card tbody tr.row-dup { background: #fff5f5 !important; }
-  body.force-card tbody tr.row-samename { background: #fffbeb !important; }
+  body.force-card tbody tr { background: var(--color-surface); margin-bottom: 10px; border-radius: 10px; padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-bottom: none !important; }
   body.force-card tbody td { padding: 5px 0; border: none !important; min-height: 22px; display: flex; gap: 8px; align-items: flex-start; }
   body.force-card tbody td:empty { display: none; }
-  body.force-card tbody td::before { content: attr(data-label); font-weight: 700; color: #718096; font-size: 11px; min-width: 76px; flex-shrink: 0; padding-top: 1px; }
+  body.force-card tbody td::before { content: attr(data-label); font-weight: 700; color: var(--color-neutral-strong); font-size: 12px; min-width: 76px; flex-shrink: 0; padding-top: 1px; }
   body.force-card tbody td:not([data-label])::before { display: none; }
-  body.force-card tbody td.actions-cell { justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0 !important; }
+  body.force-card tbody td.actions-cell { justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-neutral-tint) !important; }
+  body.force-card tbody td.row-index-cell { display: none; }
+  body.force-card tbody td.card-header-cell {
+    display: flex !important; align-items: baseline; gap: 10px;
+    padding: 0 0 8px !important; margin-bottom: 6px; border-bottom: 1px solid var(--color-neutral-tint);
+  }
+  body.force-card .card-header-cell .ch-time { font-weight: 800; font-size: 17px; font-family: monospace; color: var(--color-info); font-variant-numeric: tabular-nums; }
+  body.force-card .card-header-cell .ch-name { font-weight: 800; font-size: 15px; color: var(--color-text); }
+  body.force-card #panel-cancellations .card-header-cell .ch-time { color: var(--color-caution); }
+  body.force-card #panel-noshow .card-header-cell .ch-time { color: var(--color-danger); }
+  body.force-card #panel-sameday .card-header-cell .ch-time { color: var(--color-caution-strong); }
   /* 表強制: スマホでもカード化せず表のまま(横スクロール) */
   @media (max-width: 768px) {
     body.force-table table { display: table; }
@@ -436,6 +581,47 @@
     body.force-table tbody td::before { display: none; }
     body.force-table .table-scroll { overflow-x: auto; }
   }
+
+  /* ==== ダークモード: 構造要素(surface/border/text)のみをトークン経由でまとめて上書き ====
+     意味色(バッジ/タブ/行の状態色)は body.dark-mode { --color-*: ... } (:root定義の直後)で
+     既にトークン値ごと差し替え済みなので、ここで個別に再指定する必要はない。 */
+  body.dark-mode .auth-bar,
+  body.dark-mode .tab-bar,
+  body.dark-mode .stats-bar,
+  body.dark-mode .toolbar,
+  body.dark-mode .table-footer,
+  body.dark-mode .table-container,
+  body.dark-mode thead tr,
+  body.dark-mode .stats-table th,
+  body.dark-mode .modal,
+  body.dark-mode .settings-modal .step,
+  body.dark-mode .import-option,
+  body.dark-mode .today-banner,
+  body.dark-mode .caution-banner,
+  body.dark-mode .today-item,
+  body.dark-mode .caution-item,
+  body.dark-mode .stat-card,
+  body.dark-mode .stats-summary-card,
+  body.dark-mode .header-more-menu {
+    background: var(--color-neutral-bg);
+    border-color: var(--color-neutral-tint);
+    color: var(--color-text);
+  }
+  body.dark-mode .tab { background: var(--color-neutral-tint); color: var(--color-neutral-strong); }
+  body.dark-mode .tab:hover { background: var(--color-neutral); color: var(--color-text); }
+  body.dark-mode table, body.dark-mode td { color: var(--color-text); }
+  body.dark-mode th { color: var(--color-neutral-strong); border-bottom-color: var(--color-neutral-tint); }
+  body.dark-mode tbody tr { border-bottom-color: var(--color-neutral-tint); }
+  body.dark-mode .modal-backdrop { background: rgba(0,0,0,0.65); }
+  body.dark-mode .toast { background: var(--color-neutral); color: var(--color-bg); }
+  body.dark-mode .toast.success { background: var(--color-positive); }
+  body.dark-mode .toast.error { background: var(--color-danger); }
+  body.dark-mode input, body.dark-mode select, body.dark-mode textarea {
+    background: var(--color-neutral-tint); border-color: var(--color-neutral); color: var(--color-text);
+  }
+  body.dark-mode label { color: var(--color-neutral-strong); }
+  body.dark-mode .empty-state .icon { background: var(--color-info-tint); }
+  body.dark-mode .import-option.active { border-color: var(--color-info); background: var(--color-info-tint); color: var(--color-info-text); }
 </style>
 </head>
 <body>
@@ -447,10 +633,17 @@
     <div class="header-sub">予約・キャンセル・無断キャンセル管理</div>
   </div>
   <div class="header-right">
-    <button class="btn btn-outline" onclick="openLegendModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📖 バッジの説明</button>
-    <button class="btn btn-outline" onclick="openImportModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📤 インポート</button>
-    <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📥 Excel出力</button>
-    <button class="btn btn-outline" onclick="openSettingsModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">⚙️ 設定</button>
+    <div class="header-more" id="headerMore">
+      <button class="btn btn-outline header-more-btn" id="headerMoreBtn" onclick="toggleHeaderMore()"
+        style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)"
+        aria-haspopup="true" aria-expanded="false">⋯</button>
+      <div class="header-more-menu" id="headerMoreMenu">
+        <button class="btn btn-outline" onclick="openLegendModal();toggleHeaderMore(true)" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📖 バッジの説明</button>
+        <button class="btn btn-outline" onclick="openImportModal();toggleHeaderMore(true)" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📤 インポート</button>
+        <button class="btn btn-outline" onclick="exportExcel();toggleHeaderMore(true)" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📥 Excel出力</button>
+        <button class="btn btn-outline" onclick="openSettingsModal();toggleHeaderMore(true)" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">⚙️ 設定</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -460,6 +653,8 @@
   <span class="last-fetch-info" id="lastFetchInfo">最終取得: -</span>
   <button class="btn btn-sm btn-outline" id="fontBtn" onclick="cycleFontSize()" title="文字サイズを変更(標準/大/特大)">🔤 標準</button>
   <button class="btn btn-sm btn-outline" id="viewBtn" onclick="cycleViewMode()" title="表示モード(自動/カード/表)を切替">▦ 自動</button>
+  <button class="btn btn-sm btn-outline" id="darkBtn" onclick="cycleDarkMode()" title="表示テーマ(自動/ライト/ダーク)を切替">🌙 自動</button>
+  <button class="btn btn-sm btn-outline" id="bottomNavBtn" onclick="cycleBottomNav()" title="スマホ下部固定タブの表示切替(ON/OFF)">📌 下部固定 OFF</button>
   <button class="btn btn-sm btn-notif" id="notifBtn" onclick="requestNotificationPermission()" title="新規予約をデスクトップ通知">🔔 通知</button>
   <button class="btn btn-sm btn-resume" id="resumeBtn" onclick="resumeSession()" style="display:none" title="前回のログインをワンタップで再開します">🔄 前回のログインを再開</button>
   <button class="btn btn-sm btn-google" id="authBtn" onclick="handleAuth()">Googleサインイン</button>
@@ -467,19 +662,11 @@
 </div>
 
 <div class="tab-bar">
-  <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト</button>
-  <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール）</button>
-  <button class="tab" data-tab="sameday" onclick="switchTab('sameday')">🟠 当日キャンセル</button>
-  <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル</button>
-  <button class="tab" data-tab="stats" onclick="switchTab('stats')">📊 統計</button>
-</div>
-
-<div class="stats-bar">
-  <div class="stat-card blue-card stat-active" id="statCard-reservations" onclick="switchTab('reservations')"><div><div class="stat-num" id="stat-reservations">0</div><div>📋 予約件数</div></div></div>
-  <div class="stat-card orange-card" id="statCard-cancellations" onclick="switchTab('cancellations')"><div><div class="stat-num" id="stat-cancellations">0</div><div>✉️ キャンセル</div></div></div>
-  <div class="stat-card amber-card" id="statCard-sameday" onclick="switchTab('sameday')"><div><div class="stat-num" id="stat-sameday">0</div><div>🟠 当日キャンセル</div></div></div>
-  <div class="stat-card red-card" id="statCard-noshow" onclick="switchTab('noshow')"><div><div class="stat-num" id="stat-noshow">0</div><div>🚫 無断キャンセル</div></div></div>
-  <div class="stat-card purple-card" id="statCard-stats" onclick="switchTab('stats')"><div><div class="stat-num" id="stat-todayCount">0</div><div>📊 本日予約</div></div></div>
+  <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト <span class="tab-badge" id="stat-reservations">0</span></button>
+  <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール） <span class="tab-badge" id="stat-cancellations">0</span></button>
+  <button class="tab" data-tab="sameday" onclick="switchTab('sameday')">🟠 当日キャンセル <span class="tab-badge" id="stat-sameday">0</span></button>
+  <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル <span class="tab-badge" id="stat-noshow">0</span></button>
+  <button class="tab" data-tab="stats" onclick="switchTab('stats')">📊 統計 <span class="tab-badge" id="stat-todayCount" title="本日予約件数">0</span></button>
 </div>
 
 <div class="toolbar">
@@ -517,7 +704,7 @@
   <div class="today-banner-header" onclick="toggleTodayList()">
     <span class="today-banner-title">🌞 本日の予約</span>
     <span class="today-banner-count" id="todayCount">0</span>
-    <span style="font-size:13px;color:#4a5568">件</span>
+    <span style="font-size:13px;color:var(--color-neutral)">件</span>
     <span class="today-toggle" id="todayToggle">▼</span>
   </div>
   <div class="today-list" id="todayList"></div>
@@ -531,8 +718,8 @@
       <th onclick="sortBy('datetime')">予約日時 <span class="sort-btn">↕</span></th>
       <th>メニュー</th>
       <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center">注意</th>
       <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
-      <th>メール</th>
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-btn">↕</span></th>
       <th style="text-align:center;white-space:nowrap" title="リマインド電話を実施したらチェック">📞電話</th>
@@ -554,8 +741,8 @@
       <th onclick="sortBy('datetime')">予約日時 <span class="sort-btn">↕</span></th>
       <th>メニュー</th>
       <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center">注意</th>
       <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
-      <th>メール</th>
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">キャンセル日時 <span class="sort-btn">↕</span></th>
       <th style="text-align:center" title="🔀振替=時間変更(回数に数えない) / 🟠当日 / ✉️通常">区分</th>
@@ -564,7 +751,7 @@
     </tr></thead><tbody id="tbody-cancellations"></tbody></table>
   </div>
   <div class="empty-state" id="empty-cancellations" style="display:none"><div class="icon">✉️</div><p>キャンセルデータがありません<br><small>「📩 メール取得」でGmailから読み込めます</small></p></div>
-  <div class="table-footer"><span id="rowCount-cancellations">0件</span><span style="color:#c05621;font-weight:600;">大宮院 - キャンセルリスト</span></div>
+  <div class="table-footer"><span id="rowCount-cancellations">0件</span><span style="color:var(--color-caution);font-weight:600;">大宮院 - キャンセルリスト</span></div>
 </div></div>
 
 <!-- 当日キャンセル -->
@@ -584,7 +771,7 @@
     </tr></thead><tbody id="tbody-sameday"></tbody></table>
   </div>
   <div class="empty-state" id="empty-sameday" style="display:none"><div class="icon">🟠</div><p>当日キャンセルデータがありません<br><small>キャンセルメールから自動判定、電話分は「＋ 当日キャンセル追加」で登録</small></p></div>
-  <div class="table-footer"><span id="rowCount-sameday">0件</span><span style="color:#b7791f;font-weight:600;">大宮院 - 当日キャンセル</span></div>
+  <div class="table-footer"><span id="rowCount-sameday">0件</span><span style="color:var(--color-caution-strong);font-weight:600;">大宮院 - 当日キャンセル</span></div>
 </div></div>
 
 <!-- 無断キャンセル -->
@@ -603,7 +790,7 @@
     </tr></thead><tbody id="tbody-noshow"></tbody></table>
   </div>
   <div class="empty-state" id="empty-noshow" style="display:none"><div class="icon">🚫</div><p>無断キャンセルデータがありません<br><small>「＋ 新規追加」で手動登録できます</small></p></div>
-  <div class="table-footer"><span id="rowCount-noshow">0件</span><span style="color:#c53030;font-weight:600;">大宮院 - 無断キャンセル</span></div>
+  <div class="table-footer"><span id="rowCount-noshow">0件</span><span style="color:var(--color-danger);font-weight:600;">大宮院 - 無断キャンセル</span></div>
 </div></div>
 
 <!-- 統計パネル -->
@@ -622,7 +809,7 @@
         <th>無断率</th>
       </tr></thead><tbody id="stats-tbody"></tbody></table>
     </div>
-    <div class="table-footer"><span id="rowCount-stats">0ヶ月</span><span style="color:#6b46c1;font-weight:600;">大宮院 - 月次レポート</span></div>
+    <div class="table-footer"><span id="rowCount-stats">0ヶ月</span><span style="color:var(--color-accent-purple);font-weight:600;">大宮院 - 月次レポート</span></div>
   </div></div>
 </div>
 
@@ -632,6 +819,16 @@
     <h2>📖 バッジ・色分けの説明</h2>
 
     <div class="legend-section">
+      <h3>🎨 色の意味(共通ルール)</h3>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-danger)"></span><span class="legend-desc">赤 = 危険・要注意 — 無断キャンセル歴など、必ず確認してほしいもの</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-caution-strong)"></span><span class="legend-desc">濃いオレンジ(注意・強) = 当日キャンセルなど、赤ほどではないが要注意なもの</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-caution)"></span><span class="legend-desc">オレンジ(注意) = 通常キャンセルの蓄積など、様子を見てほしいもの</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-info)"></span><span class="legend-desc">青(情報) = 操作・参照可能な項目 — 電話番号(タップで発信)など</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-positive)"></span><span class="legend-desc">緑(良好) = リマインド実施済みなど、対応が完了した状態</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-neutral)"></span><span class="legend-desc">グレー(中立) = 件数バッジなど、警告ではない参考情報</span></div>
+    </div>
+
+    <div class="legend-section">
       <h3>📋 予約者リスト</h3>
       <div class="legend-row"><span class="badge badge-repeat">再2</span><span class="legend-desc">リピーター。同じ電話番号でキャンセル済みを除く実予約が2回以上(クリックでその人だけ検索)</span></div>
       <div class="legend-row"><span class="badge-noshow-warn">⚠️無断2</span><span class="legend-desc">この人は過去に無断キャンセルが2回ある(要注意)</span></div>
@@ -639,10 +836,10 @@
       <div class="legend-row"><span class="badge-dup">🔁重複?</span><span class="legend-desc">同じ日・同じ名前・同じ電話番号の予約が他にもある。二重登録の可能性</span></div>
       <div class="legend-row"><span class="badge-samename">👥同名?</span><span class="legend-desc">同じ日・同じ名前だが電話番号が違う予約が他にもある。別人の可能性</span></div>
       <div class="legend-row"><span class="tag-cancelled">キャンセル済</span><span class="legend-desc">キャンセルメールが届いた予約。取消線表示になり、本日サマリー・要注意アラートの対象外</span></div>
-      <div class="legend-row"><span class="legend-swatch" style="background:#fef5e7;box-shadow:inset 3px 0 0 #c53030"></span><span class="legend-desc">行全体がオレンジ色+左に赤帯 = 無断キャンセルの警告対象</span></div>
-      <div class="legend-row"><span class="legend-swatch" style="background:#fff5f5;box-shadow:inset 3px 0 0 #c53030"></span><span class="legend-desc">行全体が薄い赤+左に赤帯 = 🔁重複?の対象</span></div>
-      <div class="legend-row"><span class="legend-swatch" style="background:#fffbeb;box-shadow:inset 3px 0 0 #d69e2e"></span><span class="legend-desc">行全体が薄い黄+左に黄帯 = 👥同名?の対象</span></div>
-      <div class="legend-row"><span class="legend-swatch" style="background:#fafbfc"></span><span class="legend-desc">行がグレーで文字が薄い = 予約日時が過去(すでに来店済み想定)</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-danger-bg);box-shadow:inset 3px 0 0 var(--color-danger)"></span><span class="legend-desc">行全体が薄い赤+左に赤帯 = 無断キャンセルの警告対象</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-danger-bg);box-shadow:inset 3px 0 0 var(--color-danger)"></span><span class="legend-desc">行全体が薄い赤+左に赤帯 = 🔁重複?の対象(無断警告と同じ色。原因はマウスオーバーの説明文で判別)</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-caution-bg);box-shadow:inset 3px 0 0 var(--color-caution)"></span><span class="legend-desc">行全体が薄いオレンジ+左にオレンジ帯 = 👥同名?の対象</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-neutral-bg);border:1px solid var(--color-neutral-tint)"></span><span class="legend-desc">行がグレーで文字が薄い = 予約日時が過去(すでに来店済み想定)</span></div>
       <div class="legend-row"><span class="legend-desc" style="margin-left:0">📞電話・✉️メール のチェック列(今日以降の予約のみ) = リマインド実施済みかどうか。チェックすると実施日時を記録</span></div>
       <div class="legend-row"><span class="legend-desc" style="margin-left:0">🟠当日・🚫無断 のチェック列 = チェックすると各リストへ登録(電話キャンセル・無断キャンセルの手動登録用)</span></div>
     </div>
@@ -653,7 +850,7 @@
       <div class="legend-row"><span class="tag-kubun-sameday">🟠当日</span><span class="legend-desc">予約日と同じ日にキャンセルされた(振替を除く)</span></div>
       <div class="legend-row"><span class="tag-kubun-normal">✉️通常</span><span class="legend-desc">振替・当日以外の通常キャンセル</span></div>
       <div class="legend-row"><span class="legend-desc" style="margin-left:0">区分の自動判定が違うときは ✏️編集 から手動で固定できます</span></div>
-      <div class="legend-row"><span class="badge badge-1">1</span><span class="badge badge-c3">3</span><span class="badge badge-c4">4</span><span class="legend-desc">同じ電話番号での実キャンセル回数(振替を除く)。3回以上・4回以上で行の背景が薄紫→濃い紫に変化</span></div>
+      <div class="legend-row"><span class="badge badge-1">1</span><span class="badge badge-c3">3</span><span class="badge badge-c4">4</span><span class="legend-desc">同じ電話番号での実キャンセル回数(振替を除く)。3回以上でオレンジ・4回以上で赤の行背景になる</span></div>
     </div>
 
     <div class="legend-section">
@@ -670,8 +867,8 @@
 
     <div class="legend-section">
       <h3>🚨 トップの要注意アラート</h3>
-      <div class="legend-row"><span class="legend-swatch" style="background:#fff5f5;border:2px solid #e53e3e"></span><span class="legend-desc">赤枠 = 無断キャンセルの履歴がある人が今日以降に予約している</span></div>
-      <div class="legend-row"><span class="legend-swatch" style="background:#fffaf0;border:2px solid #d69e2e"></span><span class="legend-desc">黄枠 = 当日キャンセルの履歴のみある人が今日以降に予約している(無断歴なし)</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-danger-bg);border:2px solid var(--color-danger)"></span><span class="legend-desc">赤枠 = 無断キャンセルの履歴がある人が今日以降に予約している</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:var(--color-caution-bg);border:2px solid var(--color-caution)"></span><span class="legend-desc">オレンジ枠 = 当日キャンセルの履歴のみある人が今日以降に予約している(無断歴なし)</span></div>
       <div class="legend-row"><span class="legend-desc" style="margin-left:0">予約が0件のときはバナー自体が非表示になります</span></div>
     </div>
 
@@ -685,7 +882,7 @@
 <div class="modal-backdrop" id="importModal">
   <div class="modal" style="max-width:640px">
     <h2>📤 データインポート</h2>
-    <div style="font-size:13px;color:#718096;margin-bottom:14px;line-height:1.6">
+    <div style="font-size:13px;color:var(--color-neutral-strong);margin-bottom:14px;line-height:1.6">
       Excel(.xlsx) または CSV ファイルから既存データを読み込みます。<br>
       列名は「氏名」「電話番号」「予約日時」「日付」「時間」「メール」「メニュー」「コメント」「備考」を自動認識します。
     </div>
@@ -732,7 +929,7 @@
     </div>
     <div class="form-group"><label>メールアドレス</label><input type="email" id="f-email" placeholder="example@email.com"></div>
     <div class="form-group"><label>備考</label><textarea id="f-note" placeholder="電話対応の記録など..."></textarea></div>
-    <div id="repeatWarning" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;font-size:13px;color:#856404;margin-bottom:4px;"></div>
+    <div id="repeatWarning" style="display:none;background:var(--color-caution-bg);border:1px solid var(--color-caution);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-caution-text);margin-bottom:4px;"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveRecord()" id="saveBtn">保存</button>
@@ -744,7 +941,7 @@
 <div class="modal-backdrop" id="samedayModal">
   <div class="modal">
     <h2 id="samedayModalTitle">当日キャンセル 追加</h2>
-    <div style="font-size:12px;color:#718096;margin-bottom:14px">電話などメール以外のキャンセルをここで登録します（メール由来分は自動集計）。</div>
+    <div style="font-size:12px;color:var(--color-neutral-strong);margin-bottom:14px">電話などメール以外のキャンセルをここで登録します（メール由来分は自動集計）。</div>
     <div class="form-row">
       <div class="form-group"><label>予約日 *</label><input type="date" id="sd-date" required></div>
       <div class="form-group"><label>予約時間 *</label>
@@ -764,7 +961,7 @@
     </div>
     <div class="form-group"><label>メールアドレス</label><input type="email" id="sd-email" placeholder="example@email.com"></div>
     <div class="form-group"><label>備考</label><textarea id="sd-note" placeholder="電話連絡 / 当日◯時に連絡 など..."></textarea></div>
-    <div id="samedayRepeatWarning" style="display:none;background:#fffbeb;border:1px solid #b7791f;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:4px;"></div>
+    <div id="samedayRepeatWarning" style="display:none;background:var(--color-caution-strong-bg);border:1px solid var(--color-caution-strong);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-caution-strong-text);margin-bottom:4px;"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeSamedayModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveSameday()" id="samedaySaveBtn">保存</button>
@@ -794,7 +991,7 @@
         <option value="sameday">🟠 当日キャンセル</option>
         <option value="normal">✉️ 通常キャンセル</option>
       </select>
-      <div style="font-size:12px;color:#718096;margin-top:4px">自動判定が違っているときだけ手動で固定してください</div>
+      <div style="font-size:12px;color:var(--color-neutral-strong);margin-top:4px">自動判定が違っているときだけ手動で固定してください</div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeEmailModal()">キャンセル</button>
@@ -804,6 +1001,14 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<nav class="mobile-bottom-nav" id="mobileBottomNav">
+  <button class="tab bottom-nav-item active" data-tab="reservations" onclick="switchTab('reservations')"><span class="bni-icon">📋</span><span class="bni-label">予約</span></button>
+  <button class="tab bottom-nav-item" data-tab="cancellations" onclick="switchTab('cancellations')"><span class="bni-icon">✉️</span><span class="bni-label">キャンセル</span></button>
+  <button class="tab bottom-nav-item" data-tab="sameday" onclick="switchTab('sameday')"><span class="bni-icon">🟠</span><span class="bni-label">当日</span></button>
+  <button class="tab bottom-nav-item" data-tab="noshow" onclick="switchTab('noshow')"><span class="bni-icon">🚫</span><span class="bni-label">無断</span></button>
+  <button class="tab bottom-nav-item" data-tab="stats" onclick="switchTab('stats')"><span class="bni-icon">📊</span><span class="bni-label">統計</span></button>
+</nav>
 
 <!-- ローディング -->
 <div class="loading-overlay" id="loadingOverlay">
@@ -862,6 +1067,13 @@ function normPhone(p) {
     .replace(/[-\s　ー－()（）]/g, '');
 }
 function normName(n) { return (n||'').replace(/[\s　]/g, '').trim(); }
+// 電話番号をtel:リンク化(見た目は通常テキストに近く、スマホでタップすると発信できる)
+function telLink(phone) {
+  if (!phone) return '';
+  const digits = normPhone(phone).replace(/[^\d+]/g, '');
+  if (!digits) return esc(phone);
+  return `<a href="tel:${digits}" class="tel-link" onclick="event.stopPropagation()">${esc(phone)}</a>`;
+}
 function isPastDateTime(dt) {
   if (!dt) return false;
   const m = dt.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}):(\d{2})/);
@@ -1026,8 +1238,6 @@ function switchTab(tab) {
   ['reservations','cancellations','sameday','noshow','stats'].forEach(t => {
     const p = document.getElementById('panel-' + t);
     if (p) p.style.display = (t === tab) ? '' : 'none';
-    const card = document.getElementById('statCard-' + t);
-    if (card) card.classList.toggle('stat-active', t === tab);
   });
   // 本日サマリーは予約者リストの上にだけ表示
   const today = document.getElementById('todaySummary');
@@ -1915,13 +2125,13 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         const rd = (r.datetime || '').substring(0, 10);
         const remindable = rd && rd >= todayStr() && !isCancelled;
         if (!remindable) {
-          remindCols = `<td data-label="📞電話" style="text-align:center;color:#cbd5e0">—</td><td data-label="✉️メール" style="text-align:center;color:#cbd5e0">—</td>`;
+          remindCols = `<td data-label="📞電話" style="text-align:center;color:var(--color-neutral-muted)">—</td><td data-label="✉️メール" style="text-align:center;color:var(--color-neutral-muted)">—</td>`;
         } else {
           const telDone = !!r.remindTel, mailDone = !!r.remindMail;
           const telDate = telDone ? `<div class="remind-date">${esc((r.remindTel||'').substring(5,10).replace('-','/'))}</div>` : '';
           const mailDate = mailDone ? `<div class="remind-date">${esc((r.remindMail||'').substring(5,10).replace('-','/'))}</div>` : '';
-          remindCols = `<td data-label="📞電話" style="text-align:center"><input type="checkbox" class="remind-check" ${telDone?'checked':''} onchange="toggleRemind('${r.id}','tel',this)" title="${telDone ? 'リマインド電話済: '+esc(r.remindTel) : 'リマインド電話をしたらチェック'}">${telDate}</td>` +
-                       `<td data-label="✉️メール" style="text-align:center"><input type="checkbox" class="remind-check" ${mailDone?'checked':''} onchange="toggleRemind('${r.id}','mail',this)" title="${mailDone ? 'リマインドメール済: '+esc(r.remindMail) : 'リマインドメールを送ったらチェック'}">${mailDate}</td>`;
+          remindCols = `<td data-label="📞電話" style="text-align:center"><label class="tap-check"><input type="checkbox" class="remind-check" ${telDone?'checked':''} onchange="toggleRemind('${r.id}','tel',this)" title="${telDone ? 'リマインド電話済: '+esc(r.remindTel) : 'リマインド電話をしたらチェック'}"></label>${telDate}</td>` +
+                       `<td data-label="✉️メール" style="text-align:center"><label class="tap-check"><input type="checkbox" class="remind-check" ${mailDone?'checked':''} onchange="toggleRemind('${r.id}','mail',this)" title="${mailDone ? 'リマインドメール済: '+esc(r.remindMail) : 'リマインドメールを送ったらチェック'}"></label>${mailDate}</td>`;
         }
       }
       // リピーターバッジ（予約リストのみ）
@@ -1938,11 +2148,11 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       let samedayCol = '';
       if (isResTab) {
         if (isCancelled) {
-          samedayCol = `<td data-label="🟠当日" style="text-align:center;color:#cbd5e0" title="既にキャンセル済みのため対象外">—</td>`;
+          samedayCol = `<td data-label="🟠当日" style="text-align:center;color:var(--color-neutral-muted)" title="既にキャンセル済みのため対象外">—</td>`;
         } else if (r.movedToSameday) {
-          samedayCol = `<td data-label="🟠当日" style="text-align:center"><span class="noshow-checked-label" style="color:#b7791f">✓ 登録済</span></td>`;
+          samedayCol = `<td data-label="🟠当日" style="text-align:center"><span class="noshow-checked-label" style="color:var(--color-caution-strong)">✓ 登録済</span></td>`;
         } else {
-          samedayCol = `<td data-label="🟠当日" style="text-align:center"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}', this)" title="当日キャンセルに登録（電話キャンセル等）"></td>`;
+          samedayCol = `<td data-label="🟠当日" style="text-align:center"><label class="tap-check"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}', this)" title="当日キャンセルに登録（電話キャンセル等）"></label></td>`;
         }
       }
       // 予約者リストのみ: 無断キャンセルチェック列(キャンセル済み=事前連絡ありのため対象外)
@@ -1950,23 +2160,28 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (isResTab) {
         const alreadyMoved = r.movedToNoshow ? true : false;
         if (isCancelled) {
-          noshowCol = `<td data-label="🚫無断" style="text-align:center;color:#cbd5e0" title="既にキャンセル済み(事前連絡あり)のため対象外">—</td>`;
+          noshowCol = `<td data-label="🚫無断" style="text-align:center;color:var(--color-neutral-muted)" title="既にキャンセル済み(事前連絡あり)のため対象外">—</td>`;
         } else if (alreadyMoved) {
           noshowCol = `<td data-label="🚫無断" style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
         } else {
-          noshowCol = `<td data-label="🚫無断" style="text-align:center"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></td>`;
+          noshowCol = `<td data-label="🚫無断" style="text-align:center"><label class="tap-check"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></label></td>`;
         }
       }
       const cancelledTag = isCancelled ? ` <span class="tag-cancelled">キャンセル済</span>` : '';
+      const cautionContent = `${cancelledTag}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}`;
       const recvLabel = isCancelTab ? 'キャンセル日時' : '受付日時';
       return `<tr class="${rowClass}">
-      <td style="color:#a0aec0;font-size:12px">${i+1}</td>
+      <td class="card-header-cell"><span class="ch-time">${timeOnly(r.datetime)}</span><span class="ch-name">${esc(r.name)}</span></td>
+      <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
       <td data-label="予約日時" class="date-cell">${esc(fmtDT(r.datetime))}</td>
       <td data-label="メニュー" class="menu-cell">${esc(r.menu)}</td>
-      <td data-label="氏名" class="name-cell">${esc(r.name)}${cancelledTag}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}</td>
-      <td data-label="電話" class="phone-cell">${esc(r.phone)}</td>
-      <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
-      <td data-label="コメント" class="comment-cell">${esc(r.comment)}</td>
+      <td data-label="氏名" class="name-cell">
+        <div class="name-primary">${esc(r.name)}</div>
+        ${r.email ? `<div class="name-email">${esc(r.email)}</div>` : ''}
+      </td>
+      <td data-label="注意" class="caution-cell">${cautionContent}</td>
+      <td data-label="電話" class="phone-cell">${telLink(r.phone)}</td>
+      <td data-label="コメント" class="comment-cell" onclick="this.classList.toggle('expanded')">${esc(r.comment)}</td>
       <td data-label="${recvLabel}" class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
       ${remindCols}${samedayCol}${noshowCol}${kubunCol}${badgeCol}
       <td class="actions-cell"><div style="display:flex;gap:5px">
@@ -2009,12 +2224,14 @@ function renderNoshowTable(q, dateFrom, dateTo) {
       const rc = cnt >= 3 ? 'row-red' : cnt === 2 ? 'row-orange' : '';
       const bc = cnt >= 3 ? 'badge-3' : cnt === 2 ? 'badge-2' : 'badge-1';
       const dd = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
+      const dShort = r.date ? r.date.replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1/$2') : '';
       return `<tr class="${rc}">
-        <td style="color:#a0aec0;font-size:12px">${i+1}</td>
+        <td class="card-header-cell"><span class="ch-time">${esc(dShort)} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
+        <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
         <td data-label="日付" class="date-cell">${dd}</td><td data-label="時間">${esc(r.time)}</td>
         <td data-label="氏名" class="name-cell">${esc(r.name)}</td>
-        <td data-label="電話" class="phone-cell">${esc(r.phone)}</td>
-        <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
+        <td data-label="電話" class="phone-cell">${telLink(r.phone)}</td>
+        <td data-label="メール" style="font-size:13px;color:var(--color-neutral-muted)">${esc(r.email)}</td>
         <td data-label="備考" class="note-cell">${esc(r.note)}</td>
         <td data-label="回数" style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
         <td class="actions-cell"><div style="display:flex;gap:5px">
@@ -2059,6 +2276,7 @@ function renderSamedayTable(q, dateFrom, dateTo) {
       const rc = cnt >= 3 ? 'row-sameday-3' : cnt === 2 ? 'row-sameday-2' : '';
       const bc = cnt >= 3 ? 'badge-sd3' : cnt === 2 ? 'badge-sd2' : 'badge-1';
       const dd = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
+      const dShort = r.date ? r.date.replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1/$2') : '';
       const isAuto = r.source === 'auto';
       const tag = isAuto ? `<span class="tag-auto">✉️メール</span>` : `<span class="tag-manual">📞手動</span>`;
       const actions = isAuto
@@ -2066,11 +2284,12 @@ function renderSamedayTable(q, dateFrom, dateTo) {
         : `<button class="btn btn-outline btn-sm" onclick="openSamedayModal('${r.id}')">✏️</button>
            <button class="btn btn-danger btn-sm" onclick="deleteSameday('${r.id}')">🗑️</button>`;
       return `<tr class="${rc}">
-        <td style="color:#a0aec0;font-size:12px">${i+1}</td>
+        <td class="card-header-cell"><span class="ch-time">${esc(dShort)} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
+        <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
         <td data-label="予約日" class="date-cell">${dd}</td><td data-label="時間">${esc(r.time)}</td>
         <td data-label="氏名" class="name-cell">${esc(r.name)}</td>
-        <td data-label="電話" class="phone-cell">${esc(r.phone)}</td>
-        <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
+        <td data-label="電話" class="phone-cell">${telLink(r.phone)}</td>
+        <td data-label="メール" style="font-size:13px;color:var(--color-neutral-muted)">${esc(r.email)}</td>
         <td data-label="区分">${tag}</td>
         <td data-label="備考" class="note-cell">${esc(r.note)}</td>
         <td data-label="回数" style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
@@ -2242,7 +2461,7 @@ function renderTodaySummary() {
   if (tc) tc.textContent = list.length;
   const cont = document.getElementById('todayList');
   if (list.length === 0) {
-    cont.innerHTML = `<div style="padding:8px 12px;color:#718096;font-size:13px;background:white;border-radius:8px">本日の予約はありません</div>`;
+    cont.innerHTML = `<div style="padding:8px 12px;color:var(--color-neutral-strong);font-size:13px;background:var(--color-surface);border-radius:8px">本日の予約はありません</div>`;
   } else {
     const noshowPhoneMap = getNoshowPhoneCountMap();
     const noshowNameMap = getNoshowNameCountMap();
@@ -2257,12 +2476,15 @@ function renderTodaySummary() {
       const dup = dupBadgeFor(r, dupMap);
       const lv = dupLevelFor(r, dupMap);
       const itemCls = lv === 'dup' ? ' today-dup' : (lv === 'samename' ? ' today-samename' : '');
-      const remind = ` <span style="font-size:11px" title="📞電話リマインド${r.remindTel?'済':'未'} / ✉️メールリマインド${r.remindMail?'済':'未'}">${r.remindTel?'📞✓':'📞—'} ${r.remindMail?'✉️✓':'✉️—'}</span>`;
+      const remind = ` <span class="remind-pill-group">` +
+        `<span class="remind-pill ${r.remindTel?'is-done':'is-pending'}" title="📞電話リマインド${r.remindTel?'済':'未'}">📞${r.remindTel?'済':'未'}</span>` +
+        `<span class="remind-pill ${r.remindMail?'is-done':'is-pending'}" title="✉️メールリマインド${r.remindMail?'済':'未'}">✉️${r.remindMail?'済':'未'}</span>` +
+        `</span>`;
       return `<div class="today-item${past ? ' today-past' : ''}${itemCls}">
         <span class="today-time">${time}</span>
         <span class="today-name">${esc(r.name)}${warn}${dup}${remind}</span>
         <span class="today-menu">${esc(r.menu)}</span>
-        <span style="font-size:12px;color:#718096" class="phone-cell">${esc(r.phone)}</span>
+        <span style="font-size:12px;color:var(--color-neutral-muted)" class="phone-cell">${telLink(r.phone)}</span>
       </div>`;
     }).join('');
   }
@@ -2298,13 +2520,13 @@ function renderStats() {
   document.getElementById('statsSummary').innerHTML = `
     <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div></div>
     <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div></div>
-    <div class="stats-summary-card" style="border-left-color:#b7791f"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div></div>
+    <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div></div>
     <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div></div>
     <div class="stats-summary-card purple"><div class="label">📊 対象月数</div><div class="value">${keys.length}</div></div>`;
   const maxRes = Math.max(1, ...keys.map(k => months[k].res));
   const tbody = document.getElementById('stats-tbody');
   if (keys.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#a0aec0;padding:40px">データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--color-neutral-muted);padding:40px">データがありません</td></tr>`;
   } else {
     tbody.innerHTML = keys.map(k => {
       const m = months[k];
@@ -2314,12 +2536,12 @@ function renderStats() {
       const ym = k.replace(/(\d{4})-(\d{2})/, '$1年$2月');
       const barW = Math.round((m.res / maxRes) * 100);
       return `<tr>
-        <td data-label="月" style="font-weight:700;color:#2d3748">${ym}</td>
+        <td data-label="月" style="font-weight:700;color:var(--color-text)">${ym}</td>
         <td data-label="予約">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
-        <td data-label="キャンセル" style="color:#c05621">${m.can}</td>
-        <td data-label="振替" style="color:#553c9a">${m.fk}</td>
-        <td data-label="当日" style="color:#b7791f">${m.sd}</td>
-        <td data-label="無断" style="color:#c53030">${m.ns}</td>
+        <td data-label="キャンセル" style="color:var(--color-caution)">${m.can}</td>
+        <td data-label="振替" style="color:var(--color-info)">${m.fk}</td>
+        <td data-label="当日" style="color:var(--color-caution-strong)">${m.sd}</td>
+        <td data-label="無断" style="color:var(--color-danger)">${m.ns}</td>
         <td data-label="ｷｬﾝｾﾙ率">${cr}%</td>
         <td data-label="無断率">${nr}%</td>
       </tr>`;
@@ -2332,6 +2554,11 @@ function fmtDT(dt) {
   if (!dt) return '';
   const m = dt.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})/);
   return m ? `${m[1]}年${m[2]}月${m[3]}日 ${m[4]}` : dt;
+}
+
+function timeOnly(dt) {
+  const m = (dt || '').match(/(\d{1,2}:\d{2})/);
+  return m ? m[1] : '--:--';
 }
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -2722,7 +2949,7 @@ function handleImportFile(input) {
   const file = input.files[0];
   if (!file) return;
   if (typeof XLSX === 'undefined') {
-    document.getElementById('importPreview').innerHTML = `<div style="color:#c53030;font-size:13px">Excel機能の読み込みに失敗しています。インターネット接続を確認し、再読み込みしてください</div>`;
+    document.getElementById('importPreview').innerHTML = `<div style="color:var(--color-danger);font-size:13px">Excel機能の読み込みに失敗しています。インターネット接続を確認し、再読み込みしてください</div>`;
     return;
   }
   const reader = new FileReader();
@@ -2735,18 +2962,18 @@ function handleImportFile(input) {
       importParsed = rows.map(normalizeImportRow).filter(r => r.name || r.phone);
       renderImportPreview();
     } catch(err) {
-      document.getElementById('importPreview').innerHTML = `<div style="color:#c53030;font-size:13px">読み込みエラー: ${esc(err.message)}</div>`;
+      document.getElementById('importPreview').innerHTML = `<div style="color:var(--color-danger);font-size:13px">読み込みエラー: ${esc(err.message)}</div>`;
     }
   };
   reader.readAsArrayBuffer(file);
 }
 function renderImportPreview() {
   const cont = document.getElementById('importPreview');
-  if (importParsed.length === 0) { cont.innerHTML = `<div style="color:#c53030;font-size:13px">有効な行が見つかりませんでした（氏名か電話番号の列が必要です）</div>`; return; }
+  if (importParsed.length === 0) { cont.innerHTML = `<div style="color:var(--color-danger);font-size:13px">有効な行が見つかりませんでした（氏名か電話番号の列が必要です）</div>`; return; }
   const cols = importType === 'noshow' ? ['date','time','name','phone','email','note'] : ['datetime','menu','name','phone','email','comment'];
-  const head = cols.map(c => `<th style="padding:4px 8px;background:#f7fafc;text-align:left">${c}</th>`).join('');
-  const body = importParsed.slice(0, 8).map(r => `<tr>${cols.map(c => `<td style="padding:4px 8px;border-top:1px solid #f0f0f0">${esc(r[c]||'')}</td>`).join('')}</tr>`).join('');
-  cont.innerHTML = `<div style="font-size:13px;font-weight:700;color:#2b6cb0;margin-bottom:6px">プレビュー: ${importParsed.length}件（先頭8件表示）</div>
+  const head = cols.map(c => `<th style="padding:4px 8px;background:var(--color-neutral-bg);text-align:left">${c}</th>`).join('');
+  const body = importParsed.slice(0, 8).map(r => `<tr>${cols.map(c => `<td style="padding:4px 8px;border-top:1px solid var(--color-neutral-tint)">${esc(r[c]||'')}</td>`).join('')}</tr>`).join('');
+  cont.innerHTML = `<div style="font-size:13px;font-weight:700;color:var(--color-info);margin-bottom:6px">プレビュー: ${importParsed.length}件（先頭8件表示）</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 function confirmImport() {
@@ -2905,6 +3132,58 @@ function cycleViewMode() {
   showToast('表示モード: ' + VIEW_LABEL[next], '');
 }
 
+// ── ダークモード(自動/ライト/ダーク) ───────────────────────────────────
+const DARK_MODES = ['auto', 'light', 'dark'];
+const DARK_LABEL = { auto:'自動', light:'ライト', dark:'ダーク' };
+const darkMediaQuery = (window.matchMedia) ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function applyDarkMode() {
+  const m = localStorage.getItem('darkMode_omiya') || 'auto';
+  const isDark = (m === 'dark') || (m === 'auto' && darkMediaQuery && darkMediaQuery.matches);
+  document.body.classList.toggle('dark-mode', isDark);
+  const b = document.getElementById('darkBtn');
+  if (b) b.textContent = '🌙 ' + (DARK_LABEL[m] || '自動');
+}
+function cycleDarkMode() {
+  const m = localStorage.getItem('darkMode_omiya') || 'auto';
+  const next = DARK_MODES[(DARK_MODES.indexOf(m) + 1) % DARK_MODES.length];
+  localStorage.setItem('darkMode_omiya', next);
+  applyDarkMode();
+  showToast('表示テーマ: ' + DARK_LABEL[next], '');
+}
+if (darkMediaQuery) {
+  const onSchemeChange = () => { if ((localStorage.getItem('darkMode_omiya') || 'auto') === 'auto') applyDarkMode(); };
+  if (darkMediaQuery.addEventListener) darkMediaQuery.addEventListener('change', onSchemeChange);
+  else if (darkMediaQuery.addListener) darkMediaQuery.addListener(onSchemeChange);
+}
+
+// ── スマホ下部固定タブ(ON/OFF) ─────────────────────────────────────────
+function applyBottomNav() {
+  const on = localStorage.getItem('bottomNav_omiya') === 'on';
+  document.body.classList.toggle('bottom-nav-on', on);
+  const b = document.getElementById('bottomNavBtn');
+  if (b) b.textContent = '📌 下部固定 ' + (on ? 'ON' : 'OFF');
+}
+function cycleBottomNav() {
+  const on = localStorage.getItem('bottomNav_omiya') === 'on';
+  localStorage.setItem('bottomNav_omiya', on ? 'off' : 'on');
+  applyBottomNav();
+  showToast('スマホ下部固定タブ: ' + (on ? 'OFF' : 'ON'), '');
+}
+
+// ── ヘッダー「⋯」その他メニュー ────────────────────────────────────────
+function toggleHeaderMore(forceClose) {
+  const menu = document.getElementById('headerMoreMenu');
+  const btn = document.getElementById('headerMoreBtn');
+  if (!menu || !btn) return;
+  const open = (forceClose === true) ? false : !menu.classList.contains('open');
+  menu.classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', String(open));
+}
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('headerMore');
+  if (wrap && !wrap.contains(e.target)) toggleHeaderMore(true);
+});
+
 // ── Init ────────────────────────────────────────────────────────────────
 loadData();
 switchTab('reservations');
@@ -2913,6 +3192,8 @@ updateNotifBtn();
 updateLastFetchInfo();
 applyFontSize();
 applyViewMode();
+applyDarkMode();
+applyBottomNav();
 updateAuthUI(); // Google読み込み待ちの間も「前回のログインを再開」ボタンをすぐ出す
 checkReminderGaps(); // ローカル保存データだけでも、今日・明日のリマインド漏れがあれば通知
 setInterval(updateLastFetchInfo, 60 * 1000); // 1分ごとに「○分前」表示を更新
