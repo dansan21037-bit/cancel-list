@@ -185,6 +185,13 @@
   .settings-modal .help-text { font-size: 12px; color: #718096; margin-top: 4px; line-height: 1.5; }
   .settings-modal .step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
   .settings-modal .step-num { display: inline-block; background: #4299e1; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
+  /* バッジ凡例モーダル */
+  .legend-section { margin-bottom: 20px; }
+  .legend-section h3 { font-size: 14px; font-weight: 700; color: #2d3748; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #f0f0f0; }
+  .legend-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 9px; font-size: 13px; line-height: 1.5; }
+  .legend-row .badge, .legend-row [class^="badge-"], .legend-row [class^="tag-"] { flex-shrink: 0; }
+  .legend-desc { color: #4a5568; margin-left: 2px; }
+  .legend-swatch { display: inline-block; width: 32px; height: 20px; border-radius: 4px; flex-shrink: 0; }
   .loading-overlay {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
     z-index: 150; align-items: center; justify-content: center;
@@ -276,6 +283,15 @@
   tr.row-cancelled { background: #f7fafc; }
   tr.row-cancelled .name-cell, tr.row-cancelled .date-cell, tr.row-cancelled .menu-cell { text-decoration: line-through; color: #a0aec0; }
   .tag-cancelled { display:inline-block; background:#e2e8f0; color:#4a5568; font-size:10px; font-weight:700; padding:2px 6px; border-radius:8px; margin-left:4px; white-space:nowrap; vertical-align:middle; text-decoration:none; }
+
+  /* キャンセル区分タグ(振替/当日/通常) */
+  .tag-furikae { display:inline-block; background:#e9d8fd; color:#553c9a; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
+  .tag-kubun-sameday { display:inline-block; background:#feebc8; color:#9c4221; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
+  .tag-kubun-normal { display:inline-block; background:#e2e8f0; color:#4a5568; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
+
+  /* リマインドチェック */
+  .remind-check { width: 18px; height: 18px; cursor: pointer; accent-color: #3182ce; }
+  .remind-date { font-size: 10px; color: #718096; margin-top: 2px; white-space: nowrap; }
 
   /* 最終取得時刻 / 通知ボタン */
   .last-fetch-info { font-size: 12px; color: #718096; margin-left: 4px; padding: 2px 8px; background: #f7fafc; border-radius: 6px; }
@@ -431,6 +447,7 @@
     <div class="header-sub">予約・キャンセル・無断キャンセル管理</div>
   </div>
   <div class="header-right">
+    <button class="btn btn-outline" onclick="openLegendModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📖 バッジの説明</button>
     <button class="btn btn-outline" onclick="openImportModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📤 インポート</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">📥 Excel出力</button>
     <button class="btn btn-outline" onclick="openSettingsModal()" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.3)">⚙️ 設定</button>
@@ -478,6 +495,7 @@
   </div>
   <button class="btn btn-mail" id="fetchMailBtn" onclick="fetchEmails()" style="display:none">📩 メール取得</button>
   <button class="btn btn-outline" id="rescanBtn" onclick="fullRescan()" style="display:none" title="開始日から全期間を再走査して取りこぼしを復旧">🔁 全期間再取得</button>
+  <button class="btn btn-outline" id="remindFilterBtn" onclick="toggleRemindFilter()" title="今日以降でリマインド(📞か✉️)が未実施の予約だけを表示">📋 リマインド未</button>
   <button class="btn btn-primary" id="addNoshowBtn" onclick="openAddModal()" style="display:none">＋ 新規追加</button>
   <button class="btn btn-primary" id="addSamedayBtn" onclick="openSamedayModal()" style="display:none">＋ 当日キャンセル追加</button>
 </div>
@@ -517,6 +535,8 @@
       <th>メール</th>
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">受付日時 <span class="sort-btn">↕</span></th>
+      <th style="text-align:center;white-space:nowrap" title="リマインド電話を実施したらチェック">📞電話</th>
+      <th style="text-align:center;white-space:nowrap" title="リマインドメールを送信したらチェック">✉️メール</th>
       <th style="text-align:center;white-space:nowrap">🟠 当日</th>
       <th style="text-align:center;white-space:nowrap">🚫 無断</th>
       <th>操作</th>
@@ -538,7 +558,8 @@
       <th>メール</th>
       <th>コメント</th>
       <th onclick="sortBy('receivedAt')">キャンセル日時 <span class="sort-btn">↕</span></th>
-      <th style="text-align:center">回数</th>
+      <th style="text-align:center" title="🔀振替=時間変更(回数に数えない) / 🟠当日 / ✉️通常">区分</th>
+      <th style="text-align:center" title="実キャンセル回数(振替を除く)">回数</th>
       <th>操作</th>
     </tr></thead><tbody id="tbody-cancellations"></tbody></table>
   </div>
@@ -594,6 +615,7 @@
         <th>月</th>
         <th>予約件数</th>
         <th>キャンセル</th>
+        <th title="時間変更のための取り直し。キャンセル数・率には含めない">🔀振替</th>
         <th>当日キャンセル</th>
         <th>無断キャンセル</th>
         <th>キャンセル率</th>
@@ -602,6 +624,61 @@
     </div>
     <div class="table-footer"><span id="rowCount-stats">0ヶ月</span><span style="color:#6b46c1;font-weight:600;">市原院 - 月次レポート</span></div>
   </div></div>
+</div>
+
+<!-- バッジ凡例モーダル -->
+<div class="modal-backdrop" id="legendModal">
+  <div class="modal" style="max-width:680px">
+    <h2>📖 バッジ・色分けの説明</h2>
+
+    <div class="legend-section">
+      <h3>📋 予約者リスト</h3>
+      <div class="legend-row"><span class="badge badge-repeat">再2</span><span class="legend-desc">リピーター。同じ電話番号でキャンセル済みを除く実予約が2回以上(クリックでその人だけ検索)</span></div>
+      <div class="legend-row"><span class="badge-noshow-warn">⚠️無断2</span><span class="legend-desc">この人は過去に無断キャンセルが2回ある(要注意)</span></div>
+      <div class="legend-row"><span class="badge-sameday-warn">🟠当日2</span><span class="legend-desc">この人は過去に当日キャンセルが2回ある(振替は含まない)</span></div>
+      <div class="legend-row"><span class="badge-dup">🔁重複?</span><span class="legend-desc">同じ日・同じ名前・同じ電話番号の予約が他にもある。二重登録の可能性</span></div>
+      <div class="legend-row"><span class="badge-samename">👥同名?</span><span class="legend-desc">同じ日・同じ名前だが電話番号が違う予約が他にもある。別人の可能性</span></div>
+      <div class="legend-row"><span class="tag-cancelled">キャンセル済</span><span class="legend-desc">キャンセルメールが届いた予約。取消線表示になり、本日サマリー・要注意アラートの対象外</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#fef5e7;box-shadow:inset 3px 0 0 #c53030"></span><span class="legend-desc">行全体がオレンジ色+左に赤帯 = 無断キャンセルの警告対象</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#fff5f5;box-shadow:inset 3px 0 0 #c53030"></span><span class="legend-desc">行全体が薄い赤+左に赤帯 = 🔁重複?の対象</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#fffbeb;box-shadow:inset 3px 0 0 #d69e2e"></span><span class="legend-desc">行全体が薄い黄+左に黄帯 = 👥同名?の対象</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#fafbfc"></span><span class="legend-desc">行がグレーで文字が薄い = 予約日時が過去(すでに来店済み想定)</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">📞電話・✉️メール のチェック列(今日以降の予約のみ) = リマインド実施済みかどうか。チェックすると実施日時を記録</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">🟠当日・🚫無断 のチェック列 = チェックすると各リストへ登録(電話キャンセル・無断キャンセルの手動登録用)</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>✉️ キャンセルリスト</h3>
+      <div class="legend-row"><span class="tag-furikae">🔀振替</span><span class="legend-desc">時間変更のための取り直し(24時間以内に同じ人の新規予約あり)。回数・率には数えない</span></div>
+      <div class="legend-row"><span class="tag-kubun-sameday">🟠当日</span><span class="legend-desc">予約日と同じ日にキャンセルされた(振替を除く)</span></div>
+      <div class="legend-row"><span class="tag-kubun-normal">✉️通常</span><span class="legend-desc">振替・当日以外の通常キャンセル</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">区分の自動判定が違うときは ✏️編集 から手動で固定できます</span></div>
+      <div class="legend-row"><span class="badge badge-1">1</span><span class="badge badge-c3">3</span><span class="badge badge-c4">4</span><span class="legend-desc">同じ電話番号での実キャンセル回数(振替を除く)。3回以上・4回以上で行の背景が薄紫→濃い紫に変化</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>🟠 当日キャンセル</h3>
+      <div class="legend-row"><span class="tag-auto">✉️メール</span><span class="legend-desc">オンライン予約のキャンセルメールから自動判定</span></div>
+      <div class="legend-row"><span class="tag-manual">📞手動</span><span class="legend-desc">電話キャンセル等を「＋当日キャンセル追加」または予約行のチェックで手動登録したもの</span></div>
+      <div class="legend-row"><span class="badge badge-1">1</span><span class="badge badge-sd2">2</span><span class="badge badge-sd3">3</span><span class="legend-desc">同じ電話番号での当日キャンセル回数。2回・3回以上で行の背景が変化</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>🚫 無断キャンセル</h3>
+      <div class="legend-row"><span class="badge badge-1">1</span><span class="badge badge-2">2</span><span class="badge badge-3">3</span><span class="legend-desc">同じ電話番号での無断キャンセル回数。2回でオレンジ・3回以上で赤の行背景になる</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>🚨 トップの要注意アラート</h3>
+      <div class="legend-row"><span class="legend-swatch" style="background:#fff5f5;border:2px solid #e53e3e"></span><span class="legend-desc">赤枠 = 無断キャンセルの履歴がある人が今日以降に予約している</span></div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#fffaf0;border:2px solid #d69e2e"></span><span class="legend-desc">黄枠 = 当日キャンセルの履歴のみある人が今日以降に予約している(無断歴なし)</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">予約が0件のときはバナー自体が非表示になります</span></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeLegendModal()">閉じる</button>
+    </div>
+  </div>
 </div>
 
 <!-- インポートモーダル -->
@@ -709,6 +786,16 @@
     </div>
     <div class="form-group"><label>メールアドレス</label><input type="email" id="ef-email"></div>
     <div class="form-group"><label>コメント</label><textarea id="ef-comment"></textarea></div>
+    <div class="form-group" id="ef-kubun-group" style="display:none">
+      <label>キャンセル区分</label>
+      <select id="ef-kubun">
+        <option value="">自動判定に任せる</option>
+        <option value="furikae">🔀 振替(時間変更) — 回数に数えない</option>
+        <option value="sameday">🟠 当日キャンセル</option>
+        <option value="normal">✉️ 通常キャンセル</option>
+      </select>
+      <div style="font-size:12px;color:#718096;margin-top:4px">自動判定が違っているときだけ手動で固定してください</div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeEmailModal()">キャンセル</button>
       <button class="btn btn-primary" onclick="saveEmailRecord()">更新する</button>
@@ -735,7 +822,7 @@
     <div class="form-group" style="margin-top:16px">
       <label>OAuth クライアントID</label>
       <input type="text" id="clientIdInput" placeholder="xxxx.apps.googleusercontent.com">
-      <div class="help-text">Google Cloud ConsoleからコピーしたクライアントIDを貼り付けてください</div>
+      <div class="help-text">Google Cloud ConsoleからコピーしたクライアントIDを貼り付けてください。<br>※ HTMLファイル内の DEFAULT_CLIENT_ID にIDを設定しておくと、新しい端末でもここへの入力が不要になります(コード編集が必要な上級者向け設定)</div>
     </div>
     <div class="form-group">
       <label>共有フォルダID（任意）</label>
@@ -754,6 +841,13 @@ const STORAGE_KEY = 'reservation_ichihara';
 const DRIVE_FILE_NAME = 'reservation_ichihara.json';
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/gmail.readonly';
 const DEFAULT_FOLDER_ID = '1nUz5LIufhedp6BN1YLk0cVdrXf95G55e';
+// OAuthクライアントIDの既定値(任意)。ここに実際のClient IDを1回だけ入力しておくと、
+// 新しい端末で開いた際も⚙️設定でのID手入力が不要になる(空のままなら従来通り手入力が必要)。
+// 例: '123456789-abcdefg.apps.googleusercontent.com'
+const DEFAULT_CLIENT_ID = '';
+function getClientId() {
+  return localStorage.getItem('google_client_id') || DEFAULT_CLIENT_ID || '';
+}
 
 let reservations = [], cancellations = [], noshows = [], samedayManual = [];
 let activeTab = 'reservations';
@@ -789,6 +883,17 @@ function getNoshowNameCountMap() {
   return m;
 }
 
+// ── 予約のキャンセル済み判定(GAS等の外部同期にも対応) ─────────────────
+// cancelledAtフラグ(この端末でメール処理した際に立つ)に加えて、cancellations
+// 配列に同じIDのレコードが存在するかも都度確認する。GASが別アカウントで
+// Driveを直接更新した場合、この端末ではcancelledAtが立たないまま同期されて
+// しまうため、表示の都度突合することで「キャンセル済みなのに予約リストで
+// 現役表示され続ける」ズレを構造的に防ぐ。
+function isReservationCancelled(r) {
+  if (r.cancelledAt) return true;
+  return cancellations.some(c => c.id === r.id);
+}
+
 // ── 当日キャンセル判定・集計 ────────────────────────────────────────────
 // 当日キャンセル = 予約日(datetime) と キャンセル日(receivedAt) が同じ日付
 function isSameDayCancel(c) {
@@ -796,9 +901,51 @@ function isSameDayCancel(c) {
   const d2 = (c.receivedAt || '').substring(0, 10);
   return !!d1 && !!d2 && d1 === d2;
 }
-// メール由来(自動) + 手動 を統合した当日キャンセル一覧を返す
+
+// ── 振替(時間変更)の自動判定 ──────────────────────────────────────────
+// 「時間を変えるためにいったんキャンセルして取り直した」を検出する。
+// 判定: キャンセルの受付時刻の前後24時間以内に、同じ電話番号で別IDの予約受付がある。
+// (先に新予約→後で旧をキャンセルする操作順も拾うため、前後対称の窓にしている)
+// 振替は「実キャンセル」「当日キャンセル」の回数に数えない。
+const FURIKAE_WINDOW_MS = 24 * 60 * 60 * 1000;
+function parseDTms(s) {
+  if (!s) return NaN;
+  const m = String(s).match(/(\d{4})-(\d{1,2})-(\d{1,2})[\sT]*(\d{1,2}):(\d{2})/);
+  if (!m) return NaN;
+  return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]).getTime();
+}
+// 振替と判定したキャンセルの id を集めた Set を返す(手動区分を優先)
+function getFurikaeSet() {
+  const set = new Set();
+  const resByPhone = {};
+  reservations.forEach(r => {
+    const pn = normPhone(r.phone);
+    const t = parseDTms(r.receivedAt);
+    if (!pn || isNaN(t)) return;
+    (resByPhone[pn] = resByPhone[pn] || []).push({ id: String(r.id), t });
+  });
+  cancellations.forEach(c => {
+    if (c.kubunOverride === 'furikae') { set.add(c.id); return; }
+    if (c.kubunOverride) return; // 手動で当日/通常に固定済み → 自動判定しない
+    const pn = normPhone(c.phone);
+    const ct = parseDTms(c.receivedAt);
+    if (!pn || isNaN(ct)) return;
+    const list = resByPhone[pn] || [];
+    if (list.some(x => x.id !== String(c.id) && Math.abs(x.t - ct) <= FURIKAE_WINDOW_MS)) set.add(c.id);
+  });
+  return set;
+}
+// キャンセル1件の区分を返す: 'furikae'(振替) / 'sameday'(当日) / 'normal'(通常)
+function getCancelKubun(c, furikaeSet) {
+  if (c.kubunOverride) return c.kubunOverride;
+  if (furikaeSet && furikaeSet.has(c.id)) return 'furikae';
+  return isSameDayCancel(c) ? 'sameday' : 'normal';
+}
+
+// メール由来(自動) + 手動 を統合した当日キャンセル一覧を返す(振替は除外)
 function getSamedayList() {
-  const auto = cancellations.filter(isSameDayCancel).map(c => {
+  const furikaeSet = getFurikaeSet();
+  const auto = cancellations.filter(c => getCancelKubun(c, furikaeSet) === 'sameday').map(c => {
     const m = (c.datetime || '').match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})?/);
     return {
       id: 'auto_' + c.id, srcId: c.id, source: 'auto',
@@ -889,6 +1036,8 @@ function switchTab(tab) {
   document.getElementById('addSamedayBtn').style.display = (tab === 'sameday') ? '' : 'none';
   document.getElementById('fetchMailBtn').style.display = (isSignedIn && tab !== 'stats') ? '' : 'none';
   document.getElementById('rescanBtn').style.display = (isSignedIn && tab !== 'stats') ? '' : 'none';
+  const rfBtn = document.getElementById('remindFilterBtn');
+  if (rfBtn) rfBtn.style.display = (tab === 'reservations') ? '' : 'none';
   if (tab === 'noshow' || tab === 'sameday') { sortKey = 'date'; } else if (tab !== 'stats') { sortKey = 'datetime'; }
   sortDir = -1;
   render();
@@ -903,7 +1052,7 @@ let isRestoreAuth = false;    // true=ページ再読込時の自動復元(失�
 let tokenRefreshResolve = null; // サイレント更新の完了を待つためのresolver
 
 function initGIS() {
-  const clientId = localStorage.getItem('google_client_id');
+  const clientId = getClientId();
   if (!clientId) return;
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -963,7 +1112,7 @@ async function handleTokenResponse(resp) {
 // このボタンはユーザーの明示的なクリックから呼ばれるため、ポップアップはブロックされない。
 function resumeSession() {
   if (isSignedIn) return;
-  const clientId = localStorage.getItem('google_client_id');
+  const clientId = getClientId();
   if (!clientId) { showToast('先にClient IDを設定してください', 'error'); openSettingsModal(); return; }
   if (!tokenClient) initGIS();
   if (!tokenClient) { showToast('Google APIの読み込みを待っています...', 'error'); return; }
@@ -1018,7 +1167,7 @@ async function ensureFreshToken() {
 
 function handleAuth() {
   if (isSignedIn) { signOut(); return; }
-  const clientId = localStorage.getItem('google_client_id');
+  const clientId = getClientId();
   if (!clientId) { showToast('先にClient IDを設定してください', 'error'); openSettingsModal(); return; }
   if (!tokenClient) initGIS();
   if (tokenClient) { isInitialAuth = true; tokenClient.requestAccessToken(); }
@@ -1054,7 +1203,7 @@ function updateAuthUI() {
     btn.textContent = 'Googleサインイン'; btn.className = 'btn btn-sm btn-google';
     // 前回ログイン済みフラグがあれば「再開」ボタンを表示(クリック起点なのでポップアップがブロックされない)
     if (resumeBtn) {
-      const clientId = localStorage.getItem('google_client_id');
+      const clientId = getClientId();
       const wasSignedIn = localStorage.getItem('wasSignedIn_ichihara') === '1';
       resumeBtn.style.display = (clientId && wasSignedIn) ? '' : 'none';
       resumeBtn.textContent = '🔄 前回のログインを再開';
@@ -1096,6 +1245,7 @@ async function loadFromDrive() {
       const mod = new Date(searchData.files[0].modifiedTime).toLocaleString('ja-JP');
       document.getElementById('syncInfo').textContent = `Google Drive: 同期済み (${mod})`;
       showToast('Google Driveからデータを読み込みました', 'success');
+      checkReminderGaps();
     } else {
       await saveToDrive();
       document.getElementById('syncInfo').textContent = 'Google Drive: 新規作成しました';
@@ -1521,8 +1671,27 @@ function loadData() {
   } catch(e) { reservations = []; cancellations = []; noshows = []; samedayManual = []; }
 }
 
-function saveDataLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ reservations, cancellations, noshows, samedayManual })); }
+function saveDataLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ reservations, cancellations, noshows, samedayManual }));
+  checkStorageCapacity();
+}
 function saveData() { saveDataLocal(); if (isSignedIn) saveToDrive(); }
+
+// localStorageの上限(ブラウザ仕様上おおむね5MB相当=文字数ベース)に対する使用率を監視し、
+// 80%を超えたら警告する。セッション中1回だけ通知(保存の都度は出さない)
+let capacityWarned = false;
+function checkStorageCapacity() {
+  if (capacityWarned) return;
+  try {
+    const used = (localStorage.getItem(STORAGE_KEY) || '').length;
+    const limit = 5 * 1024 * 1024;
+    if (used / limit >= 0.8) {
+      capacityWarned = true;
+      const pct = Math.round(used / limit * 100);
+      showToast(`⚠️ 保存データが上限の${pct}%に達しています。古い予約・キャンセルデータの整理をご検討ください`, 'error');
+    }
+  } catch(e) { /* 容量取得に失敗しても保存自体は継続 */ }
+}
 
 // ── Settings ────────────────────────────────────────────────────────────
 function openSettingsModal() {
@@ -1546,7 +1715,7 @@ function saveSettings() {
   if (folderId && folderId !== DEFAULT_FOLDER_ID) localStorage.setItem('google_folder_id', folderId);
   else localStorage.removeItem('google_folder_id');
   tokenClient = null;
-  if (clientId) initGIS();
+  if (getClientId()) initGIS(); // 手入力を消してもDEFAULT_CLIENT_IDがあれば再初期化される
   closeSettingsModal();
   showToast('設定を保存しました', 'success');
 }
@@ -1555,8 +1724,16 @@ function saveSettings() {
 function getNoshowCounts() {
   const c = {}; noshows.forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; }); return c;
 }
+// 実キャンセル回数(振替=時間変更は除外)。dataがcancellationsのときだけ振替判定が効く
 function getCancelCounts(data) {
-  const c = {}; data.forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; }); return c;
+  const isCancelList = (data === cancellations);
+  const furikaeSet = isCancelList ? getFurikaeSet() : null;
+  const c = {};
+  data.forEach(r => {
+    if (isCancelList && getCancelKubun(r, furikaeSet) === 'furikae') return;
+    const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1;
+  });
+  return c;
 }
 
 // ── Render ──────────────────────────────────────────────────────────────
@@ -1572,6 +1749,56 @@ function searchByBadge(el) {
   toggleClearBtn();
   render();
 }
+
+// ── リマインド(📞電話 / ✉️メール)チェック ──────────────────────────────
+// チェックすると実施日時を記録し、Driveにも同期される(スタッフ間で共有)
+function toggleRemind(id, type, checkbox) {
+  const r = reservations.find(x => x.id === id);
+  if (!r) return;
+  const field = type === 'tel' ? 'remindTel' : 'remindMail';
+  if (checkbox.checked) {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    r[field] = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    showToast(`${type === 'tel' ? '📞電話' : '✉️メール'}リマインドを記録しました(${r.name}様)`, 'success');
+  } else {
+    r[field] = null;
+  }
+  saveData();
+  render();
+}
+let remindFilterOn = false;
+function toggleRemindFilter() {
+  remindFilterOn = !remindFilterOn;
+  const btn = document.getElementById('remindFilterBtn');
+  if (btn) {
+    btn.classList.toggle('btn-primary', remindFilterOn);
+    btn.classList.toggle('btn-outline', !remindFilterOn);
+    btn.textContent = remindFilterOn ? '📋 リマインド未のみ表示中' : '📋 リマインド未';
+  }
+  if (remindFilterOn && activeTab !== 'reservations') switchTab('reservations');
+  else render();
+}
+
+// 今日・明日の予約でリマインド(📞か✉️)が未実施の件数をトースト通知する。
+// データ読込タイミングで1回呼ぶ想定(render()の都度は呼ばない=通知の出しすぎ防止)
+function checkReminderGaps() {
+  const today = todayStr();
+  const td = new Date();
+  td.setDate(td.getDate() + 1);
+  const pad = n => String(n).padStart(2, '0');
+  const tomorrow = `${td.getFullYear()}-${pad(td.getMonth()+1)}-${pad(td.getDate())}`;
+  const targets = reservations.filter(r => {
+    if (isReservationCancelled(r)) return false;
+    const d = (r.datetime || '').substring(0, 10);
+    if (!d || d < today || d > tomorrow) return false;
+    return !(r.remindTel && r.remindMail);
+  });
+  if (targets.length > 0) {
+    setTimeout(() => showToast(`📋 今日・明日の予約でリマインド未実施が ${targets.length}件あります(ツールバー「📋リマインド未」で確認できます)`, ''), 1200);
+  }
+}
+
 function render() {
   const q = document.getElementById('searchInput').value.toLowerCase().trim();
   const dateFrom = document.getElementById('filterDateFrom').value;
@@ -1606,6 +1833,12 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (dateFrom && d < dateFrom) return false;
       if (dateTo && d > dateTo) return false;
     }
+    // リマインド未実施フィルタ(予約タブのみ): 今日以降・未キャンセルで📞か✉️が未チェックの行だけ
+    if (tabId === 'reservations' && remindFilterOn) {
+      const d = (r.datetime || '').substring(0, 10);
+      if (!d || d < todayStr() || isReservationCancelled(r)) return false;
+      if (r.remindTel && r.remindMail) return false;
+    }
     return true;
   });
   filtered.sort((a, b) => {
@@ -1622,11 +1855,14 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const samedayPhoneMap = getSamedayPhoneCountMap();
   const samedayNameMap = getSamedayNameCountMap();
   const dupMap = buildDupGroups(data); // 同日同名検出（予約・キャンセル各リスト内）
-  // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人
+  const furikaeSet = (tabId === 'cancellations') ? getFurikaeSet() : null; // キャンセル区分表示用
+  // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人。
+  // キャンセル済み予約(時間変更の残骸)を数えると「変更しただけで再2」になるため除外する
   const repeatCounts = {};
   const repeatByName = {};
   if (tabId === 'reservations') {
     for (const rec of reservations) {
+      if (isReservationCancelled(rec)) continue;
       const ph = normPhone(rec.phone);
       if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
       const nm = normName(rec.name);
@@ -1642,7 +1878,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const cnt = pn ? (counts[pn] || 1) : 1;
       const isCancelTab = (tabId === 'cancellations');
       const isResTab = (tabId === 'reservations');
-      const isCancelled = isResTab && !!r.cancelledAt;
+      const isCancelled = isResTab && isReservationCancelled(r);
       // 過去無断キャンセル者の警告（予約リストのみ）
       const nsByPhone = pn ? (noshowPhoneMap[pn] || 0) : 0;
       const nsByName = nn ? (noshowNameMap[nn] || 0) : 0;
@@ -1664,6 +1900,30 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (isCancelled) rowClass = (rowClass ? rowClass + ' ' : '') + 'row-cancelled';
       const badgeClass = isCancelTab ? (cnt >= 4 ? 'badge-c4' : cnt >= 3 ? 'badge-c3' : 'badge-1') : 'badge-1';
       const badgeCol = isCancelTab ? `<td data-label="回数" style="text-align:center"><span class="badge ${badgeClass}">${cnt}</span></td>` : '';
+      // キャンセルタブ: 区分列(🔀振替 / 🟠当日 / ✉️通常)。振替は回数に数えない
+      let kubunCol = '';
+      if (isCancelTab) {
+        const kb = getCancelKubun(r, furikaeSet);
+        const kbTag = kb === 'furikae' ? `<span class="tag-furikae" title="時間変更(取り直し)。キャンセル回数には数えません${r.kubunOverride ? '・手動区分' : ''}">🔀振替</span>`
+                    : kb === 'sameday' ? `<span class="tag-kubun-sameday" title="当日キャンセル${r.kubunOverride ? '(手動区分)' : ''}">🟠当日</span>`
+                    : `<span class="tag-kubun-normal" title="通常キャンセル${r.kubunOverride ? '(手動区分)' : ''}">✉️通常</span>`;
+        kubunCol = `<td data-label="区分" style="text-align:center">${kbTag}</td>`;
+      }
+      // 予約タブ: リマインド📞✉️チェック列(今日以降・未キャンセルのみ対象)
+      let remindCols = '';
+      if (isResTab) {
+        const rd = (r.datetime || '').substring(0, 10);
+        const remindable = rd && rd >= todayStr() && !isCancelled;
+        if (!remindable) {
+          remindCols = `<td data-label="📞電話" style="text-align:center;color:#cbd5e0">—</td><td data-label="✉️メール" style="text-align:center;color:#cbd5e0">—</td>`;
+        } else {
+          const telDone = !!r.remindTel, mailDone = !!r.remindMail;
+          const telDate = telDone ? `<div class="remind-date">${esc((r.remindTel||'').substring(5,10).replace('-','/'))}</div>` : '';
+          const mailDate = mailDone ? `<div class="remind-date">${esc((r.remindMail||'').substring(5,10).replace('-','/'))}</div>` : '';
+          remindCols = `<td data-label="📞電話" style="text-align:center"><input type="checkbox" class="remind-check" ${telDone?'checked':''} onchange="toggleRemind('${r.id}','tel',this)" title="${telDone ? 'リマインド電話済: '+esc(r.remindTel) : 'リマインド電話をしたらチェック'}">${telDate}</td>` +
+                       `<td data-label="✉️メール" style="text-align:center"><input type="checkbox" class="remind-check" ${mailDone?'checked':''} onchange="toggleRemind('${r.id}','mail',this)" title="${mailDone ? 'リマインドメール済: '+esc(r.remindMail) : 'リマインドメールを送ったらチェック'}">${mailDate}</td>`;
+        }
+      }
       // リピーターバッジ（予約リストのみ）
       let repeatBadge = '';
       if (isResTab) {
@@ -1708,7 +1968,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td data-label="メール" style="font-size:13px;color:#718096">${esc(r.email)}</td>
       <td data-label="コメント" class="comment-cell">${esc(r.comment)}</td>
       <td data-label="${recvLabel}" class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
-      ${samedayCol}${noshowCol}${badgeCol}
+      ${remindCols}${samedayCol}${noshowCol}${kubunCol}${badgeCol}
       <td class="actions-cell"><div style="display:flex;gap:5px">
         <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️</button>
@@ -1885,7 +2145,7 @@ function getCautionReservations() {
   const sdP = getSamedayPhoneCountMap(), sdN = getSamedayNameCountMap();
   const out = [];
   reservations.forEach(r => {
-    if (r.cancelledAt) return; // キャンセル済みは「来る予定」から除外
+    if (isReservationCancelled(r)) return; // キャンセル済みは「来る予定」から除外
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today) return; // 今日以降のみ
     const pn = normPhone(r.phone), nn = normName(r.name);
@@ -1903,7 +2163,7 @@ function getNewCautionAlerts(beforeIds) {
   const today = todayStr();
   const out = [];
   reservations.forEach(r => {
-    if (beforeIds.has(r.id) || r.cancelledAt) return;
+    if (beforeIds.has(r.id) || isReservationCancelled(r)) return;
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today) return;
     const pn = normPhone(r.phone), nn = normName(r.name);
@@ -1975,7 +2235,7 @@ function renderTodaySummary() {
   if (!banner) return;
   const today = todayStr();
   const list = reservations
-    .filter(r => (r.datetime||'').substring(0,10) === today && !r.cancelledAt)
+    .filter(r => (r.datetime||'').substring(0,10) === today && !isReservationCancelled(r))
     .sort((a,b) => (a.datetime||'').localeCompare(b.datetime||''));
   document.getElementById('todayCount').textContent = list.length;
   const tc = document.getElementById('stat-todayCount');
@@ -1997,9 +2257,10 @@ function renderTodaySummary() {
       const dup = dupBadgeFor(r, dupMap);
       const lv = dupLevelFor(r, dupMap);
       const itemCls = lv === 'dup' ? ' today-dup' : (lv === 'samename' ? ' today-samename' : '');
+      const remind = ` <span style="font-size:11px" title="📞電話リマインド${r.remindTel?'済':'未'} / ✉️メールリマインド${r.remindMail?'済':'未'}">${r.remindTel?'📞✓':'📞—'} ${r.remindMail?'✉️✓':'✉️—'}</span>`;
       return `<div class="today-item${past ? ' today-past' : ''}${itemCls}">
         <span class="today-time">${time}</span>
-        <span class="today-name">${esc(r.name)}${warn}${dup}</span>
+        <span class="today-name">${esc(r.name)}${warn}${dup}${remind}</span>
         <span class="today-menu">${esc(r.menu)}</span>
         <span style="font-size:12px;color:#718096" class="phone-cell">${esc(r.phone)}</span>
       </div>`;
@@ -2013,31 +2274,37 @@ function renderStats() {
   const add = (key, field, dt) => {
     const ym = (dt||'').substring(0,7);
     if (!/^\d{4}-\d{2}$/.test(ym)) return;
-    if (!months[ym]) months[ym] = { res:0, can:0, ns:0, sd:0 };
+    if (!months[ym]) months[ym] = { res:0, can:0, ns:0, sd:0, fk:0 };
     months[ym][field]++;
   };
   reservations.forEach(r => add(r, 'res', r.datetime));
-  cancellations.forEach(r => add(r, 'can', r.datetime));
+  // 振替(時間変更)は「実キャンセル」から除外して集計する
+  const furikaeSet = getFurikaeSet();
+  let totCan = 0, totFk = 0;
+  cancellations.forEach(r => {
+    if (getCancelKubun(r, furikaeSet) === 'furikae') { add(r, 'fk', r.datetime); totFk++; }
+    else { add(r, 'can', r.datetime); totCan++; }
+  });
   noshows.forEach(r => add(r, 'ns', r.date));
-  const samedayList = getSamedayList();
+  const samedayList = getSamedayList(); // 振替は自動で除外済み
   samedayList.forEach(r => add(r, 'sd', r.date));
   const keys = Object.keys(months).sort().reverse();
-  // サマリーカード（全期間合計）
-  const totRes = reservations.length, totCan = cancellations.length, totNs = noshows.length, totSd = samedayList.length;
+  // サマリーカード（全期間合計。振替は除いた実数）
+  const totRes = reservations.length, totNs = noshows.length, totSd = samedayList.length;
   const grand = totRes + totCan;
   const canRate = grand > 0 ? ((totCan / grand) * 100).toFixed(1) : '0.0';
   const nsRate = grand > 0 ? ((totNs / grand) * 100).toFixed(1) : '0.0';
   const sdRate = grand > 0 ? ((totSd / grand) * 100).toFixed(1) : '0.0';
   document.getElementById('statsSummary').innerHTML = `
     <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div></div>
-    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%</div></div>
+    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div></div>
     <div class="stats-summary-card" style="border-left-color:#b7791f"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div></div>
     <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div></div>
     <div class="stats-summary-card purple"><div class="label">📊 対象月数</div><div class="value">${keys.length}</div></div>`;
   const maxRes = Math.max(1, ...keys.map(k => months[k].res));
   const tbody = document.getElementById('stats-tbody');
   if (keys.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#a0aec0;padding:40px">データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#a0aec0;padding:40px">データがありません</td></tr>`;
   } else {
     tbody.innerHTML = keys.map(k => {
       const m = months[k];
@@ -2050,6 +2317,7 @@ function renderStats() {
         <td data-label="月" style="font-weight:700;color:#2d3748">${ym}</td>
         <td data-label="予約">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
         <td data-label="キャンセル" style="color:#c05621">${m.can}</td>
+        <td data-label="振替" style="color:#553c9a">${m.fk}</td>
         <td data-label="当日" style="color:#b7791f">${m.sd}</td>
         <td data-label="無断" style="color:#c53030">${m.ns}</td>
         <td data-label="ｷｬﾝｾﾙ率">${cr}%</td>
@@ -2091,6 +2359,13 @@ function openEditEmailModal(tabId, id) {
   document.getElementById('ef-phone').value = r.phone || '';
   document.getElementById('ef-email').value = r.email || '';
   document.getElementById('ef-comment').value = r.comment || '';
+  const kubunGroup = document.getElementById('ef-kubun-group');
+  if (tabId === 'cancellations') {
+    kubunGroup.style.display = '';
+    document.getElementById('ef-kubun').value = r.kubunOverride || '';
+  } else {
+    kubunGroup.style.display = 'none';
+  }
   document.getElementById('emailModal').classList.add('open');
 }
 
@@ -2111,6 +2386,10 @@ function saveEmailRecord() {
   data[idx].phone = document.getElementById('ef-phone').value.trim();
   data[idx].email = document.getElementById('ef-email').value.trim();
   data[idx].comment = document.getElementById('ef-comment').value.trim();
+  if (editEmailTab === 'cancellations') {
+    const kb = document.getElementById('ef-kubun').value;
+    data[idx].kubunOverride = kb || null;
+  }
   saveData();
   closeEmailModal();
   render();
@@ -2240,7 +2519,7 @@ document.getElementById('f-phone').addEventListener('input', function() {
   const existing = noshows.filter(r => r.phone === phone && r.id !== editId);
   const warn = document.getElementById('repeatWarning');
   if (existing.length > 0) {
-    const names = [...new Set(existing.map(r => r.name))].join('、');
+    const names = esc([...new Set(existing.map(r => r.name))].join('、'));
     warn.style.display = 'block';
     warn.innerHTML = `⚠️ この電話番号は既に <strong>${existing.length}件</strong> 登録済み（${names}）。追加後は合計 <strong>${existing.length + 1}回</strong>。`;
   } else { warn.style.display = 'none'; }
@@ -2298,20 +2577,30 @@ function deleteRecord(id) {
 
 // ── Excel Export ────────────────────────────────────────────────────────
 function exportExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('Excel機能の読み込みに失敗しています。インターネット接続を確認し、再読み込みしてください', 'error');
+    return;
+  }
   const wb = XLSX.utils.book_new();
   const today = new Date().toISOString().slice(0,10);
   if (activeTab === 'reservations') {
-    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','受付日時'];
-    const rows = reservations.map(r => [r.id,r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt]);
+    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','受付日時','キャンセル済','📞電話リマインド','✉️メールリマインド'];
+    const rows = reservations.map(r => [
+      r.id, r.datetime, r.menu, r.name, r.phone, r.email, r.comment, r.receivedAt,
+      isReservationCancelled(r) ? 'キャンセル済' : '',
+      r.remindTel || '', r.remindMail || ''
+    ]);
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
-    ws['!cols'] = [8,18,30,14,14,22,20,18].map(w=>({wch:w}));
+    ws['!cols'] = [8,18,30,14,14,22,20,18,10,18,18].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, '予約者リスト');
     XLSX.writeFile(wb, `予約者リスト市原_${today}.xlsx`);
   } else if (activeTab === 'cancellations') {
-    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','キャンセル日時'];
-    const rows = cancellations.map(r => [r.id,r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt]);
+    const furikaeSet1 = getFurikaeSet();
+    const kubunLabel = { furikae:'振替', sameday:'当日', normal:'通常' };
+    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','キャンセル日時','区分'];
+    const rows = cancellations.map(r => [r.id,r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt, kubunLabel[getCancelKubun(r, furikaeSet1)]]);
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
-    ws['!cols'] = [8,18,30,14,14,22,20,18].map(w=>({wch:w}));
+    ws['!cols'] = [8,18,30,14,14,22,20,18,8].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, 'キャンセルリスト');
     XLSX.writeFile(wb, `キャンセルリスト市原_${today}.xlsx`);
   } else if (activeTab === 'sameday') {
@@ -2385,6 +2674,10 @@ function updateLastFetchInfo() {
   el.classList.toggle('fresh', min < 70);
 }
 
+// ── バッジ凡例モーダル ──────────────────────────────────────────────────
+function openLegendModal() { document.getElementById('legendModal').classList.add('open'); }
+function closeLegendModal() { document.getElementById('legendModal').classList.remove('open'); }
+
 // ── インポート（CSV / Excel） ───────────────────────────────────────────
 let importType = 'reservations';
 let importParsed = [];
@@ -2428,6 +2721,10 @@ function normalizeImportRow(obj) {
 function handleImportFile(input) {
   const file = input.files[0];
   if (!file) return;
+  if (typeof XLSX === 'undefined') {
+    document.getElementById('importPreview').innerHTML = `<div style="color:#c53030;font-size:13px">Excel機能の読み込みに失敗しています。インターネット接続を確認し、再読み込みしてください</div>`;
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
@@ -2514,8 +2811,9 @@ document.getElementById('emailModal').addEventListener('click', function(e) { if
 document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) closeSettingsModal(); });
 document.getElementById('importModal').addEventListener('click', function(e) { if (e.target === this) closeImportModal(); });
 document.getElementById('samedayModal').addEventListener('click', function(e) { if (e.target === this) closeSamedayModal(); });
+document.getElementById('legendModal').addEventListener('click', function(e) { if (e.target === this) closeLegendModal(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); closeSamedayModal(); }
+  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); closeSamedayModal(); closeLegendModal(); }
   if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveRecord();
   if (e.key === 'Enter' && document.getElementById('samedayModal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveSameday();
 });
@@ -2616,6 +2914,7 @@ updateLastFetchInfo();
 applyFontSize();
 applyViewMode();
 updateAuthUI(); // Google読み込み待ちの間も「前回のログインを再開」ボタンをすぐ出す
+checkReminderGaps(); // ローカル保存データだけでも、今日・明日のリマインド漏れがあれば通知
 setInterval(updateLastFetchInfo, 60 * 1000); // 1分ごとに「○分前」表示を更新
 function tryInitGIS() {
   // 自動でrequestAccessTokenを呼ぶとユーザー操作を伴わずブラウザにポップアップをブロック
