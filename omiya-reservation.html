@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>予約管理システム 大宮</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f3460'/%3E%3Cpath d='M28 52 L44 68 L74 34' stroke='white' stroke-width='12' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f3460'/%3E%3Cpath d='M28 52 L44 68 L74 34' stroke='white' stroke-width='12' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -20,10 +25,15 @@
     --color-positive: #2f855a;       --color-positive-tint: #c6f6d5;       --color-positive-text: #22543d;       --color-positive-bg: #f0fff4;
     --color-accent-purple: #6b46c1;  --color-accent-purple-tint: #f0e6ff;  /* 統計タブ専用アクセント(意味色ではない) */
     --color-zebra-tint: #f8fafc;
+    --color-highlight-bg: #fff3a3;   --color-highlight-text: #5c4a00;      /* 検索語ハイライト用(専用トークン) */
     --tap-min: 44px;
     /* ページ構造トークン(ダークモード用) */
     --color-bg: #f0f2f5; --color-text: #333; --color-surface: #ffffff;
   }
+  /* 店舗アクセントカラー(ヘッダーグラデーション最終ストップ色の単色トークン化)。
+     意味色ではなくブランド色なので、ダークモードでも値は変えない(ヘッダー自体と同じ扱い)。
+     gen-stores.js が stores[key].grad の最終ストップを正規表現で抽出し、この1箇所だけ置換する。 */
+  :root { --store-accent: #0f3460; }
   body.dark-mode {
     --color-bg: #16181d; --color-text: #e2e8f0; --color-surface: #22252b;
     --color-danger: #fc8181;         --color-danger-tint: #742a2a;         --color-danger-text: #fed7d7;         --color-danger-bg: #2d1b1b;
@@ -34,10 +44,11 @@
     --color-positive: #68d391;       --color-positive-tint: #22543d;       --color-positive-text: #c6f6d5;       --color-positive-bg: #16281f;
     --color-accent-purple: #9f7aea;  --color-accent-purple-tint: #322659;
     --color-zebra-tint: #1c2027;
+    --color-highlight-bg: #7a6600;   --color-highlight-text: #fff3c4;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+    font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
     background: var(--color-bg); color: var(--color-text); min-height: 100vh;
     transition: background-color .2s ease, color .2s ease;
   }
@@ -73,7 +84,7 @@
     transition: all 0.2s; position: relative; top: 2px;
   }
   .tab:hover { color: var(--color-neutral); background: var(--color-neutral-tint); }
-  .tab.active { color: white; background: var(--color-info); border-color: var(--color-info); box-shadow: 0 -2px 8px rgba(43,108,176,0.3); }
+  .tab.active { color: white; background: var(--store-accent); border-color: var(--store-accent); box-shadow: 0 -2px 8px rgba(0,0,0,0.25); }
   .tab.active[data-tab="cancellations"] { background: var(--color-caution); border-color: var(--color-caution); box-shadow: 0 -2px 8px rgba(192,86,33,0.3); }
   .tab.active[data-tab="noshow"] { background: var(--color-danger); border-color: var(--color-danger); box-shadow: 0 -2px 8px rgba(197,48,48,0.3); }
   .tab-badge {
@@ -83,6 +94,9 @@
   }
   .tab:not(.active) .tab-badge { background: var(--color-neutral-tint); color: var(--color-neutral); }
   .tab.active .tab-badge { background: rgba(255,255,255,0.28); color: #fff; }
+  /* タブ切替時のフェードイン(即時表示切替ではなく、新しく表示されたパネルだけを軽くフェード) */
+  @keyframes tabPanelIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .tab-panel-enter { animation: tabPanelIn 0.25s ease; }
   .stats-bar {
     display: flex; gap: 12px; padding: 16px 24px; background: var(--color-surface);
     border-bottom: 1px solid var(--color-neutral-tint); flex-wrap: wrap;
@@ -112,7 +126,7 @@
     width: 100%; padding: 9px 32px 9px 34px; border: 1px solid #e2e8f0;
     border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; transition: border 0.2s;
   }
-  .search-input:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+  .search-input:focus { border-color: var(--store-accent); box-shadow: 0 0 0 3px rgba(0,0,0,0.12); }
   .search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #a0aec0; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 13px; line-height: 20px; text-align: center; cursor: pointer; display: none; padding: 0; }
   .search-clear:hover { background: var(--color-danger); }
   .btn {
@@ -120,8 +134,8 @@
     font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.2s;
     display: flex; align-items: center; gap: 6px; white-space: nowrap;
   }
-  .btn-primary { background: #4299e1; color: white; }
-  .btn-primary:hover { background: #3182ce; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(66,153,225,0.4); }
+  .btn-primary { background: var(--store-accent); color: white; }
+  .btn-primary:hover { filter: brightness(0.88); background: var(--store-accent); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
   .btn-success { background: #48bb78; color: white; }
   .btn-outline { background: white; color: #4a5568; border: 1px solid #e2e8f0; }
   .btn-outline:hover { background: #f7fafc; border-color: #cbd5e0; }
@@ -156,7 +170,13 @@
     transition: all 0.15s;
   }
   th[onclick]:hover .sort-btn { background: var(--color-info-tint); color: var(--color-info); }
-  tbody tr { border-bottom: 1px solid var(--color-neutral-tint); transition: background 0.15s; }
+  /* ソート状態の可視化: 現在のソート列を強調 */
+  th.sort-active { color: var(--color-info); }
+  .sort-btn.active {
+    background: var(--color-info-tint); color: var(--color-info-text);
+    border: 1px solid var(--color-info); font-weight: 700;
+  }
+  tbody tr { border-bottom: 1px solid var(--color-neutral-tint); transition: background 0.15s, transform 0.15s ease, box-shadow 0.15s ease; }
   tbody tr:last-child { border-bottom: none; }
   /* 縞模様。状態色を持つ行(row-*)では:not()により無効化し、状態色が必ず優先される */
   tbody tr:nth-child(even):not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
@@ -164,7 +184,21 @@
     :not(.row-sameday-2):not(.row-sameday-3) {
     background: var(--color-zebra-tint);
   }
-  tbody tr:hover { background: var(--color-neutral-bg) !important; }
+  /* 状態色を持つ行(row-*)はhover時も自身の色を維持させる(:not()で除外) */
+  tbody tr:hover:not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
+    :not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red)
+    :not(.row-sameday-2):not(.row-sameday-3) {
+    background: var(--color-neutral-bg) !important;
+  }
+  /* 行ホバーで軽く浮き上がらせる(デスクトップのみ。カード表示ではhoverの概念が薄いため対象外) */
+  @media (min-width: 769px) {
+    body:not(.force-card) tbody tr:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      position: relative;
+      z-index: 2;
+    }
+  }
   td { padding: 13px 14px; vertical-align: middle; }
   /* 無断キャンセル用（意味カラー: 注意=オレンジ / 危険=赤） */
   tr.row-orange { border-left: 4px solid var(--color-caution) !important; background: var(--color-caution-bg) !important; }
@@ -207,10 +241,15 @@
   a.tel-link:active { opacity: 0.55; }
   .phone-cell { font-family: monospace; color: var(--color-info); font-size: 13px; font-variant-numeric: tabular-nums; }
   .date-cell { white-space: nowrap; color: var(--color-neutral); font-variant-numeric: tabular-nums; }
+  /* 相対日付+曜日表示: 太字の相対表記(今日/明日/MM-DD(曜)) + 下に小さくフル日付 */
+  .date-cell .date-rel { font-weight: 700; }
+  .date-cell .date-full { font-size: 11px; color: var(--color-neutral-muted); margin-top: 1px; }
   .note-cell { color: var(--color-neutral-strong); font-size: 13px; max-width: 260px; }
   .menu-cell { font-size: 13px; max-width: 280px; color: var(--color-neutral); }
   .comment-cell { font-size: 12px; max-width: 150px; color: var(--color-neutral-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   .comment-cell:hover, .comment-cell.expanded { white-space: normal; overflow: visible; position: relative; z-index: 10; background: var(--color-surface); box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
+  /* 検索語ハイライト(専用トークン。危険/注意等の意味色とは独立) */
+  .search-hl { background: var(--color-highlight-bg); color: var(--color-highlight-text); border-radius: 3px; padding: 0 2px; font-weight: 700; }
   .actions-cell { display: flex; gap: 5px; }
   .empty-state { text-align: center; padding: 60px 20px; color: var(--color-neutral); }
   .empty-state .icon {
@@ -243,22 +282,76 @@
     width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
     font-size: 14px; font-family: inherit; outline: none; transition: border 0.2s; background: white;
   }
-  input:focus, select:focus, textarea:focus { border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+  input:focus, select:focus, textarea:focus { border-color: var(--store-accent); box-shadow: 0 0 0 3px rgba(0,0,0,0.12); }
   textarea { resize: vertical; min-height: 70px; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
   .toast {
     position: fixed; bottom: 24px; right: 24px; background: #2d3748; color: white;
-    padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 200;
+    padding: 14px 20px 16px; border-radius: 10px; font-size: 14px; z-index: 200;
     box-shadow: 0 4px 20px rgba(0,0,0,0.3); opacity: 0; transform: translateY(10px);
-    transition: all 0.3s; pointer-events: none; max-width: 400px;
+    transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: none; max-width: 400px;
+    display: flex; align-items: flex-start; gap: 10px;
+    border-left: 4px solid var(--color-info);
+    overflow: hidden; /* 下部プログレスバーの角丸クリップ用 */
   }
-  .toast.show { opacity: 1; transform: none; }
-  .toast.success { background: #276749; }
-  .toast.error { background: #9b2c2c; }
+  /* show中だけクリック可能にする(元々は常にpointer-events:noneでボタンが押せなかった) */
+  .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  .toast-icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
+  .toast-msg { flex: 1; line-height: 1.5; padding-right: 2px; }
+  .toast-progress {
+    position: absolute; left: 0; bottom: 0; height: 3px; width: 100%;
+    background: rgba(255,255,255,0.55); transform-origin: left center; transform: scaleX(1);
+  }
+  .toast.show .toast-progress { animation: toastDrain var(--toast-duration, 4000ms) linear forwards; }
+  @keyframes toastDrain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  .toast-undo-btn {
+    flex-shrink: 0; background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.45);
+    border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+    font-family: inherit; white-space: nowrap; transition: background 0.15s;
+  }
+  .toast-undo-btn:hover { background: rgba(255,255,255,0.3); }
+  .toast-undo-btn:active { background: rgba(255,255,255,0.45); }
+  .toast.success { background: #276749; border-left-color: var(--color-positive); }
+  .toast.error   { background: #9b2c2c; border-left-color: var(--color-danger); }
+  /* ===== 行タップ詳細シート(モバイル/カード表示: 行タップで全項目+操作をまとめて表示) ===== */
+  .row-detail-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 105; align-items: flex-end; justify-content: center;
+  }
+  .row-detail-backdrop.open { display: flex; }
+  .row-detail-sheet {
+    background: var(--color-surface); color: var(--color-text);
+    width: 100%; max-width: 560px; max-height: 85vh; overflow-y: auto;
+    border-radius: 18px 18px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,0.35);
+    padding: 6px 20px calc(20px + env(safe-area-inset-bottom));
+    transform: translateY(100%); transition: transform 0.25s ease;
+  }
+  .row-detail-backdrop.open .row-detail-sheet { transform: translateY(0); }
+  .row-detail-handle { width: 40px; height: 4px; border-radius: 2px; background: var(--color-neutral-tint); margin: 10px auto 6px; }
+  .row-detail-header { display: flex; align-items: center; gap: 10px; padding: 4px 0 14px; border-bottom: 1px solid var(--color-neutral-tint); margin-bottom: 14px; }
+  .row-detail-header h3 { flex: 1; font-size: 17px; font-weight: 800; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-detail-close {
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: var(--color-neutral-tint); color: var(--color-neutral-strong);
+    font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .row-detail-close:hover { background: var(--color-neutral-muted); color: #fff; }
+  .rds-row { display: flex; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--color-neutral-tint); font-size: 14px; align-items: flex-start; }
+  .rds-row:last-child { border-bottom: none; }
+  .rds-label { flex: 0 0 96px; font-weight: 700; color: var(--color-neutral-strong); font-size: 12px; padding-top: 2px; }
+  .rds-value { flex: 1; color: var(--color-text); word-break: break-word; }
+  .row-detail-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 4px; }
+  .row-detail-actions .btn { width: 100%; justify-content: center; min-height: var(--tap-min); }
+  .rds-check-row {
+    display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--color-text);
+    background: var(--color-neutral-bg); border-radius: 8px; padding: 10px 12px; cursor: pointer;
+  }
+  .rds-check-row input { width: 22px; height: 22px; flex-shrink: 0; cursor: pointer; }
+  body.rds-open { overflow: hidden; }
   .settings-modal { max-width: 480px; }
   .settings-modal .help-text { font-size: 12px; color: var(--color-neutral-strong); margin-top: 4px; line-height: 1.5; }
   .settings-modal .step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
-  .settings-modal .step-num { display: inline-block; background: #4299e1; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
+  .settings-modal .step-num { display: inline-block; background: var(--store-accent); color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 700; line-height: 20px; margin-right: 6px; }
   /* バッジ凡例モーダル */
   .legend-section { margin-bottom: 20px; }
   .legend-section h3 { font-size: 14px; font-weight: 700; color: var(--color-text); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--color-neutral-tint); }
@@ -290,6 +383,16 @@
     animation: shimmer 1.4s ease-in-out infinite;
   }
   @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+  /* テーブル用スケルトンローディング(メール取得中、表示中のtbodyに仮のシマー行を挿入) */
+  .skeleton-row { pointer-events: none; }
+  .skeleton-row td.skeleton-cell { padding: 16px 14px; }
+  .skel-block {
+    display: inline-block; height: 14px; margin: 3px 10px 3px 0; border-radius: 6px; vertical-align: middle;
+    background: linear-gradient(90deg, var(--color-neutral-tint) 25%, var(--color-neutral-muted) 37%, var(--color-neutral-tint) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  .skel-w1 { width: 60px; } .skel-w2 { width: 130px; } .skel-w3 { width: 90px; }
   @media (max-width: 600px) {
     .header h1 { font-size: 18px; }
     .toolbar { gap: 8px; }
@@ -338,7 +441,7 @@
   .today-banner {
     margin: 12px 24px 0; padding: 14px 18px;
     background: linear-gradient(135deg, #ebf8ff 0%, #e6fffa 100%);
-    border: 1px solid #4299e1; border-radius: 12px;
+    border: 1px solid var(--color-info); border-radius: 12px;
     box-shadow: 0 2px 8px rgba(66,153,225,0.15);
   }
   /* 要注意客アラートバナー */
@@ -372,6 +475,7 @@
   .today-banner-count { font-size: 22px; font-weight: 800; color: var(--color-info); }
   .today-toggle { font-size: 14px; color: var(--color-info); transition: transform 0.2s; }
   .today-toggle.collapsed { transform: rotate(-90deg); }
+  .today-date-badge { font-weight: 400; font-size: 12px; opacity: 0.85; margin-left: 2px; }
   .today-list { margin-top: 12px; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
   .today-list.collapsed { display: none; }
   .today-item {
@@ -418,6 +522,68 @@
   }
   .remind-pill.is-done { background: var(--color-positive-tint); color: var(--color-positive-text); border-color: var(--color-positive); }
   .remind-pill.is-pending { background: transparent; color: var(--color-neutral-muted); border-color: var(--color-neutral-muted); border-style: dashed; }
+  /* クイックフィルタチップ(今日/明日/今週/要注意のみ/リマインド未) */
+  .quick-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: 100%; padding-top: 2px; }
+  .quick-chip {
+    padding: 6px 14px; border: 1px solid var(--color-neutral-tint); border-radius: 999px;
+    background: var(--color-surface); color: var(--color-neutral-strong); font-size: 13px; font-weight: 700;
+    font-family: inherit; cursor: pointer; white-space: nowrap; transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .quick-chip:hover { border-color: var(--color-info); color: var(--color-info); background: var(--color-info-tint); }
+  .quick-chip.chip-active { background: var(--color-info); border-color: var(--color-info); color: #fff; box-shadow: 0 1px 4px rgba(66,153,225,0.35); }
+  .quick-chip.chip-active-warn { background: var(--color-danger); border-color: var(--color-danger); color: #fff; box-shadow: 0 1px 4px rgba(197,48,48,0.3); }
+  /* チェック時のポップアニメーション(リマインド📞✉️・当日🟠・無断🚫チェック共通) */
+  @keyframes checkPop { 0% { transform: scale(1); } 45% { transform: scale(1.32); } 100% { transform: scale(1); } }
+  .remind-check:checked, .noshow-check:checked, .sameday-check:checked { animation: checkPop 0.28s ease; }
+
+  /* ==== 印刷: 「本日の予約」だけをレセプション用紙として出力 ====
+     body直下の全パネル(ヘッダー/認証バー/タブ/ツールバー/要注意バナー/各タブ一覧表/モーダル/
+     トースト/モバイル下部固定タブ/読込中オーバーレイ)を列挙して非表示にし、#todaySummary だけ残す。
+     今後body直下に新しい常設パネルを追加した場合は、このリストにも追記すること(注意点参照)。 */
+  @media print {
+    .header, .auth-bar, .tab-bar, .toolbar, .caution-banner,
+    [id^="panel-"], .mobile-bottom-nav, .modal-backdrop, .toast, .loading-overlay,
+    .row-detail-backdrop {
+      display: none !important;
+    }
+
+    #todaySummary {
+      display: block !important; /* switchTab()が他タブ表示中に付けるinline style="display:none"を上書き */
+      margin: 0; padding: 0; background: #fff !important; border: none !important;
+      box-shadow: none !important; color: #000 !important; font-size: 13px;
+    }
+    .today-banner-header { cursor: default; margin-bottom: 6mm; padding-bottom: 3mm; border-bottom: 2px solid #000; }
+    .today-banner-title { color: #000 !important; font-size: 18px; }
+    .today-banner-count { color: #000 !important; }
+    #todayToggle { display: none !important; } /* 折りたたみ矢印は印刷不要 */
+
+    /* 折りたたみ(collapsed)状態でも強制的に開いた状態で印刷する */
+    #todayList, #todayList.collapsed {
+      display: grid !important; max-height: none !important; overflow: visible !important;
+    }
+    .today-item {
+      background: #fff !important; border: none !important; border-bottom: 1px solid #999 !important;
+      border-radius: 0; break-inside: avoid; padding: 3mm 1mm;
+    }
+    .today-item.today-past,
+    .today-item.today-dup,
+    .today-item.today-samename {
+      background: #fff !important; opacity: 1 !important; border-left: none !important;
+    }
+    #todaySummary .today-time, #todaySummary .today-name,
+    #todaySummary .today-menu, #todaySummary .phone-cell {
+      color: #000 !important; font-size: 13px;
+    }
+    #todaySummary .today-time { font-size: 15px; }
+    #todaySummary a { color: #000 !important; text-decoration: none !important; }
+    /* バッジ/ピル類は色塗りでなく黒枠+白背景に統一(ダークモードが有効でも常に黒) */
+    #todaySummary [class*="badge"], #todaySummary .remind-pill {
+      background: #fff !important; color: #000 !important; border: 1px solid #000 !important;
+    }
+
+    @page { margin: 14mm 10mm; }
+  }
 
   /* 最終取得時刻 / 通知ボタン */
   .last-fetch-info { font-size: 12px; color: var(--color-neutral-strong); margin-left: 4px; padding: 2px 8px; background: var(--color-neutral-bg); border-radius: 6px; }
@@ -473,6 +639,42 @@
   .stats-table td { padding: 12px 14px; border-bottom: 1px solid var(--color-neutral-tint); font-size: 14px; }
   .stats-bar-visual { background: var(--color-neutral-tint); border-radius: 4px; height: 6px; margin-top: 4px; overflow: hidden; max-width: 240px; }
   .stats-bar-fill { background: linear-gradient(90deg, var(--color-info), var(--color-accent-purple)); height: 100%; transition: width 0.3s; }
+
+  /* ==== 統計タブ拡張: 月次トレンド/前月比/曜日×時間帯ヒートマップ/内訳ドーナツ ==== */
+  .stats-trend-wrap { margin: 12px 24px 0; background: var(--color-surface); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .stats-trend-title { font-size: 12px; font-weight: 700; color: var(--color-neutral-strong); margin-bottom: 6px; }
+  .stats-trend-chart { width: 100%; height: 64px; display: block; }
+  .stats-trend-empty, .stats-heatmap-empty { text-align: center; color: var(--color-neutral-muted); font-size: 12px; padding: 18px 0; }
+
+  .stats-delta { font-size: 11px; font-weight: 700; margin-top: 4px; display: flex; align-items: center; gap: 3px; }
+  .stats-delta .arrow { font-size: 12px; line-height: 1; }
+  .stats-delta.d-up-good, .stats-delta.d-down-good { color: var(--color-positive); }
+  .stats-delta.d-up-bad { color: var(--color-danger); }
+  .stats-delta.d-up-caution { color: var(--color-caution); }
+  .stats-delta.d-up-caution-strong { color: var(--color-caution-strong); }
+  .stats-delta.d-flat { color: var(--color-neutral-strong); }
+  .stats-delta.d-none { color: var(--color-neutral-muted); font-weight: 500; }
+
+  .stats-visuals { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; padding: 12px 24px 0; align-items: stretch; }
+  @media (max-width: 900px) { .stats-visuals { grid-template-columns: 1fr; } }
+  .stats-panel-box { background: var(--color-surface); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .stats-panel-box h4 { font-size: 12px; font-weight: 700; color: var(--color-neutral-strong); margin-bottom: 10px; }
+
+  .heatmap-sub-title { font-size: 11px; font-weight: 700; color: var(--color-neutral-strong); margin-bottom: 4px; }
+  .heatmap-grid { display: grid; grid-template-columns: 56px repeat(7, 1fr); gap: 3px; font-size: 11px; margin-bottom: 4px; }
+  .heatmap-grid .hm-head { text-align: center; font-weight: 700; color: var(--color-neutral-strong); padding: 3px 0; }
+  .heatmap-grid .hm-rowlabel { display: flex; align-items: center; color: var(--color-neutral-strong); font-weight: 600; white-space: nowrap; }
+  .heatmap-grid .hm-cell { aspect-ratio: 1 / 1; min-height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; border: 1px solid var(--color-neutral-tint); }
+  .heatmap-grid .hm-cell.hm-zero { color: var(--color-neutral-muted); font-weight: 500; }
+
+  .donut-row { display: flex; align-items: center; gap: 18px; }
+  .donut-chart { width: 108px; height: 108px; border-radius: 50%; flex-shrink: 0; position: relative; }
+  .donut-chart::after { content: ''; position: absolute; inset: 18px; border-radius: 50%; background: var(--color-surface); }
+  .donut-legend { display: grid; gap: 6px; font-size: 12px; flex: 1; min-width: 0; }
+  .donut-legend-row { display: flex; align-items: center; gap: 7px; }
+  .donut-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .donut-label { color: var(--color-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .donut-count { font-weight: 700; color: var(--color-neutral-strong); }
 
   /* インポートモーダル */
   .btn-import { background: #ed8936; color: white; }
@@ -531,6 +733,11 @@
     .stats-summary { padding: 8px 10px 0; grid-template-columns: 1fr 1fr; gap: 8px; }
     .stats-summary-card { padding: 10px 12px; }
     .stats-summary-card .value { font-size: 18px; }
+    .stats-trend-wrap { margin: 8px 10px 0; padding: 10px 12px; }
+    .stats-visuals { padding: 8px 10px 0; }
+    .heatmap-grid { grid-template-columns: 40px repeat(7, 1fr); font-size: 10px; }
+    .donut-chart { width: 84px; height: 84px; }
+    .donut-chart::after { inset: 14px; }
     .stats-table th, .stats-table td { padding: 8px 10px; font-size: 12px; }
     .last-fetch-info { display: none; }
     /* ヘッダーをモバイルで縦積み・折り返し可能に */
@@ -547,6 +754,7 @@
     .remind-check { width: 22px; height: 22px; }
     td.actions-cell .btn.btn-sm { min-width: var(--tap-min); min-height: var(--tap-min); padding: 10px; font-size: 16px; justify-content: center; }
     a.tel-link { display: inline-flex; align-items: center; min-height: var(--tap-min); padding: 10px 6px; margin: -10px -6px; }
+    .quick-chip { min-height: var(--tap-min); padding: 8px 14px; }
   }
 
   /* ===== 表示モード手動切替(カード強制 / 表強制) ===== */
@@ -613,15 +821,18 @@
   body.dark-mode th { color: var(--color-neutral-strong); border-bottom-color: var(--color-neutral-tint); }
   body.dark-mode tbody tr { border-bottom-color: var(--color-neutral-tint); }
   body.dark-mode .modal-backdrop { background: rgba(0,0,0,0.65); }
-  body.dark-mode .toast { background: var(--color-neutral); color: var(--color-bg); }
-  body.dark-mode .toast.success { background: var(--color-positive); }
-  body.dark-mode .toast.error { background: var(--color-danger); }
+  body.dark-mode .toast:not(.success):not(.error) { background: var(--color-neutral-bg); color: var(--color-text); }
   body.dark-mode input, body.dark-mode select, body.dark-mode textarea {
     background: var(--color-neutral-tint); border-color: var(--color-neutral); color: var(--color-text);
   }
   body.dark-mode label { color: var(--color-neutral-strong); }
   body.dark-mode .empty-state .icon { background: var(--color-info-tint); }
   body.dark-mode .import-option.active { border-color: var(--color-info); background: var(--color-info-tint); color: var(--color-info-text); }
+  @media (prefers-reduced-motion: reduce) {
+    .tab-panel-enter, .toast-progress, .skel-block,
+    .remind-check:checked, .noshow-check:checked, .sameday-check:checked { animation: none !important; }
+    body:not(.force-card) tbody tr:hover { transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -685,6 +896,13 @@
   <button class="btn btn-outline" id="remindFilterBtn" onclick="toggleRemindFilter()" title="今日以降でリマインド(📞か✉️)が未実施の予約だけを表示">📋 リマインド未</button>
   <button class="btn btn-primary" id="addNoshowBtn" onclick="openAddModal()" style="display:none">＋ 新規追加</button>
   <button class="btn btn-primary" id="addSamedayBtn" onclick="openSamedayModal()" style="display:none">＋ 当日キャンセル追加</button>
+  <div class="quick-filters" id="quickFilters">
+    <button type="button" class="quick-chip" id="chip-today" onclick="applyQuickFilter('today')" aria-pressed="false">今日</button>
+    <button type="button" class="quick-chip" id="chip-tomorrow" onclick="applyQuickFilter('tomorrow')" aria-pressed="false">明日</button>
+    <button type="button" class="quick-chip" id="chip-week" onclick="applyQuickFilter('week')" aria-pressed="false">今週</button>
+    <button type="button" class="quick-chip chip-res-only" id="chip-caution" onclick="applyQuickFilter('caution')" title="無断・当日キャンセル履歴のある要注意客の予約だけを表示" aria-pressed="false">🚨 要注意のみ</button>
+    <button type="button" class="quick-chip chip-res-only" id="chip-remind" onclick="applyQuickFilter('remind')" title="今日以降でリマインド(📞か✉️)が未実施の予約だけを表示" aria-pressed="false">📋 リマインド未</button>
+  </div>
 </div>
 
 <!-- 要注意客アラート -->
@@ -702,7 +920,7 @@
 <!-- 本日の予約サマリー -->
 <div class="today-banner" id="todaySummary" style="display:none">
   <div class="today-banner-header" onclick="toggleTodayList()">
-    <span class="today-banner-title">🌞 本日の予約</span>
+    <span class="today-banner-title">🌞 本日の予約 <span id="todayDateBadge" class="today-date-badge"></span></span>
     <span class="today-banner-count" id="todayCount">0</span>
     <span style="font-size:13px;color:var(--color-neutral)">件</span>
     <span class="today-toggle" id="todayToggle">▼</span>
@@ -730,7 +948,7 @@
     </tr></thead><tbody id="tbody-reservations"></tbody></table>
   </div>
   <div class="empty-state" id="empty-reservations" style="display:none"><div class="icon">📋</div><p>予約データがありません<br><small>「📩 メール取得」でGmailから読み込めます</small></p></div>
-  <div class="table-footer"><span id="rowCount-reservations">0件</span><span style="color:#4299e1;font-weight:600;">大宮院 - 予約者リスト</span></div>
+  <div class="table-footer"><span id="rowCount-reservations">0件</span><span style="color:var(--store-accent);font-weight:600;">大宮院 - 予約者リスト</span></div>
 </div></div>
 
 <!-- キャンセルリスト -->
@@ -795,7 +1013,9 @@
 
 <!-- 統計パネル -->
 <div id="panel-stats" style="display:none">
+  <div class="stats-trend-wrap" id="statsTrend"></div>
   <div class="stats-summary" id="statsSummary"></div>
+  <div class="stats-visuals" id="statsVisuals"></div>
   <div class="table-wrap">
     <div class="table-container"><div class="table-scroll">
       <table class="stats-table"><thead><tr>
@@ -1000,7 +1220,12 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">ℹ️</span>
+  <span class="toast-msg" id="toastMsg"></span>
+  <button type="button" class="toast-undo-btn" id="toastUndoBtn" style="display:none">元に戻す</button>
+  <span class="toast-progress" id="toastProgress"></span>
+</div>
 
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
   <button class="tab bottom-nav-item active" data-tab="reservations" onclick="switchTab('reservations')"><span class="bni-icon">📋</span><span class="bni-label">予約</span></button>
@@ -1041,6 +1266,19 @@
   </div>
 </div>
 
+<!-- 行タップ詳細シート(モバイル/カード表示用) -->
+<div class="row-detail-backdrop" id="rowDetailSheetBackdrop">
+  <div class="row-detail-sheet" id="rowDetailSheet">
+    <div class="row-detail-handle"></div>
+    <div class="row-detail-header">
+      <h3 id="rowDetailTitle">詳細</h3>
+      <button type="button" class="row-detail-close" onclick="closeRowDetailSheet()" aria-label="閉じる">✕</button>
+    </div>
+    <div id="rowDetailBody"></div>
+    <div class="row-detail-actions" id="rowDetailActions"></div>
+  </div>
+</div>
+
 <script>
 const STORAGE_KEY = 'reservation_omiya';
 const DRIVE_FILE_NAME = 'reservation_omiya.json';
@@ -1068,11 +1306,12 @@ function normPhone(p) {
 }
 function normName(n) { return (n||'').replace(/[\s　]/g, '').trim(); }
 // 電話番号をtel:リンク化(見た目は通常テキストに近く、スマホでタップすると発信できる)
-function telLink(phone) {
+function telLink(phone, query) {
   if (!phone) return '';
   const digits = normPhone(phone).replace(/[^\d+]/g, '');
-  if (!digits) return esc(phone);
-  return `<a href="tel:${digits}" class="tel-link" onclick="event.stopPropagation()">${esc(phone)}</a>`;
+  const label = highlightMatch(phone, query); // query省略時はesc(phone)と同じ結果
+  if (!digits) return label;
+  return `<a href="tel:${digits}" class="tel-link" onclick="event.stopPropagation()">${label}</a>`;
 }
 function isPastDateTime(dt) {
   if (!dt) return false;
@@ -1237,7 +1476,16 @@ function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   ['reservations','cancellations','sameday','noshow','stats'].forEach(t => {
     const p = document.getElementById('panel-' + t);
-    if (p) p.style.display = (t === tab) ? '' : 'none';
+    if (!p) return;
+    if (t === tab) {
+      p.style.display = '';
+      p.classList.remove('tab-panel-enter');
+      void p.offsetWidth; // reflow強制(同じタブへの連打でもアニメを再生させる)
+      p.classList.add('tab-panel-enter');
+    } else {
+      p.style.display = 'none';
+      p.classList.remove('tab-panel-enter');
+    }
   });
   // 本日サマリーは予約者リストの上にだけ表示
   const today = document.getElementById('todaySummary');
@@ -1248,6 +1496,11 @@ function switchTab(tab) {
   document.getElementById('rescanBtn').style.display = (isSignedIn && tab !== 'stats') ? '' : 'none';
   const rfBtn = document.getElementById('remindFilterBtn');
   if (rfBtn) rfBtn.style.display = (tab === 'reservations') ? '' : 'none';
+  // クイックフィルタ: statsタブは検索/日付フィルタが効かないため行ごと非表示。
+  // 要注意/リマインド未チップは予約者リストのみ意味を持つため個別に非表示(remindFilterBtnと同じ判定)
+  const qf = document.getElementById('quickFilters');
+  if (qf) qf.style.display = (tab === 'stats') ? 'none' : '';
+  document.querySelectorAll('.chip-res-only').forEach(el => { el.style.display = (tab === 'reservations') ? '' : 'none'; });
   if (tab === 'noshow' || tab === 'sameday') { sortKey = 'date'; } else if (tab !== 'stats') { sortKey = 'datetime'; }
   sortDir = -1;
   render();
@@ -1542,6 +1795,7 @@ function cancelFetch() {
   fetchCancelled = true;
   isFetching = false;
   hideLoading();
+  clearTableSkeleton();
   showToast('メール取得をキャンセルしました', '');
 }
 
@@ -1630,6 +1884,7 @@ async function fetchEmails() {
   isFetching = true;
   fetchCancelled = false;
   showLoading('メールを検索中...');
+  showTableSkeleton();
   try {
     await ensureFreshToken();
     const afterDate = getSearchDate('lastFetchTime_omiya', '2025/10/01');
@@ -1647,6 +1902,7 @@ async function fetchEmails() {
     updateLastFetchInfo();
     reservations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
     cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+    tableSkeletonActive = false;
     saveData(); render(); hideLoading();
     showToast(`予約${newRes}件、キャンセル${newCan}件を取得（合計: ${reservations.length}/${cancellations.length}件）`, 'success');
     // 通知に出す例示名は「実際に新規追加された予約」から選ぶ(最新日時の予約とは限らないため)
@@ -1658,6 +1914,7 @@ async function fetchEmails() {
     if (dupN > 0) setTimeout(() => showToast(`⚠️ 今回の取得で同日・同名の予約が ${dupN} 組見つかりました。重複の可能性を確認してください（一覧の🔁/👥バッジ参照）`, 'error'), 800);
   } catch(e) {
     hideLoading();
+    clearTableSkeleton();
     if (!fetchCancelled) showToast('メール取得エラー: ' + e.message, 'error');
   }
   isFetching = false;
@@ -1673,6 +1930,7 @@ async function fullRescan() {
   isFetching = true;
   fetchCancelled = false;
   showLoading('全期間を再走査中...');
+  showTableSkeleton();
   try {
     await ensureFreshToken();
     const after = startDate.trim();
@@ -1689,10 +1947,12 @@ async function fullRescan() {
     updateLastFetchInfo();
     reservations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
     cancellations.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+    tableSkeletonActive = false;
     saveData(); render(); hideLoading();
     showToast(`全期間再取得: 新規 予約${newRes}件 / キャンセル${newCan}件を復旧`, 'success');
   } catch(e) {
     hideLoading();
+    clearTableSkeleton();
     if (!fetchCancelled) showToast('再取得エラー: ' + e.message, 'error');
   }
   isFetching = false;
@@ -1990,6 +2250,66 @@ function toggleRemindFilter() {
   else render();
 }
 
+// ── クイックフィルタチップ(今日/明日/今週/要注意のみ/リマインド未) ─────
+let cautionFilterOn = false; // 「要注意のみ」チップ。remindFilterOnと同じ着脱式フィルタのパターン
+function addDaysStr(dateStr, days) {
+  const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return dateStr;
+  const dt = new Date(+m[1], +m[2]-1, +m[3]);
+  dt.setDate(dt.getDate() + days);
+  const pad = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+}
+// 週の始まり=月曜として、指定日を含む週の月曜日を返す(業務運用に合わせた仮定)
+function mondayOfWeekStr(dateStr) {
+  const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return dateStr;
+  const dt = new Date(+m[1], +m[2]-1, +m[3]);
+  const dow = dt.getDay(); // 0=日 1=月 ... 6=土
+  const diff = (dow === 0) ? -6 : (1 - dow);
+  dt.setDate(dt.getDate() + diff);
+  const pad = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+}
+function applyQuickFilter(kind) {
+  const fromEl = document.getElementById('filterDateFrom');
+  const toEl = document.getElementById('filterDateTo');
+  const today = todayStr();
+  if (kind === 'today' || kind === 'tomorrow' || kind === 'week') {
+    let from, to;
+    if (kind === 'today') { from = today; to = today; }
+    else if (kind === 'tomorrow') { from = addDaysStr(today, 1); to = addDaysStr(today, 1); }
+    else { from = mondayOfWeekStr(today); to = addDaysStr(mondayOfWeekStr(today), 6); }
+    const alreadyActive = (fromEl.value === from && toEl.value === to);
+    if (alreadyActive) { fromEl.value = ''; toEl.value = ''; }
+    else { fromEl.value = from; toEl.value = to; }
+    render();
+  } else if (kind === 'caution') {
+    cautionFilterOn = !cautionFilterOn;
+    if (cautionFilterOn && activeTab !== 'reservations') switchTab('reservations');
+    else render();
+  } else if (kind === 'remind') {
+    toggleRemindFilter(); // 既存のトグルをそのまま利用(render()も内部で呼ばれる)
+  }
+}
+// チップの押下(active)状態を現在のフィルタ状態から再計算する。render()末尾から呼ぶ
+function updateQuickFilterChips() {
+  const fromEl = document.getElementById('filterDateFrom');
+  const toEl = document.getElementById('filterDateTo');
+  if (!fromEl || !toEl) return;
+  const from = fromEl.value, to = toEl.value;
+  const today = todayStr();
+  const tomorrow = addDaysStr(today, 1);
+  const weekFrom = mondayOfWeekStr(today);
+  const weekTo = addDaysStr(weekFrom, 6);
+  const set = (id, cls, on) => { const el = document.getElementById(id); if (el) { el.classList.toggle(cls, on); el.setAttribute('aria-pressed', String(on)); } };
+  set('chip-today', 'chip-active', from === today && to === today);
+  set('chip-tomorrow', 'chip-active', from === tomorrow && to === tomorrow);
+  set('chip-week', 'chip-active', from === weekFrom && to === weekTo);
+  set('chip-caution', 'chip-active-warn', cautionFilterOn);
+  set('chip-remind', 'chip-active', remindFilterOn);
+}
+
 // 今日・明日の予約でリマインド(📞か✉️)が未実施の件数をトースト通知する。
 // データ読込タイミングで1回呼ぶ想定(render()の都度は呼ばない=通知の出しすぎ防止)
 function checkReminderGaps() {
@@ -2020,15 +2340,19 @@ function render() {
   else renderNoshowTable(q, dateFrom, dateTo);
   renderTodaySummary();
   renderCautionBanner();
+  updateQuickFilterChips();
   document.getElementById('stat-reservations').textContent = reservations.length;
   document.getElementById('stat-cancellations').textContent = cancellations.length;
   document.getElementById('stat-noshow').textContent = noshows.length;
   document.getElementById('stat-sameday').textContent = getSamedayList().length;
+  updateSortIndicators();
 }
 
 function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const qNorm = q ? q.replace(/[\s\u3000]/g, '') : '';
   const qPhoneNorm = q ? normPhone(q) : ''; // phone search: strip hyphens etc from the query too, to match normPhone(r.phone)
+  // 「要注意のみ」チップ: 予約タブでONの間だけ getCautionReservations() に載っているidに絞る
+  const cautionIds = (tabId === 'reservations' && cautionFilterOn) ? new Set(getCautionReservations().map(o => o.r.id)) : null;
   let filtered = data.filter(r => {
     if (q) {
       const nameNorm = (r.name||'').replace(/[\s\u3000]/g, '').toLowerCase();
@@ -2049,6 +2373,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (!d || d < todayStr() || isReservationCancelled(r)) return false;
       if (r.remindTel && r.remindMail) return false;
     }
+    if (cautionIds && !cautionIds.has(r.id)) return false;
     return true;
   });
   filtered.sort((a, b) => {
@@ -2170,19 +2495,19 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const cancelledTag = isCancelled ? ` <span class="tag-cancelled">キャンセル済</span>` : '';
       const cautionContent = `${cancelledTag}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}`;
       const recvLabel = isCancelTab ? 'キャンセル日時' : '受付日時';
-      return `<tr class="${rowClass}">
+      return `<tr class="${rowClass}" data-id="${r.id}">
       <td class="card-header-cell"><span class="ch-time">${timeOnly(r.datetime)}</span><span class="ch-name">${esc(r.name)}</span></td>
       <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
-      <td data-label="予約日時" class="date-cell">${esc(fmtDT(r.datetime))}</td>
-      <td data-label="メニュー" class="menu-cell">${esc(r.menu)}</td>
+      <td data-label="予約日時" class="date-cell">${fmtDateCellHTML(r.datetime)}</td>
+      <td data-label="メニュー" class="menu-cell">${highlightMatch(r.menu, q)}</td>
       <td data-label="氏名" class="name-cell">
-        <div class="name-primary">${esc(r.name)}</div>
+        <div class="name-primary">${highlightMatch(r.name, q)}</div>
         ${r.email ? `<div class="name-email">${esc(r.email)}</div>` : ''}
       </td>
       <td data-label="注意" class="caution-cell">${cautionContent}</td>
-      <td data-label="電話" class="phone-cell">${telLink(r.phone)}</td>
+      <td data-label="電話" class="phone-cell">${telLink(r.phone, q)}</td>
       <td data-label="コメント" class="comment-cell" onclick="this.classList.toggle('expanded')">${esc(r.comment)}</td>
-      <td data-label="${recvLabel}" class="date-cell">${esc(fmtDT(r.receivedAt))}</td>
+      <td data-label="${recvLabel}" class="date-cell">${fmtDateCellHTML(r.receivedAt)}</td>
       ${remindCols}${samedayCol}${noshowCol}${kubunCol}${badgeCol}
       <td class="actions-cell"><div style="display:flex;gap:5px">
         <button class="btn btn-outline btn-sm" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️</button>
@@ -2223,14 +2548,14 @@ function renderNoshowTable(q, dateFrom, dateTo) {
       const cnt = counts[normPhone(r.phone)] || 1;
       const rc = cnt >= 3 ? 'row-red' : cnt === 2 ? 'row-orange' : '';
       const bc = cnt >= 3 ? 'badge-3' : cnt === 2 ? 'badge-2' : 'badge-1';
-      const dd = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
-      const dShort = r.date ? r.date.replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1/$2') : '';
-      return `<tr class="${rc}">
-        <td class="card-header-cell"><span class="ch-time">${esc(dShort)} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
+      const dateCellHTML = fmtDateCellPartsHTML(r.date);
+      const chDate = r.date ? fmtDateRel(r.date) : '';
+      return `<tr class="${rc}" data-id="${r.id}">
+        <td class="card-header-cell"><span class="ch-time">${chDate} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
         <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
-        <td data-label="日付" class="date-cell">${dd}</td><td data-label="時間">${esc(r.time)}</td>
-        <td data-label="氏名" class="name-cell">${esc(r.name)}</td>
-        <td data-label="電話" class="phone-cell">${telLink(r.phone)}</td>
+        <td data-label="日付" class="date-cell">${dateCellHTML}</td><td data-label="時間">${esc(r.time)}</td>
+        <td data-label="氏名" class="name-cell">${highlightMatch(r.name, q)}</td>
+        <td data-label="電話" class="phone-cell">${telLink(r.phone, q)}</td>
         <td data-label="メール" style="font-size:13px;color:var(--color-neutral-muted)">${esc(r.email)}</td>
         <td data-label="備考" class="note-cell">${esc(r.note)}</td>
         <td data-label="回数" style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
@@ -2275,20 +2600,20 @@ function renderSamedayTable(q, dateFrom, dateTo) {
       const cnt = counts[normPhone(r.phone)] || 1;
       const rc = cnt >= 3 ? 'row-sameday-3' : cnt === 2 ? 'row-sameday-2' : '';
       const bc = cnt >= 3 ? 'badge-sd3' : cnt === 2 ? 'badge-sd2' : 'badge-1';
-      const dd = r.date ? r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
-      const dShort = r.date ? r.date.replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1/$2') : '';
+      const dateCellHTML = fmtDateCellPartsHTML(r.date);
+      const chDate = r.date ? fmtDateRel(r.date) : '';
       const isAuto = r.source === 'auto';
       const tag = isAuto ? `<span class="tag-auto">✉️メール</span>` : `<span class="tag-manual">📞手動</span>`;
       const actions = isAuto
         ? `<button class="btn btn-outline btn-sm" title="キャンセルタブで編集" data-search-key="${esc(r.phone||r.name||'')}" onclick="switchTab('cancellations');searchByBadge(this)">🔍</button>`
         : `<button class="btn btn-outline btn-sm" onclick="openSamedayModal('${r.id}')">✏️</button>
            <button class="btn btn-danger btn-sm" onclick="deleteSameday('${r.id}')">🗑️</button>`;
-      return `<tr class="${rc}">
-        <td class="card-header-cell"><span class="ch-time">${esc(dShort)} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
+      return `<tr class="${rc}" data-id="${r.id}">
+        <td class="card-header-cell"><span class="ch-time">${chDate} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
         <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
-        <td data-label="予約日" class="date-cell">${dd}</td><td data-label="時間">${esc(r.time)}</td>
-        <td data-label="氏名" class="name-cell">${esc(r.name)}</td>
-        <td data-label="電話" class="phone-cell">${telLink(r.phone)}</td>
+        <td data-label="予約日" class="date-cell">${dateCellHTML}</td><td data-label="時間">${esc(r.time)}</td>
+        <td data-label="氏名" class="name-cell">${highlightMatch(r.name, q)}</td>
+        <td data-label="電話" class="phone-cell">${telLink(r.phone, q)}</td>
         <td data-label="メール" style="font-size:13px;color:var(--color-neutral-muted)">${esc(r.email)}</td>
         <td data-label="区分">${tag}</td>
         <td data-label="備考" class="note-cell">${esc(r.note)}</td>
@@ -2303,6 +2628,7 @@ function renderSamedayTable(q, dateFrom, dateTo) {
 // ── 当日キャンセル 手動CRUD ──────────────────────────────────────────
 let editSamedayId = null;
 function openSamedayModal(id) {
+  closeRowDetailSheet();
   editSamedayId = null;
   document.getElementById('samedayModalTitle').textContent = '当日キャンセル 追加';
   document.getElementById('samedaySaveBtn').textContent = '追加する';
@@ -2347,13 +2673,25 @@ function saveSameday() {
 function deleteSameday(id) {
   const r = samedayManual.find(x => x.id === id);
   if (!r || !confirm(`「${r.name}」（${r.date}）の当日キャンセル(手動)を削除しますか？`)) return;
+  closeRowDetailSheet();
+  const recordCopy = JSON.parse(JSON.stringify(r));
+  let restoreFlagResId = null;
   // 予約リストから登録したものは、元の予約のチェックを解除
   if (r.fromReservationId) {
     const orig = reservations.find(x => String(x.id) === String(r.fromReservationId));
-    if (orig) orig.movedToSameday = false;
+    if (orig) { orig.movedToSameday = false; restoreFlagResId = orig.id; }
   }
   samedayManual = samedayManual.filter(x => x.id !== id);
-  saveData(); render(); showToast('削除しました', '');
+  saveData(); render();
+  showUndoToast(`「${r.name}」の当日キャンセル(手動)データを削除しました`, function() {
+    samedayManual.push(recordCopy);
+    if (restoreFlagResId != null) {
+      const orig = reservations.find(x => x.id === restoreFlagResId);
+      if (orig) orig.movedToSameday = true;
+    }
+    saveData(); render();
+    showToast(`「${recordCopy.name}」を復元しました ✓`, 'success');
+  });
 }
 
 // ── 要注意客アラート(無断/当日キャンセル履歴のある予約者) ────────────
@@ -2428,13 +2766,13 @@ function renderCautionBanner() {
   cont.innerHTML = list.map(o => {
     const r = o.r;
     const m = (r.datetime||'').match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})?/);
-    const when = m ? `${m[2]}/${m[3]}${m[4] ? ' ' + m[4] : ''}` : (r.datetime||'');
+    const when = m ? fmtDateRel(`${m[1]}-${m[2]}-${m[3]}`, m[4] || '') : esc(r.datetime||'');
     const sev = o.ns > 0 ? '' : ' sev-amber';
     const nsB = o.ns > 0 ? `<span class="badge-noshow-warn">⚠️無断${o.ns}</span>` : '';
     const sdB = o.sd > 0 ? `<span class="badge-sameday-warn">🟠当日${o.sd}</span>` : '';
     const key = r.phone || r.name || '';
     return `<div class="caution-item${sev}" data-search-key="${esc(key)}" onclick="searchByBadge(this)">
-      <span class="caution-when">${esc(when)}</span>
+      <span class="caution-when">${when}</span>
       <span class="caution-name">${esc(r.name)}</span>
       <span class="caution-badges">${nsB}${sdB}</span>
       <span class="caution-phone">${esc(r.phone)}</span>
@@ -2453,6 +2791,8 @@ function renderTodaySummary() {
   const banner = document.getElementById('todaySummary');
   if (!banner) return;
   const today = todayStr();
+  const badge = document.getElementById('todayDateBadge');
+  if (badge) badge.innerHTML = `(${fmtWeekdayTag(today)})`;
   const list = reservations
     .filter(r => (r.datetime||'').substring(0,10) === today && !isReservationCancelled(r))
     .sort((a,b) => (a.datetime||'').localeCompare(b.datetime||''));
@@ -2490,6 +2830,150 @@ function renderTodaySummary() {
   }
 }
 
+// ── 統計タブ拡張: ヘルパー ────────────────────────────────────────────
+// YYYY-MM の暦上の「前月」キーを返す(年またぎ対応)
+function prevYmKey(ym) {
+  const m = (ym || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return null;
+  let y = +m[1], mo = +m[2] - 1;
+  if (mo < 1) { mo = 12; y -= 1; }
+  return `${y}-${String(mo).padStart(2, '0')}`;
+}
+
+// 'YYYY-MM-DD' の曜日(0=日..6=土)。new Date(文字列)はUTC解釈でタイムゾーンにより
+// 日付が前後にずれるため、年月日を数値分解してローカル日時のDateを組み立てる。
+function ymdToWeekday(dateStr) {
+  const m = (dateStr || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(+m[1], +m[2] - 1, +m[3]).getDay();
+}
+
+// 'HH:MM' → 時間帯バケット(0=午前/1=午後/2=夜間, null=時刻不明)
+function timeBucketIndex(timeStr) {
+  const m = (timeStr || '').match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const h = +m[1];
+  if (h < 12) return 0;
+  if (h < 17) return 1;
+  return 2;
+}
+
+// CSSカスタムプロパティの実色(hex)を読み取ってRGB成分に変換する(ライト/ダークで値が変わるため)
+function resolveHexVar(varName) {
+  const v = getComputedStyle(document.body).getPropertyValue(varName).trim();
+  const m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const num = parseInt(h, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+function rgbaStr(rgb, alpha) {
+  return rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})` : `rgba(197,48,48,${alpha})`;
+}
+
+// 前月比の矢印+差分HTML。metric: 'res'(増=良い) / 'can','sd','ns'(増=悪い)
+function deltaBadgeHTML(metric, curr, prev) {
+  if (prev === null || prev === undefined) {
+    return `<div class="stats-delta d-none">先月データなし</div>`;
+  }
+  const diff = curr - prev;
+  if (diff === 0) return `<div class="stats-delta d-flat"><span class="arrow">→</span>先月比 ±0件</div>`;
+  const up = diff > 0;
+  const arrow = up ? '▲' : '▼';
+  const sign = up ? '+' : '';
+  let cls;
+  if (metric === 'res') cls = up ? 'd-up-good' : 'd-up-caution';
+  else if (!up) cls = 'd-down-good';
+  else cls = metric === 'ns' ? 'd-up-bad' : (metric === 'sd' ? 'd-up-caution-strong' : 'd-up-caution');
+  return `<div class="stats-delta ${cls}"><span class="arrow">${arrow}</span>先月比 ${sign}${diff}件</div>`;
+}
+
+// ① 月次キャンセル件数のミニ折れ線SVG(chronKeysは昇順=古→新)。0/1件でも壊れない。
+function buildTrendSparklineSVG(chronKeys, months) {
+  if (chronKeys.length === 0) return `<div class="stats-trend-empty">データがありません</div>`;
+  const W = 300, H = 60, PAD = 6;
+  const vals = chronKeys.map(k => months[k].can);
+  const max = Math.max(1, ...vals);
+  if (chronKeys.length === 1) {
+    const y = H - PAD - (vals[0] / max) * (H - PAD * 2);
+    return `<svg class="stats-trend-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <circle cx="${W/2}" cy="${y.toFixed(1)}" r="4" fill="var(--color-caution)"></circle>
+      <text x="${W/2}" y="${H-2}" font-size="9" text-anchor="middle" fill="var(--color-neutral-strong)">${chronKeys[0]}のみ</text>
+    </svg>`;
+  }
+  const stepX = (W - PAD * 2) / (chronKeys.length - 1);
+  const pts = vals.map((v, i) => [PAD + i * stepX, H - PAD - (v / max) * (H - PAD * 2)]);
+  const line = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const area = `${PAD},${H-PAD} ${line} ${(W-PAD).toFixed(1)},${H-PAD}`;
+  return `<svg class="stats-trend-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polygon points="${area}" fill="var(--color-caution)" opacity="0.15"></polygon>
+    <polyline points="${line}" fill="none" stroke="var(--color-caution)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+    ${pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="var(--color-caution)"></circle>`).join('')}
+  </svg>`;
+}
+
+// ③ 曜日(月-日)×時間帯 当日+無断キャンセルのヒートマップHTML
+// 単一データ源(当日 or 無断)の曜日×時間帯グリッドを1つ作る。色は呼び出し側から渡す
+// (当日=caution-strong/無断=dangerと、既存のバッジ・タグと同じ色分けを維持するため、1つの赤一色グラデーションに混ぜない)
+function buildOneHeatmapHTML(items, colorVarName) {
+  if (items.length === 0) return `<div class="stats-heatmap-empty">データがありません</div>`;
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // 月火水木金土日
+  const dayLabel = ['月', '火', '水', '木', '金', '土', '日'];
+  const bucketLabel = ['午前', '午後', '夜間', '不明'];
+  const grid = [[0,0,0,0,0,0,0],[0,0,0,0,0,0,0],[0,0,0,0,0,0,0],[0,0,0,0,0,0,0]];
+  items.forEach(it => {
+    const wd = ymdToWeekday(it.date);
+    if (wd === null) return;
+    const col = dayOrder.indexOf(wd);
+    const b = timeBucketIndex(it.time);
+    grid[b === null ? 3 : b][col]++;
+  });
+  let max = 0;
+  grid.forEach(row => row.forEach(v => { if (v > max) max = v; }));
+  const rgb = resolveHexVar(colorVarName);
+  const cell = v => v === 0
+    ? `<div class="hm-cell hm-zero" style="background:var(--color-neutral-bg)">0</div>`
+    : `<div class="hm-cell" style="background:${rgbaStr(rgb, 0.15 + 0.65 * (v / max))}">${v}</div>`;
+  let html = `<div class="heatmap-grid"><div></div>`;
+  dayLabel.forEach(d => html += `<div class="hm-head">${d}</div>`);
+  bucketLabel.forEach((lb, r) => {
+    html += `<div class="hm-rowlabel">${lb}</div>`;
+    for (let c = 0; c < 7; c++) html += cell(grid[r][c]);
+  });
+  return html + `</div>`;
+}
+// 当日(caution-strong)と無断(danger)を別々のヒートマップにする(1つの赤一色に混ぜると色の意味が区別できなくなるため)
+function buildCancelHeatmapHTML() {
+  return `<div class="heatmap-sub-title">🟠 当日キャンセル</div>${buildOneHeatmapHTML(getSamedayList(), '--color-caution-strong')}
+    <div class="heatmap-sub-title" style="margin-top:10px">🚫 無断キャンセル</div>${buildOneHeatmapHTML(noshows, '--color-danger')}`;
+}
+
+// ④ 全期間キャンセル内訳(通常/当日/振替/無断)ドーナツ+凡例HTML
+function buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs) {
+  const total = totCanNormal + totSd + totFk + totNs;
+  const rows = [
+    { label: '通常キャンセル', count: totCanNormal, color: 'var(--color-neutral)' },
+    { label: '当日キャンセル', count: totSd, color: 'var(--color-caution-strong)' },
+    { label: '振替(時間変更)', count: totFk, color: 'var(--color-info)' },
+    { label: '無断キャンセル', count: totNs, color: 'var(--color-danger)' },
+  ];
+  if (total === 0) {
+    return `<div class="donut-row"><div class="donut-chart" style="background:var(--color-neutral-tint)"></div>
+      <div class="donut-legend"><div class="stats-heatmap-empty" style="padding:0">データがありません</div></div></div>`;
+  }
+  let acc = 0;
+  const stops = rows.map(r => {
+    const from = acc; acc += (r.count / total) * 100;
+    return `${r.color} ${from.toFixed(2)}% ${acc.toFixed(2)}%`;
+  }).join(', ');
+  const legend = rows.map(r => `<div class="donut-legend-row">
+    <span class="donut-dot" style="background:${r.color}"></span>
+    <span class="donut-label">${r.label}</span><span class="donut-count">${r.count}件</span></div>`).join('');
+  return `<div class="donut-row"><div class="donut-chart" style="background:conic-gradient(${stops})"></div>
+    <div class="donut-legend">${legend}</div></div>`;
+}
+
 // ── 月次統計レポート ────────────────────────────────────────────────────
 function renderStats() {
   const months = {};
@@ -2500,29 +2984,49 @@ function renderStats() {
     months[ym][field]++;
   };
   reservations.forEach(r => add(r, 'res', r.datetime));
-  // 振替(時間変更)は「実キャンセル」から除外して集計する
   const furikaeSet = getFurikaeSet();
-  let totCan = 0, totFk = 0;
+  let totCan = 0, totFk = 0, totCanNormal = 0;
   cancellations.forEach(r => {
-    if (getCancelKubun(r, furikaeSet) === 'furikae') { add(r, 'fk', r.datetime); totFk++; }
-    else { add(r, 'can', r.datetime); totCan++; }
+    const kubun = getCancelKubun(r, furikaeSet);
+    if (kubun === 'furikae') { add(r, 'fk', r.datetime); totFk++; }
+    else { add(r, 'can', r.datetime); totCan++; if (kubun !== 'sameday') totCanNormal++; }
   });
   noshows.forEach(r => add(r, 'ns', r.date));
-  const samedayList = getSamedayList(); // 振替は自動で除外済み
+  const samedayList = getSamedayList();
   samedayList.forEach(r => add(r, 'sd', r.date));
   const keys = Object.keys(months).sort().reverse();
-  // サマリーカード（全期間合計。振替は除いた実数）
+  const chronKeys = keys.slice().reverse(); // 昇順(古→新): 折れ線チャート用
+
   const totRes = reservations.length, totNs = noshows.length, totSd = samedayList.length;
   const grand = totRes + totCan;
   const canRate = grand > 0 ? ((totCan / grand) * 100).toFixed(1) : '0.0';
   const nsRate = grand > 0 ? ((totNs / grand) * 100).toFixed(1) : '0.0';
   const sdRate = grand > 0 ? ((totSd / grand) * 100).toFixed(1) : '0.0';
+
+  // 前月比: 直近月 vs 暦上の前月(データが無ければ「先月データなし」)
+  const latestKey = keys[0] || null;
+  const latestM = latestKey ? months[latestKey] : null;
+  const prevM = latestKey ? months[prevYmKey(latestKey)] : null;
+  const deltaRes = latestM ? deltaBadgeHTML('res', latestM.res, prevM ? prevM.res : null) : '';
+  const deltaCan = latestM ? deltaBadgeHTML('can', latestM.can, prevM ? prevM.can : null) : '';
+  const deltaSd  = latestM ? deltaBadgeHTML('sd',  latestM.sd,  prevM ? prevM.sd  : null) : '';
+  const deltaNs  = latestM ? deltaBadgeHTML('ns',  latestM.ns,  prevM ? prevM.ns  : null) : '';
+
   document.getElementById('statsSummary').innerHTML = `
-    <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div></div>
-    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div></div>
-    <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div></div>
-    <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div></div>
+    <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div>${deltaRes}</div>
+    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div>${deltaCan}</div>
+    <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div>${deltaSd}</div>
+    <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div>${deltaNs}</div>
     <div class="stats-summary-card purple"><div class="label">📊 対象月数</div><div class="value">${keys.length}</div></div>`;
+
+  const trendEl = document.getElementById('statsTrend');
+  if (trendEl) trendEl.innerHTML = `<div class="stats-trend-title">📈 月次キャンセル件数の推移</div>${buildTrendSparklineSVG(chronKeys, months)}`;
+
+  const visualsEl = document.getElementById('statsVisuals');
+  if (visualsEl) visualsEl.innerHTML = `
+    <div class="stats-panel-box"><h4>🗓️ 曜日×時間帯 当日/無断キャンセル傾向</h4>${buildCancelHeatmapHTML()}</div>
+    <div class="stats-panel-box"><h4>🥯 キャンセル内訳(全期間)</h4>${buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs)}</div>`;
+
   const maxRes = Math.max(1, ...keys.map(k => months[k].res));
   const tbody = document.getElementById('stats-tbody');
   if (keys.length === 0) {
@@ -2535,10 +3039,12 @@ function renderStats() {
       const nr = base > 0 ? ((m.ns / base) * 100).toFixed(1) : '0.0';
       const ym = k.replace(/(\d{4})-(\d{2})/, '$1年$2月');
       const barW = Math.round((m.res / maxRes) * 100);
+      const pm = months[prevYmKey(k)];
+      const rowDelta = pm ? deltaBadgeHTML('can', m.can, pm.can) : `<div class="stats-delta d-none">ー</div>`;
       return `<tr>
         <td data-label="月" style="font-weight:700;color:var(--color-text)">${ym}</td>
         <td data-label="予約">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
-        <td data-label="キャンセル" style="color:var(--color-caution)">${m.can}</td>
+        <td data-label="キャンセル" style="color:var(--color-caution)">${m.can}${rowDelta}</td>
         <td data-label="振替" style="color:var(--color-info)">${m.fk}</td>
         <td data-label="当日" style="color:var(--color-caution-strong)">${m.sd}</td>
         <td data-label="無断" style="color:var(--color-danger)">${m.ns}</td>
@@ -2562,6 +3068,69 @@ function timeOnly(dt) {
 }
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// 検索ハイライト用: 正規表現の特殊文字をエスケープ(ユーザー入力をそのまま正規表現に渡さないため)
+function escRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+// esc()でHTMLエスケープした「後」に、一致箇所だけ<mark>で囲む(順序が逆だと二重エスケープ/構造破壊の危険)。
+// マッチ結果mはescText由来の部分文字列そのものなので、そのまま挿入して安全。
+// normPhone正規化桁だけが一致するケース(表示は"090-1234-5678"だが検索語がハイフン無し等)は、
+// 表示テキスト上に文字列としての一致箇所が存在しないため何も囲まれない=ハイライトなしで表示されるだけ。
+function highlightMatch(text, query) {
+  const escText = esc(text);
+  if (!query) return escText;
+  const escQuery = esc(String(query));
+  if (!escQuery) return escText;
+  let re;
+  try { re = new RegExp(escRegExp(escQuery), 'ig'); } catch(e) { return escText; }
+  return escText.replace(re, m => `<mark class="search-hl">${m}</mark>`);
+}
+
+// ── 相対日付+曜日表示 ────────────────────────────────────────────────
+const WEEKDAY_JA = ['日','月','火','水','木','金','土'];
+
+// 'YYYY-MM-DD' → 'MM/DD(曜)' (今日/明日への丸めはしない。土=青/日=赤で色分け)
+function fmtWeekdayTag(dateStr) {
+  const m = (dateStr || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const wd = new Date(+m[1], +m[2] - 1, +m[3]).getDay(); // 0=日..6=土
+  const label = WEEKDAY_JA[wd];
+  const tag = wd === 0 ? `<span style="color:var(--color-danger)">(${label})</span>`
+            : wd === 6 ? `<span style="color:var(--color-info)">(${label})</span>`
+            : `(${label})`;
+  return `${m[2]}/${m[3]}${tag}`;
+}
+
+// 'YYYY-MM-DD' (+任意で 'HH:MM') → '今日 10:00' / '明日 14:00' / '07/28(月) 10:00'
+// 過去日付(無断キャンセル等)は今日/明日に誤判定せず必ずMM/DD(曜)側に落ちる
+function fmtDateRel(dateStr, timeStr) {
+  if (!dateStr) return '';
+  const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return esc(dateStr) + (timeStr ? ' ' + esc(timeStr) : '');
+  const dNorm = `${m[1]}-${m[2]}-${m[3]}`;
+  const now = new Date();
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tmrw = new Date(t0); tmrw.setDate(t0.getDate() + 1);
+  const tmrwNorm = `${tmrw.getFullYear()}-${String(tmrw.getMonth()+1).padStart(2,'0')}-${String(tmrw.getDate()).padStart(2,'0')}`;
+  const timePart = timeStr ? ' ' + esc(timeStr) : '';
+  if (dNorm === todayStr()) return `今日${timePart}`;
+  if (dNorm === tmrwNorm) return `明日${timePart}`;
+  return `${fmtWeekdayTag(dNorm)}${timePart}`;
+}
+
+// 'YYYY-MM-DD HH:MM' 文字列(予約日時/受付日時等)→ 2行HTML(相対+フル日付)。呼び出し側でescは不要
+function fmtDateCellHTML(dt) {
+  if (!dt) return '';
+  const m = dt.match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})/);
+  if (!m) return esc(dt);
+  const rel = fmtDateRel(`${m[1]}-${m[2]}-${m[3]}`, m[4]);
+  return `<div class="date-rel">${rel}</div><div class="date-full">${m[1]}年${m[2]}月${m[3]}日</div>`;
+}
+
+// 'YYYY-MM-DD' 単体(無断/当日キャンセルのdate列。時刻は別列のため時刻なし)→ 2行HTML
+function fmtDateCellPartsHTML(dateStr) {
+  if (!dateStr) return '';
+  const full = dateStr.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日');
+  return `<div class="date-rel">${fmtDateRel(dateStr)}</div><div class="date-full">${full}</div>`;
+}
 
 function sortBy(key) {
   if (sortKey === key) sortDir = -sortDir;
@@ -2569,11 +3138,26 @@ function sortBy(key) {
   render();
 }
 
+// ── ソート状態の可視化 ────────────────────────────────────────────────
+function updateSortIndicators() {
+  document.querySelectorAll('th[onclick]').forEach(th => {
+    const m = (th.getAttribute('onclick') || '').match(/sortBy\('([^']+)'\)/);
+    const btn = th.querySelector('.sort-btn');
+    if (!btn) return;
+    const isActive = !!(m && m[1] === sortKey);
+    th.classList.toggle('sort-active', isActive);
+    btn.classList.toggle('active', isActive);
+    btn.textContent = isActive ? (sortDir === 1 ? '▲' : '▼') : '↕';
+    th.setAttribute('aria-sort', isActive ? (sortDir === 1 ? 'ascending' : 'descending') : 'none');
+  });
+}
+
 // ── Email Record Edit/Delete ─────────────────────────────────────────────
 let editEmailTab = null;
 let editEmailId = null;
 
 function openEditEmailModal(tabId, id) {
+  closeRowDetailSheet();
   const data = tabId === 'reservations' ? reservations : cancellations;
   const r = data.find(x => x.id === id);
   if (!r) return;
@@ -2629,17 +3213,31 @@ function deleteEmailRecord(tabId, id) {
   if (!r) return;
   const label = tabId === 'reservations' ? '予約' : 'キャンセル';
   if (!confirm(`「${r.name}」（${r.datetime}）の${label}データを削除しますか？`)) return;
+  closeRowDetailSheet();
+  const recordCopy = JSON.parse(JSON.stringify(r));
+  let restoreCancelledAt = null;
   if (tabId === 'reservations') {
     reservations = reservations.filter(x => x.id !== id);
   } else {
     cancellations = cancellations.filter(x => x.id !== id);
     // 対応する予約の「キャンセル済み」フラグも解除(誤登録の取り消しに対応)
     const origRes = reservations.find(x => x.id === id);
-    if (origRes) origRes.cancelledAt = null;
+    if (origRes) { restoreCancelledAt = { resId: origRes.id, prev: origRes.cancelledAt }; origRes.cancelledAt = null; }
   }
   saveData();
   render();
-  showToast('削除しました', '');
+  showUndoToast(`「${r.name}」の${label}データを削除しました`, function() {
+    if (tabId === 'reservations') reservations.push(recordCopy);
+    else {
+      cancellations.push(recordCopy);
+      if (restoreCancelledAt) {
+        const orig = reservations.find(x => x.id === restoreCancelledAt.resId);
+        if (orig) orig.cancelledAt = restoreCancelledAt.prev;
+      }
+    }
+    saveData(); render();
+    showToast(`「${recordCopy.name}」を復元しました ✓`, 'success');
+  });
 }
 
 // ── Move Reservation to Noshow ───────────────────────────────────────────
@@ -2722,6 +3320,7 @@ function openAddModal() {
 }
 
 function openEditModal(id) {
+  closeRowDetailSheet();
   const r = noshows.find(x => x.id === id);
   if (!r) return;
   editId = id;
@@ -2788,18 +3387,34 @@ function saveRecord() {
 function deleteRecord(id) {
   const r = noshows.find(x => x.id === id);
   if (!r || !confirm(`「${r.name}」（${r.date}）を削除しますか？`)) return;
+  closeRowDetailSheet();
+  const recordCopy = JSON.parse(JSON.stringify(r));
+  let restoreFlagResId = null;
   // 元の予約レコードの「登録済み」フラグを解除
   if (r.fromReservationId) {
     const orig = reservations.find(x => String(x.id) === String(r.fromReservationId));
-    if (orig) { orig.movedToNoshow = false; }
+    if (orig) { orig.movedToNoshow = false; restoreFlagResId = orig.id; }
   }
   // fromReservationIdがない場合も電話番号+日付で照合して解除
   if (!r.fromReservationId && r.phone && r.date) {
     const orig = reservations.find(x => x.phone === r.phone && x.movedToNoshow && (x.datetime||'').startsWith(r.date));
-    if (orig) { orig.movedToNoshow = false; }
+    if (orig) { orig.movedToNoshow = false; restoreFlagResId = orig.id; }
   }
   noshows = noshows.filter(x => x.id !== id);
-  saveData(); render(); showToast('削除しました', '');
+  saveData(); render();
+  showUndoToast(`「${r.name}」の無断キャンセルデータを削除しました`, function() {
+    // 元の数値idが、取り消し待ちの間に追加された新規レコードに再利用されている場合は採番し直す(id衝突防止)
+    if (noshows.some(x => x.id === recordCopy.id)) {
+      recordCopy.id = noshows.length > 0 ? Math.max(...noshows.map(n => Number(n.id) || 0)) + 1 : 1;
+    }
+    noshows.push(recordCopy);
+    if (restoreFlagResId != null) {
+      const orig = reservations.find(x => x.id === restoreFlagResId);
+      if (orig) orig.movedToNoshow = true;
+    }
+    saveData(); render();
+    showToast(`「${recordCopy.name}」を復元しました ✓`, 'success');
+  });
 }
 
 // ── Excel Export ────────────────────────────────────────────────────────
@@ -3007,30 +3622,181 @@ function confirmImport() {
   showToast(`${added}件をインポートしました ✓ ${skipMsg}`, 'success');
 }
 
+// ── 行タップ詳細シート(モバイル/カード表示: 全項目+操作をまとめて表示) ──────
+let rowDetailReturnFocusEl = null; // 閉じた時にフォーカスを戻す元要素(キーボード/スクリーンリーダー対応)
+function openRowDetailSheet(tabId, id) {
+  let r;
+  if (tabId === 'reservations') r = reservations.find(x => String(x.id) === String(id));
+  else if (tabId === 'cancellations') r = cancellations.find(x => String(x.id) === String(id));
+  else if (tabId === 'noshow') r = noshows.find(x => String(x.id) === String(id));
+  else if (tabId === 'sameday') r = getSamedayList().find(x => String(x.id) === String(id));
+  else return;
+  if (!r) return;
+
+  const rows = [];
+  const push = (label, html) => rows.push(`<div class="rds-row"><div class="rds-label">${esc(label)}</div><div class="rds-value">${html}</div></div>`);
+  let actionsHtml = '';
+
+  if (tabId === 'reservations' || tabId === 'cancellations') {
+    const isCancelTab = tabId === 'cancellations';
+    const cancelled = !isCancelTab && isReservationCancelled(r);
+    push(isCancelTab ? 'キャンセル日時' : '予約日時', esc(fmtDT(r.datetime)) || '—');
+    push('メニュー', esc(r.menu) || '—');
+    push('電話番号', telLink(r.phone) || '—');
+    push('メールアドレス', esc(r.email) || '—');
+    push('コメント', r.comment ? esc(r.comment).replace(/\n/g, '<br>') : '—');
+    push(isCancelTab ? 'キャンセル受付日時' : '受付日時', esc(fmtDT(r.receivedAt)) || '—');
+    if (!isCancelTab) {
+      push('状態', cancelled ? '<span class="tag-cancelled">キャンセル済</span>' : '通常');
+      if (r.remindTel) push('📞電話リマインド', `済(${esc(r.remindTel)})`);
+      if (r.remindMail) push('✉️メールリマインド', `済(${esc(r.remindMail)})`);
+      if (r.movedToSameday) push('🟠当日キャンセル登録', '登録済');
+      if (r.movedToNoshow) push('🚫無断キャンセル登録', '登録済');
+    } else {
+      const kb = getCancelKubun(r, getFurikaeSet());
+      const kbLabel = kb === 'furikae' ? '🔀振替' : kb === 'sameday' ? '🟠当日' : '✉️通常';
+      push('区分', kbLabel + (r.kubunOverride ? '(手動)' : ''));
+    }
+    actionsHtml = `
+      <button class="btn btn-outline" onclick="openEditEmailModal('${tabId}','${r.id}')">✏️ 編集</button>
+      <button class="btn btn-danger" onclick="deleteEmailRecord('${tabId}','${r.id}')">🗑️ 削除</button>`;
+    if (!isCancelTab) {
+      const rd = (r.datetime || '').substring(0, 10);
+      const remindable = rd && rd >= todayStr() && !cancelled;
+      if (remindable) {
+        actionsHtml += `
+          <label class="rds-check-row"><input type="checkbox" class="remind-check" ${r.remindTel ? 'checked' : ''} onchange="toggleRemind('${r.id}','tel',this);openRowDetailSheet('${tabId}','${r.id}')"> 📞電話リマインド 実施済み</label>
+          <label class="rds-check-row"><input type="checkbox" class="remind-check" ${r.remindMail ? 'checked' : ''} onchange="toggleRemind('${r.id}','mail',this);openRowDetailSheet('${tabId}','${r.id}')"> ✉️メールリマインド 実施済み</label>`;
+      }
+      if (!cancelled) {
+        if (!r.movedToSameday) actionsHtml += `<label class="rds-check-row"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🟠当日キャンセルに登録</label>`;
+        if (!r.movedToNoshow) actionsHtml += `<label class="rds-check-row"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🚫無断キャンセルに登録</label>`;
+      }
+    }
+  } else if (tabId === 'noshow') {
+    push('日付', r.date ? esc(r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日')) : '—');
+    push('時間', esc(r.time) || '—');
+    push('電話番号', telLink(r.phone) || '—');
+    push('メールアドレス', esc(r.email) || '—');
+    push('備考', r.note ? esc(r.note).replace(/\n/g, '<br>') : '—');
+    push('無断キャンセル回数', (getNoshowCounts()[normPhone(r.phone)] || 1) + '回');
+    actionsHtml = `
+      <button class="btn btn-outline" onclick="openEditModal(${r.id})">✏️ 編集</button>
+      <button class="btn btn-danger" onclick="deleteRecord(${r.id})">🗑️ 削除</button>`;
+  } else if (tabId === 'sameday') {
+    push('予約日', r.date ? esc(r.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日')) : '—');
+    push('時間', esc(r.time) || '—');
+    push('電話番号', telLink(r.phone) || '—');
+    push('メールアドレス', esc(r.email) || '—');
+    push('区分', r.source === 'auto' ? '<span class="tag-auto">✉️メール</span>' : '<span class="tag-manual">📞手動</span>');
+    push('備考', r.note ? esc(r.note).replace(/\n/g, '<br>') : '—');
+    push('当日キャンセル回数', (getSamedayCounts()[normPhone(r.phone)] || 1) + '回');
+    actionsHtml = r.source === 'auto'
+      ? `<button class="btn btn-outline" data-search-key="${esc(r.phone || r.name || '')}" onclick="switchTab('cancellations');searchByBadge(this)">🔍 キャンセルタブで編集</button>`
+      : `<button class="btn btn-outline" onclick="openSamedayModal('${r.id}')">✏️ 編集</button>
+         <button class="btn btn-danger" onclick="deleteSameday('${r.id}')">🗑️ 削除</button>`;
+  }
+
+  document.getElementById('rowDetailTitle').textContent = r.name || '詳細';
+  document.getElementById('rowDetailBody').innerHTML = rows.join('');
+  document.getElementById('rowDetailActions').innerHTML = actionsHtml;
+  const backdrop = document.getElementById('rowDetailSheetBackdrop');
+  const wasOpen = backdrop.classList.contains('open');
+  backdrop.classList.add('open');
+  document.body.classList.add('rds-open');
+  // 初回オープン時だけフォーカスを移動+復帰先を記録する(チェック操作等での再描画時は奪わない)
+  if (!wasOpen) {
+    rowDetailReturnFocusEl = document.activeElement;
+    document.querySelector('#rowDetailSheet .row-detail-close').focus();
+  }
+}
+function closeRowDetailSheet() {
+  document.getElementById('rowDetailSheetBackdrop').classList.remove('open');
+  document.body.classList.remove('rds-open');
+  if (rowDetailReturnFocusEl && typeof rowDetailReturnFocusEl.focus === 'function') {
+    rowDetailReturnFocusEl.focus();
+  }
+  rowDetailReturnFocusEl = null;
+}
+
 // ── Toast / Loading ─────────────────────────────────────────────────────
 // トーストをキュー化: 短時間に複数呼ばれても上書きで消えず、順番に表示する
 let toastQueue = [];
 let toastShowing = false;
+const TOAST_VISIBLE_MS = 4000; // 表示し続ける時間。下部プログレスバーのアニメ時間もこれに同期させる
+const TOAST_ICONS = { success: '✅', error: '⚠️', '': 'ℹ️' };
 function showToast(msg, type) {
   toastQueue.push({ msg, type });
+  processToastQueue();
+}
+// 削除の「元に戻す」用トースト。duration ミリ秒(既定5秒)経つと自動で確定し、ボタンは押せなくなる。
+function showUndoToast(msg, undoFn, duration) {
+  toastQueue.push({ msg, type: 'success', undo: undoFn, duration: duration || 5000 });
   processToastQueue();
 }
 function processToastQueue() {
   if (toastShowing || toastQueue.length === 0) return;
   toastShowing = true;
-  const { msg, type } = toastQueue.shift();
+  const { msg, type, undo, duration } = toastQueue.shift();
+  const dur = duration || TOAST_VISIBLE_MS;
   const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast show' + (type ? ' '+type : '');
-  setTimeout(() => {
+  const undoBtn = document.getElementById('toastUndoBtn');
+  document.getElementById('toastIcon').textContent = TOAST_ICONS[type] || TOAST_ICONS[''];
+  document.getElementById('toastMsg').textContent = msg;
+  t.style.setProperty('--toast-duration', dur + 'ms');
+  let hideTimer;
+  const finish = () => {
+    clearTimeout(hideTimer);
+    undoBtn.onclick = null;
     t.className = 'toast';
     setTimeout(() => { toastShowing = false; processToastQueue(); }, 300);
-  }, 4000);
+  };
+  if (undo) {
+    undoBtn.style.display = '';
+    undoBtn.onclick = () => {
+      // 二重クリック防止: undo()が例外を投げても再度押せないよう先にボタンを無効化する
+      undoBtn.style.display = 'none'; undoBtn.onclick = null;
+      try { undo(); } finally { finish(); }
+    };
+  } else {
+    undoBtn.style.display = 'none';
+    undoBtn.onclick = null;
+  }
+  t.className = 'toast show' + (type ? ' '+type : '');
+  hideTimer = setTimeout(finish, dur);
 }
 function showLoading(text) {
   document.getElementById('loadingText').textContent = text || 'メールを取得中...';
   document.getElementById('loadingOverlay').classList.add('show');
 }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+// ── テーブル・スケルトンローディング ──────────────────────────────────────
+// フルスクリーンのloadingOverlayに加え、現在表示中タブのtbodyにも軽量なシマー行を出す。
+// 正常完了時はrender()がtbody.innerHTMLを丸ごと実データで上書きするため自然に消える。
+// キャンセル/エラーでrender()を経由しないパスだけ clearTableSkeleton() で明示的に消す。
+let tableSkeletonActive = false;
+const SKELETON_TABS = { reservations:1, cancellations:1, sameday:1, noshow:1 }; // 統計タブは表構造が違うため対象外
+function showTableSkeleton() {
+  if (!SKELETON_TABS[activeTab]) return;
+  const tbody = document.getElementById('tbody-' + activeTab);
+  const empty = document.getElementById('empty-' + activeTab);
+  if (!tbody) return;
+  tableSkeletonActive = true;
+  if (empty) empty.style.display = 'none';
+  let rows = '';
+  for (let i = 0; i < 6; i++) {
+    rows += '<tr class="skeleton-row"><td colspan="20" class="skeleton-cell">' +
+      '<span class="skel-block skel-w1"></span><span class="skel-block skel-w2"></span>' +
+      '<span class="skel-block skel-w3"></span><span class="skel-block skel-w2"></span></td></tr>';
+  }
+  tbody.innerHTML = rows;
+}
+function clearTableSkeleton() {
+  if (!tableSkeletonActive) return;
+  tableSkeletonActive = false;
+  render();
+}
 
 // ── Events ──────────────────────────────────────────────────────────────
 document.getElementById('modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
@@ -3039,8 +3805,20 @@ document.getElementById('settingsModal').addEventListener('click', function(e) {
 document.getElementById('importModal').addEventListener('click', function(e) { if (e.target === this) closeImportModal(); });
 document.getElementById('samedayModal').addEventListener('click', function(e) { if (e.target === this) closeSamedayModal(); });
 document.getElementById('legendModal').addEventListener('click', function(e) { if (e.target === this) closeLegendModal(); });
+document.getElementById('rowDetailSheetBackdrop').addEventListener('click', function(e) { if (e.target === this) closeRowDetailSheet(); });
+['tbody-reservations', 'tbody-cancellations', 'tbody-noshow', 'tbody-sameday'].forEach(tbodyId => {
+  const el = document.getElementById(tbodyId);
+  if (!el) return;
+  el.addEventListener('click', function(e) {
+    if (!isCardViewActive()) return; // デスクトップ表表示ではセル単位の操作を優先し、シートは開かない
+    if (e.target.closest('input, a, button, label, .comment-cell, .badge-repeat, .actions-cell')) return;
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr) return;
+    openRowDetailSheet(tbodyId.replace('tbody-', ''), tr.getAttribute('data-id'));
+  });
+});
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); closeSamedayModal(); closeLegendModal(); }
+  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); closeSamedayModal(); closeLegendModal(); closeRowDetailSheet(); }
   if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveRecord();
   if (e.key === 'Enter' && document.getElementById('samedayModal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveSameday();
 });
@@ -3130,6 +3908,13 @@ function cycleViewMode() {
   localStorage.setItem('viewMode_omiya', next);
   applyViewMode();
   showToast('表示モード: ' + VIEW_LABEL[next], '');
+}
+// カード表示中(モバイル自動 or 手動固定)かどうか。行タップ詳細シートの発火条件に使う
+function isCardViewActive() {
+  const m = localStorage.getItem('viewMode_omiya') || 'auto';
+  if (m === 'card') return true;
+  if (m === 'table') return false;
+  return !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
 }
 
 // ── ダークモード(自動/ライト/ダーク) ───────────────────────────────────
