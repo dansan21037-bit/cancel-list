@@ -181,13 +181,13 @@
   /* 縞模様。状態色を持つ行(row-*)では:not()により無効化し、状態色が必ず優先される */
   tbody tr:nth-child(even):not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
     :not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red)
-    :not(.row-sameday-2):not(.row-sameday-3) {
+    :not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
     background: var(--color-zebra-tint);
   }
   /* 状態色を持つ行(row-*)はhover時も自身の色を維持させる(:not()で除外) */
   tbody tr:hover:not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
     :not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red)
-    :not(.row-sameday-2):not(.row-sameday-3) {
+    :not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
     background: var(--color-neutral-bg) !important;
   }
   /* 行ホバーで軽く浮き上がらせる(デスクトップのみ。カード表示ではhoverの概念が薄いため対象外) */
@@ -512,6 +512,42 @@
   .tag-kubun-sameday { display:inline-block; background: var(--color-caution-tint); color: var(--color-caution-text); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
   .tag-kubun-normal { display:inline-block; background: var(--color-neutral-tint); color: var(--color-neutral); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; cursor:help; }
 
+  /* ===== 予約不可リスト =====
+     予約不可は「薄い背景色」系の警告より一段強い意味なので、あえてベタ塗り(白文字)にして
+     既存のtint系バッジと視覚的にはっきり差をつける(＝これは止める、の合図) */
+  /* 「予約不可」だけをベタ塗りにして最強の視覚重みにする。
+     ダークモードでは--color-dangerが明るい赤(#fc8181)に変わるため、白文字だとコントラスト不足になる。
+     そのため文字色は body.dark-mode 側で濃色に反転させている(下のダークモード用ルール参照) */
+  .tag-blocked { display:inline-block; background: var(--color-danger); color:#fff; font-size:11px; font-weight:800; padding:3px 9px; border-radius:8px; white-space:nowrap; }
+  /* 「確認待ち」は判断待ちであって危険ではないので、ベタ塗りにせず枠線+淡色にして予約不可と区別する
+     (白文字＋中間色のアンバーは明暗どちらのテーマでもコントラストが足りないという理由もある) */
+  .tag-blockpending { display:inline-block; background: var(--color-caution-strong-tint); color: var(--color-caution-strong-text); border:1px solid var(--color-caution-strong); font-size:11px; font-weight:800; padding:2px 8px; border-radius:8px; white-space:nowrap; }
+  .tag-blockexempt { display:inline-block; background: var(--color-neutral-tint); color: var(--color-neutral); font-size:11px; font-weight:700; padding:3px 9px; border-radius:8px; white-space:nowrap; }
+  /* 予約者リストで予約不可の人に出す最重要バッジ */
+  .badge-blocked { display:inline-block; background: var(--color-danger); color:#fff; font-size:12px; font-weight:800; padding:3px 8px; border-radius:8px; white-space:nowrap; vertical-align:middle; }
+  .badge-blockpending { display:inline-block; background: var(--color-caution-strong-tint); color: var(--color-caution-strong-text); border:1px solid var(--color-caution-strong); font-size:12px; font-weight:800; padding:2px 7px; border-radius:8px; white-space:nowrap; vertical-align:middle; }
+  tr.row-blocked      { border-left: 4px solid var(--color-danger) !important; background: var(--color-danger-bg) !important; }
+  tr.row-blockpending { border-left: 4px solid var(--color-caution-strong) !important; background: var(--color-caution-strong-bg) !important; }
+  /* 当日キャンセルの理由チップ(やむを得ない=中立グレー / 自己都合=注意オレンジ / 未設定=点線) */
+  .reason-chip { display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; border:1px solid transparent; cursor:pointer; font-family:inherit; }
+  .reason-chip.r-unavoidable { background: var(--color-neutral-tint); color: var(--color-neutral); }
+  .reason-chip.r-personal { background: var(--color-caution-tint); color: var(--color-caution-text); }
+  .reason-chip.r-unset { background: transparent; color: var(--color-neutral-muted); border-color: var(--color-neutral-muted); border-style: dashed; }
+  .reason-chip:hover { filter: brightness(0.93); }
+  /* 理由選択モーダルのボタン一覧 */
+  .reason-pick-group { margin-bottom: 14px; }
+  .reason-pick-group h4 { font-size: 12px; font-weight: 700; color: var(--color-neutral-strong); margin-bottom: 7px; }
+  .reason-pick-list { display: grid; gap: 7px; }
+  .reason-pick-btn {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    padding: 11px 13px; border-radius: 9px; border: 1px solid var(--color-neutral-tint);
+    background: var(--color-surface); color: var(--color-text); font-size: 14px; font-weight: 600;
+    font-family: inherit; cursor: pointer; min-height: var(--tap-min); transition: all 0.15s;
+  }
+  .reason-pick-btn:hover { border-color: var(--color-info); background: var(--color-info-tint); }
+  .reason-pick-btn.selected { border-color: var(--color-info); background: var(--color-info-tint); font-weight: 800; }
+  .reason-pick-note { font-size: 11px; color: var(--color-neutral-muted); margin-left: auto; white-space: nowrap; }
+
   /* リマインドチェック */
   .remind-check { width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-info); }
   .remind-date { font-size: 12px; color: var(--color-neutral-strong); margin-top: 2px; white-space: nowrap; }
@@ -676,6 +712,18 @@
   .donut-label { color: var(--color-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .donut-count { font-weight: 700; color: var(--color-neutral-strong); }
 
+  /* 理由内訳 / リマインド効果 の横棒 */
+  .reason-bar-row { display: grid; grid-template-columns: 150px 1fr auto; gap: 9px; align-items: center; font-size: 12px; margin-bottom: 7px; }
+  .reason-bar-label { color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .reason-bar-track { height: 12px; background: var(--color-neutral-tint); border-radius: 6px; overflow: hidden; }
+  .reason-bar-fill { display: block; height: 100%; border-radius: 6px; transition: width 0.3s; }
+  .reason-bar-num { font-weight: 700; color: var(--color-neutral-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .reason-bar-hint { font-size: 11px; color: var(--color-neutral-strong); margin-top: 9px; line-height: 1.5; }
+  @media (max-width: 768px) {
+    .reason-bar-row { grid-template-columns: 1fr auto; gap: 6px 8px; }
+    .reason-bar-track { grid-column: 1 / -1; }
+  }
+
   /* インポートモーダル */
   .btn-import { background: #ed8936; color: white; }
   .btn-import:hover { background: #dd6b20; }
@@ -828,6 +876,9 @@
   body.dark-mode label { color: var(--color-neutral-strong); }
   body.dark-mode .empty-state .icon { background: var(--color-info-tint); }
   body.dark-mode .import-option.active { border-color: var(--color-info); background: var(--color-info-tint); color: var(--color-info-text); }
+  body.dark-mode .reason-pick-btn { background: var(--color-neutral-bg); border-color: var(--color-neutral-tint); }
+  /* ダークモードでは--color-dangerが明るい赤に変わるため、ベタ塗りバッジの文字を濃色へ反転してコントラストを確保する */
+  body.dark-mode .tag-blocked, body.dark-mode .badge-blocked { color: #1a202c; }
   @media (prefers-reduced-motion: reduce) {
     .tab-panel-enter, .toast-progress, .skel-block,
     .remind-check:checked, .noshow-check:checked, .sameday-check:checked { animation: none !important; }
@@ -877,6 +928,7 @@
   <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール） <span class="tab-badge" id="stat-cancellations">0</span></button>
   <button class="tab" data-tab="sameday" onclick="switchTab('sameday')">🟠 当日キャンセル <span class="tab-badge" id="stat-sameday">0</span></button>
   <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル <span class="tab-badge" id="stat-noshow">0</span></button>
+  <button class="tab" data-tab="blocklist" onclick="switchTab('blocklist')">🚷 予約不可 <span class="tab-badge" id="stat-blocklist" title="予約不可 / 確認待ち">0</span></button>
   <button class="tab" data-tab="stats" onclick="switchTab('stats')">📊 統計 <span class="tab-badge" id="stat-todayCount" title="本日予約件数">0</span></button>
 </div>
 
@@ -896,6 +948,7 @@
   <button class="btn btn-outline" id="remindFilterBtn" onclick="toggleRemindFilter()" title="今日以降でリマインド(📞か✉️)が未実施の予約だけを表示">📋 リマインド未</button>
   <button class="btn btn-primary" id="addNoshowBtn" onclick="openAddModal()" style="display:none">＋ 新規追加</button>
   <button class="btn btn-primary" id="addSamedayBtn" onclick="openSamedayModal()" style="display:none">＋ 当日キャンセル追加</button>
+  <button class="btn btn-danger" id="addBlockBtn" onclick="openBlockModal()" style="display:none">＋ 予約不可に登録</button>
   <div class="quick-filters" id="quickFilters">
     <button type="button" class="quick-chip" id="chip-today" onclick="applyQuickFilter('today')" aria-pressed="false">今日</button>
     <button type="button" class="quick-chip" id="chip-tomorrow" onclick="applyQuickFilter('tomorrow')" aria-pressed="false">明日</button>
@@ -983,6 +1036,7 @@
       <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
       <th>メール</th>
       <th>区分</th>
+      <th title="クリックで理由を選べます。「やむを得ない事情」は予約不可の回数に数えません">キャンセル理由</th>
       <th>備考</th>
       <th style="text-align:center" onclick="sortBy('count')">回数 <span class="sort-btn">↕</span></th>
       <th>操作</th>
@@ -1009,6 +1063,24 @@
   </div>
   <div class="empty-state" id="empty-noshow" style="display:none"><div class="icon">🚫</div><p>無断キャンセルデータがありません<br><small>「＋ 新規追加」で手動登録できます</small></p></div>
   <div class="table-footer"><span id="rowCount-noshow">0件</span><span style="color:var(--color-danger);font-weight:600;">川口院 - 無断キャンセル</span></div>
+</div></div>
+
+<!-- 予約不可リスト -->
+<div class="table-wrap" id="panel-blocklist" style="display:none">
+  <div class="table-container"><div class="table-scroll">
+    <table><thead><tr>
+      <th style="width:40px">#</th>
+      <th>状態</th>
+      <th onclick="sortBy('name')">氏名 <span class="sort-btn">↕</span></th>
+      <th onclick="sortBy('phone')">電話番号 <span class="sort-btn">↕</span></th>
+      <th>きっかけ</th>
+      <th>メモ</th>
+      <th>登録日</th>
+      <th>操作</th>
+    </tr></thead><tbody id="tbody-blocklist"></tbody></table>
+  </div>
+  <div class="empty-state" id="empty-blocklist" style="display:none"><div class="icon">🚷</div><p>予約不可リストは空です<br><small>無断キャンセルを登録すると自動で追加されます。当日キャンセルが2回になった方は「⏳確認待ち」として上がります</small></p></div>
+  <div class="table-footer"><span id="rowCount-blocklist">0件</span><span style="color:var(--color-danger);font-weight:600;">川口院 - 予約不可リスト</span></div>
 </div></div>
 
 <!-- 統計パネル -->
@@ -1083,6 +1155,23 @@
     <div class="legend-section">
       <h3>🚫 無断キャンセル</h3>
       <div class="legend-row"><span class="badge badge-1">1</span><span class="badge badge-2">2</span><span class="badge badge-3">3</span><span class="legend-desc">同じ電話番号での無断キャンセル回数。2回でオレンジ・3回以上で赤の行背景になる</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>🚷 予約不可リスト</h3>
+      <div class="legend-row"><span class="tag-blocked">🚷 予約不可</span><span class="legend-desc">今後の予約をお断りする方。ベタ塗りの赤＝「これは止める」の最も強い合図です</span></div>
+      <div class="legend-row"><span class="tag-blockpending">⏳ 確認待ち</span><span class="legend-desc">当日キャンセルが2回になり、自動で候補に上がった状態。スタッフが「🚷不可」か「✅免除」を選んでください</span></div>
+      <div class="legend-row"><span class="tag-blockexempt">✅ 免除</span><span class="legend-desc">事情を確認して「予約不可にしない」と決めた方。その時点の回数を記録し、さらに増えたら再び確認待ちに戻ります</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">自動ルール: <b>🚫無断キャンセルを登録すると即「予約不可」</b>／<b>🟠当日キャンセル(カウント対象)が2回で「確認待ち」</b></div>
+      <div class="legend-row"><span class="badge-blocked">🚷予約不可</span><span class="legend-desc">予約者リストに出るバッジ。この方の予約が入ると強い警告とデスクトップ通知が出ます</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>📝 当日キャンセルの理由</h3>
+      <div class="legend-row"><span class="reason-chip r-unavoidable">🤒体調不良（本人）</span><span class="legend-desc">グレー＝<b>やむを得ない事情</b>。記録は残りますが、予約不可の回数には数えません（体調不良・家族看病・交通機関・悪天候・冠婚葬祭）</span></div>
+      <div class="legend-row"><span class="reason-chip r-personal">😴予約忘れ・寝坊</span><span class="legend-desc">オレンジ＝<b>自己都合</b>。2回で予約不可の確認対象になります（仕事・予約忘れ・都合・理由不明・その他）</span></div>
+      <div class="legend-row"><span class="reason-chip r-unset">⚪ 理由を選ぶ</span><span class="legend-desc">点線＝未設定。メールから自動判定した分は理由が分からないため、安全側で「カウント対象」になります。クリックで選べます</span></div>
+      <div class="legend-row"><span class="badge-sameday-warn">🟠当日3(情状2)</span><span class="legend-desc">「(情状N)」は、やむを得ない事情として回数に数えなかった件数です。総数は必ず表示されるので、乱用パターンも見逃しません</span></div>
     </div>
 
     <div class="legend-section">
@@ -1180,6 +1269,13 @@
       <div class="form-group"><label>電話番号 *</label><input type="tel" id="sd-phone" placeholder="09012345678"></div>
     </div>
     <div class="form-group"><label>メールアドレス</label><input type="email" id="sd-email" placeholder="example@email.com"></div>
+    <div class="form-group">
+      <label>キャンセル理由</label>
+      <select id="sd-reason"></select>
+      <div class="help-text" style="font-size:12px;color:var(--color-neutral-strong);margin-top:4px;line-height:1.5">
+        🟢やむを得ない事情は「予約不可」の回数に数えません（記録は残ります）
+      </div>
+    </div>
     <div class="form-group"><label>備考</label><textarea id="sd-note" placeholder="電話連絡 / 当日◯時に連絡 など..."></textarea></div>
     <div id="samedayRepeatWarning" style="display:none;background:var(--color-caution-strong-bg);border:1px solid var(--color-caution-strong);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--color-caution-strong-text);margin-bottom:4px;"></div>
     <div class="modal-actions">
@@ -1232,6 +1328,7 @@
   <button class="tab bottom-nav-item" data-tab="cancellations" onclick="switchTab('cancellations')"><span class="bni-icon">✉️</span><span class="bni-label">キャンセル</span></button>
   <button class="tab bottom-nav-item" data-tab="sameday" onclick="switchTab('sameday')"><span class="bni-icon">🟠</span><span class="bni-label">当日</span></button>
   <button class="tab bottom-nav-item" data-tab="noshow" onclick="switchTab('noshow')"><span class="bni-icon">🚫</span><span class="bni-label">無断</span></button>
+  <button class="tab bottom-nav-item" data-tab="blocklist" onclick="switchTab('blocklist')"><span class="bni-icon">🚷</span><span class="bni-label">予約不可</span></button>
   <button class="tab bottom-nav-item" data-tab="stats" onclick="switchTab('stats')"><span class="bni-icon">📊</span><span class="bni-label">統計</span></button>
 </nav>
 
@@ -1266,6 +1363,42 @@
   </div>
 </div>
 
+<!-- 予約不可 手動登録モーダル -->
+<div class="modal-backdrop" id="blockModal">
+  <div class="modal">
+    <h2>🚷 予約不可に登録</h2>
+    <div style="font-size:12px;color:var(--color-neutral-strong);margin-bottom:14px;line-height:1.6">
+      無断キャンセルは自動で登録されます。ここでは、それ以外の事情（迷惑行為など）で予約をお断りする方を手動で登録します。
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>氏名 *</label><input type="text" id="bl-name" placeholder="山田 太郎"></div>
+      <div class="form-group"><label>電話番号 *</label><input type="tel" id="bl-phone" placeholder="09012345678"></div>
+    </div>
+    <div class="form-group"><label>メモ（理由）</label><textarea id="bl-note" placeholder="登録した理由を記録しておくと、後で判断を見直せます"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeBlockModal()">キャンセル</button>
+      <button class="btn btn-danger" onclick="addBlockManual()">予約不可に登録</button>
+    </div>
+  </div>
+</div>
+
+<!-- 当日キャンセル 理由選択モーダル -->
+<div class="modal-backdrop" id="reasonModal">
+  <div class="modal">
+    <h2>🟠 当日キャンセルの理由</h2>
+    <div style="font-size:12px;color:var(--color-neutral-strong);margin-bottom:14px;line-height:1.6" id="reasonModalTarget"></div>
+    <div id="reasonPickBody"></div>
+    <div class="form-group" id="reasonNoteGroup" style="display:none">
+      <label>詳細メモ</label>
+      <input type="text" id="reasonNoteInput" placeholder="具体的な理由を記入">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeReasonModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveReasonPick()">保存する</button>
+    </div>
+  </div>
+</div>
+
 <!-- 行タップ詳細シート(モバイル/カード表示用) -->
 <div class="row-detail-backdrop" id="rowDetailSheetBackdrop">
   <div class="row-detail-sheet" id="rowDetailSheet">
@@ -1292,7 +1425,27 @@ function getClientId() {
   return localStorage.getItem('google_client_id') || DEFAULT_CLIENT_ID || '';
 }
 
-let reservations = [], cancellations = [], noshows = [], samedayManual = [];
+let reservations = [], cancellations = [], noshows = [], samedayManual = [], blocklist = [];
+
+// ── 当日キャンセルの理由マスタ ───────────────────────────────────────────
+// counts:false = 「やむを得ない事情」。記録は残すが、予約不可の判定回数には数えない。
+// (体調不良ばかり何回も、という乱用パターンはバッジに総数も併記されるため見逃さない)
+const SAMEDAY_REASONS = [
+  { key: 'sick',     label: '体調不良（本人）',          icon: '🤒', counts: false },
+  { key: 'family',   label: '家族の体調不良・看病',      icon: '👨‍👩‍👧', counts: false },
+  { key: 'transit',  label: '交通機関の遅延・トラブル',  icon: '🚃', counts: false },
+  { key: 'weather',  label: '悪天候（大雨・大雪・台風）', icon: '🌧️', counts: false },
+  { key: 'ceremony', label: '冠婚葬祭・弔事',            icon: '🕊️', counts: false },
+  { key: 'work',     label: '仕事・急な用事',            icon: '💼', counts: true  },
+  { key: 'forgot',   label: '予約忘れ・寝坊',            icon: '😴', counts: true  },
+  { key: 'change',   label: '都合が悪くなった',          icon: '📅', counts: true  },
+  { key: 'unknown',  label: '理由を聞けなかった・不明',  icon: '❓', counts: true  },
+  { key: 'other',    label: 'その他（自由記入）',        icon: '✍️', counts: true  },
+];
+function getReasonDef(key) { return SAMEDAY_REASONS.find(r => r.key === key) || null; }
+// 未設定(空)は安全側に倒して「カウント対象」とする
+function reasonCounts(key) { const d = getReasonDef(key); return d ? d.counts : true; }
+function reasonLabel(key) { const d = getReasonDef(key); return d ? d.icon + d.label : '⚪未設定'; }
 let activeTab = 'reservations';
 let editId = null, sortKey = 'datetime', sortDir = -1;
 let accessToken = null, driveFileId = null, tokenClient = null, isSignedIn = false;
@@ -1403,7 +1556,9 @@ function getSamedayList() {
       date: m ? m[1] : (c.datetime || '').substring(0, 10),
       time: m && m[2] ? m[2] : '',
       name: c.name || '', phone: c.phone || '', email: c.email || '',
-      note: c.comment || '', datetime: c.datetime || ''
+      note: c.comment || '', datetime: c.datetime || '',
+      // メール由来分の理由は元のキャンセルレコード側に保存する(srcIdで書き戻す)
+      reason: c.samedayReason || '', reasonNote: c.samedayReasonNote || ''
     };
   });
   // 手動登録後に同一の出来事のキャンセルメールが届くと二重計上されるため、
@@ -1418,6 +1573,379 @@ function getSamedayCounts() {
   const c = {};
   getSamedayList().forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; });
   return c;
+}
+// 予約不可の判定に使う回数。「やむを得ない事情」の理由が付いた分は除外して数える
+function getSamedayCountedCounts(list) {
+  const c = {};
+  (list || getSamedayList()).forEach(r => {
+    if (!reasonCounts(r.reason)) return;
+    const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1;
+  });
+  return c;
+}
+// 「やむを得ない事情」として除外された件数(バッジに「情状N」として併記する用)
+function getSamedayExemptCounts(list) {
+  const c = {};
+  (list || getSamedayList()).forEach(r => {
+    if (reasonCounts(r.reason)) return;
+    const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1;
+  });
+  return c;
+}
+// 当日キャンセルの理由を保存する(自動=元のキャンセルレコード / 手動=samedayManual)
+function setSamedayReason(rowId, srcId, source, reasonKey, reasonNote) {
+  if (source === 'auto') {
+    const c = cancellations.find(x => String(x.id) === String(srcId));
+    if (!c) return false;
+    c.samedayReason = reasonKey; c.samedayReasonNote = reasonNote || '';
+  } else {
+    const s = samedayManual.find(x => String(x.id) === String(rowId));
+    if (!s) return false;
+    s.reason = reasonKey; s.reasonNote = reasonNote || '';
+  }
+  return true;
+}
+
+// 当日キャンセル一覧の「理由」セル。クリックで理由選択モーダルを開く。
+// 氏名・メモはdata属性経由で渡す(onclick文字列に直接埋めると特殊文字で壊れる/危険なため)
+function reasonChipHTML(r) {
+  const d = getReasonDef(r.reason);
+  const cls = !d ? 'r-unset' : (d.counts ? 'r-personal' : 'r-unavoidable');
+  const label = d ? esc(d.icon + d.label) : '⚪ 理由を選ぶ';
+  const tip = d ? (d.counts ? '自己都合: 予約不可の回数に数えます' : 'やむを得ない事情: 予約不可の回数に数えません')
+                : '未設定(カウント対象)。クリックして理由を選んでください';
+  const noteLine = (d && r.reasonNote)
+    ? `<div style="font-size:11px;color:var(--color-neutral-strong);margin-top:3px">${esc(r.reasonNote)}</div>` : '';
+  // id/srcIdはインポート由来だと引用符を含み得るのでonclick文字列に直接埋めない。全てdata属性経由で渡す
+  return `<button type="button" class="reason-chip ${cls}" title="${tip}" ` +
+    `data-pid="${esc(String(r.id || ''))}" data-psrcid="${esc(String(r.srcId || ''))}" ` +
+    `data-psource="${esc(r.source || '')}" data-preason="${esc(r.reason || '')}" ` +
+    `data-pname="${esc(r.name || '')}" data-pnote="${esc(r.reasonNote || '')}" ` +
+    `onclick="openReasonModalFromEl(this)">${label}</button>${noteLine}`;
+}
+
+// ── 予約不可リスト ──────────────────────────────────────────────────────
+// status: 'blocked'=予約不可 / 'pending'=確認待ち(スタッフ判断待ち) / 'exempt'=免除(今回は不可にしない)
+const SAMEDAY_BLOCK_THRESHOLD = 2; // 当日キャンセルが何回で「確認待ち」に上げるか
+function nowStamp() {
+  const d = new Date(); const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// 電話番号を主キーにする(無い場合のみ氏名で代用)。他の集計と同じ正規化ルールに揃える
+function blockKeyOf(phone, name) {
+  const p = normPhone(phone);
+  if (p) return 'p:' + p;
+  const n = normName(name);
+  return n ? 'n:' + n : '';
+}
+function findBlockEntry(phone, name) {
+  const k = blockKeyOf(phone, name);
+  if (!k) return null;
+  return blocklist.find(b => blockKeyOf(b.phone, b.name) === k) || null;
+}
+function isBlockedCustomer(phone, name) {
+  const e = findBlockEntry(phone, name);
+  return !!(e && e.status === 'blocked');
+}
+function newBlockId() { return 'bl_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+// 削除直後の「元に戻す」猶予中は自動再登録を抑止する。
+// (抑止しないと削除した瞬間に自動ルールが同じ人を作り直し、元のメモを失ったまま行が残ってしまう)
+const BLOCK_UNDO_GRACE_MS = 8000;
+let recentlyDeletedBlockKeys = new Map(); // key -> 削除時刻(ms)
+function isBlockRecentlyDeleted(phone, name) {
+  const k = blockKeyOf(phone, name);
+  if (!k) return false;
+  const t = recentlyDeletedBlockKeys.get(k);
+  if (t === undefined) return false;
+  if (Date.now() - t > BLOCK_UNDO_GRACE_MS) { recentlyDeletedBlockKeys.delete(k); return false; }
+  return true;
+}
+
+// 自動判定: 無断キャンセル→即「予約不可」/ 当日キャンセル(カウント対象)が閾値到達→「確認待ち」。
+// 呼び出し側で戻り値が0より大きければ saveData() すること。
+function syncBlocklistAuto() {
+  let changed = 0;
+  const now = nowStamp();
+  // ⓪ 同一人物の重複エントリを1件に統合する。
+  //    削除→自動再登録→「元に戻す」の順で操作すると同じ人が2行になり得るため、
+  //    スタッフが判断済み(decidedAtあり)のものを優先して残し、それ以外は先に登録された方を残す。
+  const byKey = {};
+  const deduped = [];
+  blocklist.forEach(e => {
+    const k = blockKeyOf(e.phone, e.name);
+    if (!k) { deduped.push(e); return; }
+    const prev = byKey[k];
+    if (!prev) { byKey[k] = e; deduped.push(e); return; }
+    const better = (a, b) => {
+      if (!!a.decidedAt !== !!b.decidedAt) return a.decidedAt ? a : b; // 手動判断を優先
+      return (a.addedAt || '') <= (b.addedAt || '') ? a : b;            // 次に古い方(元のメモが残っている方)
+    };
+    const keep = better(prev, e);
+    deduped[deduped.indexOf(prev)] = keep;
+    byKey[k] = keep;
+    changed++;
+  });
+  if (changed > 0) blocklist = deduped;
+  // ① 無断キャンセルがある人は即「予約不可」
+  const nsCounts = getNoshowCounts();
+  const nsSeen = new Set();
+  noshows.forEach(n => {
+    const k = blockKeyOf(n.phone, n.name);
+    if (!k || nsSeen.has(k)) return;
+    nsSeen.add(k);
+    const p = normPhone(n.phone);
+    const nsCnt = p ? (nsCounts[p] || 0) : 1;
+    const e = findBlockEntry(n.phone, n.name);
+    if (!e && isBlockRecentlyDeleted(n.phone, n.name)) return; // 「元に戻す」待ちの間は作り直さない
+    if (!e) {
+      blocklist.push({ id: newBlockId(), name: n.name || '', phone: n.phone || '',
+        status: 'blocked', source: 'noshow', note: '無断キャンセルのため自動登録',
+        addedAt: now, decidedAt: now, exemptAtCount: 0, exemptAtNoshowCount: 0 });
+      changed++;
+    } else if (e.status === 'pending') {
+      // 確認待ちのまま無断キャンセルが発生したら予約不可へ引き上げる
+      e.status = 'blocked'; e.source = 'noshow'; e.decidedAt = now;
+      e.note = '無断キャンセル発生のため予約不可';
+      changed++;
+    } else if (e.status === 'exempt' && nsCnt > (e.exemptAtNoshowCount || 0)) {
+      // 免除は「スタッフが事情を確認して下した判断」なので勝手に覆さない。
+      // 免除した時点より無断キャンセルが増えた場合(＝免除後に新たに無断があった)だけ予約不可へ戻す。
+      e.status = 'blocked'; e.source = 'noshow'; e.decidedAt = now;
+      e.note = '免除後に無断キャンセルが発生したため予約不可';
+      changed++;
+    }
+  });
+  // ② 当日キャンセル(カウント対象のみ)が閾値に到達した人は「確認待ち」
+  const list = getSamedayList();
+  const counted = getSamedayCountedCounts(list);
+  const seen = new Set();
+  list.forEach(s => {
+    const k = blockKeyOf(s.phone, s.name);
+    const p = normPhone(s.phone);
+    if (!k || !p || seen.has(k)) return;
+    seen.add(k);
+    const cnt = counted[p] || 0;
+    if (cnt < SAMEDAY_BLOCK_THRESHOLD) return;
+    const e = findBlockEntry(s.phone, s.name);
+    if (!e && isBlockRecentlyDeleted(s.phone, s.name)) return; // 「元に戻す」待ちの間は作り直さない
+    if (!e) {
+      blocklist.push({ id: newBlockId(), name: s.name || '', phone: s.phone || '',
+        status: 'pending', source: 'sameday', note: `当日キャンセル${cnt}回のため確認待ち`,
+        addedAt: now, decidedAt: '', exemptAtCount: 0 });
+      changed++;
+    } else if (e.status === 'exempt' && cnt > (e.exemptAtCount || 0)) {
+      // 免除した時点より回数が増えた → もう一度スタッフに判断してもらう
+      e.status = 'pending'; e.source = 'sameday'; e.decidedAt = '';
+      e.note = `免除後に当日キャンセルが${cnt}回に増加`;
+      changed++;
+    }
+  });
+  // ③ 理由を「やむを得ない事情」に変更した等でカウントが閾値を下回った確認待ちは自動で取り下げる。
+  //    スタッフが既に判断した(予約不可/免除)ものと、無断キャンセル由来のものは触らない。
+  const before = blocklist.length;
+  blocklist = blocklist.filter(e => {
+    if (e.status !== 'pending' || e.source !== 'sameday') return true;
+    const p = normPhone(e.phone);
+    return (p ? (counted[p] || 0) : 0) >= SAMEDAY_BLOCK_THRESHOLD;
+  });
+  changed += (before - blocklist.length);
+  return changed;
+}
+
+// ── 当日キャンセル 理由選択モーダル ─────────────────────────────────────
+let reasonPickTarget = null;
+let reasonPickSelected = '';
+// 理由チップから呼ぶ入口。全ての値をdata属性から読み取る(onclick文字列に値を埋め込まないため)
+function openReasonModalFromEl(el) {
+  const d = el.dataset;
+  openReasonModal(d.pid, d.psrcid, d.psource, d.pname, d.preason, d.pnote);
+}
+function openReasonModal(rowId, srcId, source, name, current, currentNote) {
+  reasonPickTarget = { rowId, srcId, source };
+  reasonPickSelected = current || '';
+  document.getElementById('reasonModalTarget').textContent = `${name} さんの当日キャンセル理由を選んでください`;
+  document.getElementById('reasonNoteInput').value = currentNote || '';
+  renderReasonPickList();
+  document.getElementById('reasonModal').classList.add('open');
+}
+function renderReasonPickList() {
+  const groups = [
+    { title: '🟢 やむを得ない事情（予約不可の回数には数えません）', counts: false },
+    { title: '🟠 自己都合（2回で予約不可の確認対象になります）', counts: true },
+  ];
+  let html = '';
+  groups.forEach(g => {
+    html += `<div class="reason-pick-group"><h4>${g.title}</h4><div class="reason-pick-list">`;
+    SAMEDAY_REASONS.filter(r => r.counts === g.counts).forEach(r => {
+      const sel = reasonPickSelected === r.key ? ' selected' : '';
+      html += `<button type="button" class="reason-pick-btn${sel}" onclick="pickReason('${r.key}')">` +
+        `<span style="font-size:18px">${r.icon}</span><span>${esc(r.label)}</span></button>`;
+    });
+    html += `</div></div>`;
+  });
+  document.getElementById('reasonPickBody').innerHTML = html;
+  // 「その他」「理由不明」を選んだ時だけ自由記入欄を出す
+  const needNote = (reasonPickSelected === 'other' || reasonPickSelected === 'unknown');
+  document.getElementById('reasonNoteGroup').style.display = needNote ? '' : 'none';
+}
+function pickReason(key) { reasonPickSelected = key; renderReasonPickList(); }
+function closeReasonModal() { document.getElementById('reasonModal').classList.remove('open'); reasonPickTarget = null; }
+function saveReasonPick() {
+  if (!reasonPickTarget) return;
+  if (!reasonPickSelected) { showToast('理由を選んでください', 'error'); return; }
+  const note = document.getElementById('reasonNoteInput').value.trim();
+  const t = reasonPickTarget;
+  if (!setSamedayReason(t.rowId, t.srcId, t.source, reasonPickSelected, note)) {
+    showToast('対象のデータが見つかりませんでした', 'error'); closeReasonModal(); return;
+  }
+  const d = getReasonDef(reasonPickSelected);
+  closeReasonModal();
+  saveData(); render(); // saveData()内でsyncBlocklistAuto()が走り、確認待ちの増減も自動反映される
+  showToast(`理由を「${d.icon}${d.label}」に設定しました${d.counts ? '' : '（回数にはカウントしません）'}`, 'success');
+}
+
+// ── 予約不可リストの操作 ────────────────────────────────────────────────
+function blockSetBlocked(id) {
+  const e = blocklist.find(b => b.id === id);
+  if (!e) return;
+  if (!confirm(`「${e.name}」さんを予約不可にしますか？\n\n今後この方の予約が入ると、強い警告が表示されるようになります。`)) return;
+  e.status = 'blocked'; e.decidedAt = nowStamp();
+  closeRowDetailSheet(); saveData(); render();
+  showToast(`🚷「${e.name}」さんを予約不可にしました`, 'error');
+}
+// 「今回は免除」と「予約不可を解除」の両方に使う。
+// 免除した時点の当日キャンセル回数を記録し、それを超えたら自動で再び確認待ちに戻す。
+function blockSetExempt(id) {
+  const e = blocklist.find(b => b.id === id);
+  if (!e) return;
+  const isRelease = e.status === 'blocked';
+  const msg = isRelease
+    ? `「${e.name}」さんの予約不可を解除します。\n理由をメモしてください（例: ご本人と話し合い済み）`
+    : `「${e.name}」さんを今回は免除します（予約不可にしない）。\n理由をメモしてください（例: 家庭の事情を確認済み）`;
+  const note = prompt(msg, e.note || '');
+  if (note === null) return;
+  e.status = 'exempt';
+  e.decidedAt = nowStamp();
+  // 免除した「時点の回数」を両方記録しておき、これを超えた時だけ自動で判断をやり直す。
+  // (記録しないと、無断/当日の記録が残っている限り次の保存で免除が即上書きされてしまう)
+  const pnE = normPhone(e.phone);
+  e.exemptAtCount = pnE ? (getSamedayCountedCounts()[pnE] || 0) : SAMEDAY_BLOCK_THRESHOLD;
+  e.exemptAtNoshowCount = pnE ? (getNoshowCounts()[pnE] || 0) : 1;
+  e.note = note;
+  closeRowDetailSheet(); saveData(); render();
+  showToast(`✅「${e.name}」さんを免除しました（次に当日キャンセルが増えたら再度確認します）`, 'success');
+}
+function blockDelete(id) {
+  const e = blocklist.find(b => b.id === id);
+  if (!e) return;
+  if (!confirm(`「${e.name}」さんを予約不可リストから完全に削除しますか？\n\n⚠️ 無断・当日キャンセルの記録が残っている場合、次回の自動判定で再び追加されます。\n恒久的に対象外にしたい場合は「✅免除」をお使いください。`)) return;
+  const copy = JSON.parse(JSON.stringify(e));
+  const delKey = blockKeyOf(e.phone, e.name);
+  if (delKey) recentlyDeletedBlockKeys.set(delKey, Date.now()); // 猶予中は自動再登録しない
+  blocklist = blocklist.filter(b => b.id !== id);
+  closeRowDetailSheet(); saveData(); render();
+  showUndoToast(`「${copy.name}」さんを予約不可リストから削除しました`, function() {
+    if (delKey) recentlyDeletedBlockKeys.delete(delKey);
+    // 猶予中に自動ルールが別エントリを作っていた場合に備え、同一人物の既存行は取り除いてから戻す
+    blocklist = blocklist.filter(b => blockKeyOf(b.phone, b.name) !== delKey);
+    blocklist.push(copy); saveData(); render();
+    showToast(`「${copy.name}」さんを復元しました ✓`, 'success');
+  });
+}
+function addBlockManual() {
+  const name = document.getElementById('bl-name').value.trim();
+  const phone = document.getElementById('bl-phone').value.trim();
+  const note = document.getElementById('bl-note').value.trim();
+  if (!name || !phone) { showToast('氏名・電話番号は必須です', 'error'); return; }
+  const exist = findBlockEntry(phone, name);
+  if (exist) {
+    exist.status = 'blocked'; exist.decidedAt = nowStamp();
+    exist.note = note || exist.note;
+    showToast(`「${name}」さんは既に登録済みのため、予約不可に更新しました`, 'success');
+  } else {
+    blocklist.push({ id: newBlockId(), name, phone, status: 'blocked', source: 'manual',
+      note: note || '手動で登録', addedAt: nowStamp(), decidedAt: nowStamp(), exemptAtCount: 0 });
+    showToast(`🚷「${name}」さんを予約不可に登録しました`, 'error');
+  }
+  closeBlockModal(); saveData(); render();
+}
+function openBlockModal() {
+  ['bl-name','bl-phone','bl-note'].forEach(x => document.getElementById(x).value = '');
+  document.getElementById('blockModal').classList.add('open');
+}
+function closeBlockModal() { document.getElementById('blockModal').classList.remove('open'); }
+
+// ── 予約不可リスト 一覧描画 ─────────────────────────────────────────────
+function renderBlocklistTable(q, dateFrom, dateTo) {
+  const qNorm = q ? q.replace(/[\s　]/g, '') : '';
+  const qPhoneNorm = q ? normPhone(q) : '';
+  let filtered = blocklist.filter(b => {
+    if (q) {
+      const nameNorm = (b.name||'').replace(/[\s　]/g, '').toLowerCase();
+      const match = nameNorm.includes(qNorm) || (qPhoneNorm && normPhone(b.phone).includes(qPhoneNorm)) ||
+        (b.phone||'').includes(q) || (b.note||'').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    const d = (b.addedAt || '').substring(0, 10);
+    if (dateFrom && d && d < dateFrom) return false;
+    if (dateTo && d && d > dateTo) return false;
+    return true;
+  });
+  // 並び順: まず状態(確認待ち→予約不可→免除)でグループ化し、その中を見出しクリックの並び替えに従わせる。
+  // 判断待ちを常に最上部に集めたいので、状態は常に第1キーのままにしている。
+  const order = { pending: 0, blocked: 1, exempt: 2 };
+  filtered.sort((a, b) => {
+    const oa = order[a.status] ?? 3, ob = order[b.status] ?? 3;
+    if (oa !== ob) return oa - ob;
+    if (sortKey === 'name' || sortKey === 'phone') {
+      const va = (a[sortKey] || ''), vb = (b[sortKey] || '');
+      if (va !== vb) return va < vb ? -sortDir : sortDir;
+    }
+    return (b.addedAt || '').localeCompare(a.addedAt || '');
+  });
+  const tbody = document.getElementById('tbody-blocklist');
+  const empty = document.getElementById('empty-blocklist');
+  if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; }
+  else {
+    empty.style.display = 'none';
+    const samedayCounted = getSamedayCountedCounts();
+    const nsCounts = getNoshowCounts();
+    tbody.innerHTML = filtered.map((b, i) => {
+      const rc = b.status === 'blocked' ? 'row-blocked' : (b.status === 'pending' ? 'row-blockpending' : 'row-past');
+      const tag = b.status === 'blocked' ? `<span class="tag-blocked">🚷 予約不可</span>`
+                : b.status === 'pending' ? `<span class="tag-blockpending">⏳ 確認待ち</span>`
+                : `<span class="tag-blockexempt">✅ 免除</span>`;
+      const pn = normPhone(b.phone);
+      const srcLabel = b.source === 'noshow' ? '🚫 無断キャンセル' : (b.source === 'sameday' ? '🟠 当日キャンセル' : '✍️ 手動登録');
+      const hist = `<span style="font-size:11px;color:var(--color-neutral-strong)">無断${pn ? (nsCounts[pn]||0) : 0}回 / 当日${pn ? (samedayCounted[pn]||0) : 0}回(実カウント)</span>`;
+      let actions = '';
+      if (b.status === 'pending') {
+        actions = `<button class="btn btn-danger btn-sm" onclick="blockSetBlocked('${b.id}')" title="予約不可にする">🚷 不可</button>
+                   <button class="btn btn-outline btn-sm" onclick="blockSetExempt('${b.id}')" title="今回は予約不可にしない">✅ 免除</button>`;
+      } else if (b.status === 'blocked') {
+        actions = `<button class="btn btn-outline btn-sm" onclick="blockSetExempt('${b.id}')" title="予約不可を解除する">🔓 解除</button>`;
+      } else {
+        actions = `<button class="btn btn-danger btn-sm" onclick="blockSetBlocked('${b.id}')" title="やはり予約不可にする">🚷 不可</button>`;
+      }
+      actions += `<button class="btn btn-danger btn-sm" onclick="blockDelete('${b.id}')" title="リストから完全に削除">🗑️</button>`;
+      return `<tr class="${rc}" data-id="${b.id}">
+        <td class="card-header-cell"><span class="ch-time">${tag}</span><span class="ch-name">${esc(b.name)}</span></td>
+        <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
+        <td data-label="状態" style="white-space:nowrap">${tag}</td>
+        <td data-label="氏名" class="name-cell">${highlightMatch(b.name, q)}</td>
+        <td data-label="電話" class="phone-cell">${telLink(b.phone, q)}</td>
+        <td data-label="きっかけ" style="font-size:12px;white-space:nowrap">${srcLabel}<br>${hist}</td>
+        <td data-label="メモ" class="note-cell">${esc(b.note)}</td>
+        <td data-label="登録日" class="date-cell">${esc((b.addedAt||'').substring(0,10))}</td>
+        <td class="actions-cell"><div style="display:flex;gap:5px;flex-wrap:wrap">${actions}</div></td>
+      </tr>`;
+    }).join('');
+  }
+  const nBlocked = blocklist.filter(b => b.status === 'blocked').length;
+  const nPending = blocklist.filter(b => b.status === 'pending').length;
+  document.getElementById('rowCount-blocklist').textContent =
+    `${filtered.length}件 / 全${blocklist.length}件（🚷予約不可${nBlocked} ⏳確認待ち${nPending}）`;
 }
 function getSamedayPhoneCountMap() { return getSamedayCounts(); }
 function getSamedayNameCountMap() {
@@ -1474,7 +2002,7 @@ function getNewDupGroupCount(beforeIds) {
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  ['reservations','cancellations','sameday','noshow','stats'].forEach(t => {
+  ['reservations','cancellations','sameday','noshow','blocklist','stats'].forEach(t => {
     const p = document.getElementById('panel-' + t);
     if (!p) return;
     if (t === tab) {
@@ -1492,8 +2020,11 @@ function switchTab(tab) {
   if (today) today.style.display = (tab === 'reservations') ? '' : 'none';
   document.getElementById('addNoshowBtn').style.display = (tab === 'noshow') ? '' : 'none';
   document.getElementById('addSamedayBtn').style.display = (tab === 'sameday') ? '' : 'none';
-  document.getElementById('fetchMailBtn').style.display = (isSignedIn && tab !== 'stats') ? '' : 'none';
-  document.getElementById('rescanBtn').style.display = (isSignedIn && tab !== 'stats') ? '' : 'none';
+  const abBtn = document.getElementById('addBlockBtn');
+  if (abBtn) abBtn.style.display = (tab === 'blocklist') ? '' : 'none';
+  const noFetch = (tab === 'stats' || tab === 'blocklist');
+  document.getElementById('fetchMailBtn').style.display = (isSignedIn && !noFetch) ? '' : 'none';
+  document.getElementById('rescanBtn').style.display = (isSignedIn && !noFetch) ? '' : 'none';
   const rfBtn = document.getElementById('remindFilterBtn');
   if (rfBtn) rfBtn.style.display = (tab === 'reservations') ? '' : 'none';
   // クイックフィルタ: statsタブは検索/日付フィルタが効かないため行ごと非表示。
@@ -1501,7 +2032,9 @@ function switchTab(tab) {
   const qf = document.getElementById('quickFilters');
   if (qf) qf.style.display = (tab === 'stats') ? 'none' : '';
   document.querySelectorAll('.chip-res-only').forEach(el => { el.style.display = (tab === 'reservations') ? '' : 'none'; });
-  if (tab === 'noshow' || tab === 'sameday') { sortKey = 'date'; } else if (tab !== 'stats') { sortKey = 'datetime'; }
+  if (tab === 'noshow' || tab === 'sameday') { sortKey = 'date'; }
+  else if (tab === 'blocklist') { sortKey = 'name'; }
+  else if (tab !== 'stats') { sortKey = 'datetime'; }
   sortDir = -1;
   render();
 }
@@ -1703,6 +2236,7 @@ async function loadFromDrive() {
       cancellations = data.cancellations || [];
       noshows = data.noshows || [];
       samedayManual = data.samedayManual || [];
+      blocklist = data.blocklist || [];
       saveDataLocal();
       render();
       const mod = new Date(searchData.files[0].modifiedTime).toLocaleString('ja-JP');
@@ -1739,6 +2273,7 @@ async function mergeWithRemoteBeforeSave() {
     cancellations = mergeById(remote.cancellations, cancellations);
     noshows = mergeById(remote.noshows, noshows);
     samedayManual = mergeById(remote.samedayManual, samedayManual);
+    blocklist = mergeById(remote.blocklist, blocklist);
   } catch(e) { /* タイムアウト等はローカルの内容のまま保存 */ }
 }
 // remote(他端末保存分を含む可能性)とlocal(この端末が保存しようとしている内容)をID単位で統合。
@@ -1756,7 +2291,7 @@ async function saveToDrive() {
   await ensureFreshToken();
   await mergeWithRemoteBeforeSave();
   try {
-    const content = JSON.stringify({ reservations, cancellations, noshows, samedayManual });
+    const content = JSON.stringify({ reservations, cancellations, noshows, samedayManual, blocklist });
     if (driveFileId) {
       const resp = await fetch(
         `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media&supportsAllDrives=true`,
@@ -2137,15 +2672,17 @@ function parseCancellationEmail(body) {
 function loadData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) { const d = JSON.parse(saved); reservations = d.reservations || []; cancellations = d.cancellations || []; noshows = d.noshows || []; samedayManual = d.samedayManual || []; }
-  } catch(e) { reservations = []; cancellations = []; noshows = []; samedayManual = []; }
+    if (saved) { const d = JSON.parse(saved); reservations = d.reservations || []; cancellations = d.cancellations || []; noshows = d.noshows || []; samedayManual = d.samedayManual || []; blocklist = d.blocklist || []; }
+  } catch(e) { reservations = []; cancellations = []; noshows = []; samedayManual = []; blocklist = []; }
 }
 
 function saveDataLocal() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ reservations, cancellations, noshows, samedayManual }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ reservations, cancellations, noshows, samedayManual, blocklist }));
   checkStorageCapacity();
 }
-function saveData() { saveDataLocal(); if (isSignedIn) saveToDrive(); }
+// 保存のたびに予約不可リストの自動判定を回す。
+// (無断/当日キャンセルの追加・削除・理由変更など、あらゆる変更経路がここを通るため取りこぼしがない)
+function saveData() { syncBlocklistAuto(); saveDataLocal(); if (isSignedIn) saveToDrive(); }
 
 // localStorageの上限(ブラウザ仕様上おおむね5MB相当=文字数ベース)に対する使用率を監視し、
 // 80%を超えたら警告する。セッション中1回だけ通知(保存の都度は出さない)
@@ -2336,6 +2873,7 @@ function render() {
   if (activeTab === 'reservations') renderEmailTable(reservations, 'reservations', q, dateFrom, dateTo);
   else if (activeTab === 'cancellations') renderEmailTable(cancellations, 'cancellations', q, dateFrom, dateTo);
   else if (activeTab === 'sameday') renderSamedayTable(q, dateFrom, dateTo);
+  else if (activeTab === 'blocklist') renderBlocklistTable(q, dateFrom, dateTo);
   else if (activeTab === 'stats') renderStats();
   else renderNoshowTable(q, dateFrom, dateTo);
   renderTodaySummary();
@@ -2345,6 +2883,13 @@ function render() {
   document.getElementById('stat-cancellations').textContent = cancellations.length;
   document.getElementById('stat-noshow').textContent = noshows.length;
   document.getElementById('stat-sameday').textContent = getSamedayList().length;
+  const blBadge = document.getElementById('stat-blocklist');
+  if (blBadge) {
+    const nb = blocklist.filter(b => b.status === 'blocked').length;
+    const np = blocklist.filter(b => b.status === 'pending').length;
+    blBadge.textContent = np > 0 ? `${nb}+${np}` : String(nb);
+    blBadge.title = `予約不可${nb}件 / 確認待ち${np}件`;
+  }
   updateSortIndicators();
 }
 
@@ -2389,6 +2934,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const noshowNameMap = getNoshowNameCountMap();
   const samedayPhoneMap = getSamedayPhoneCountMap();
   const samedayNameMap = getSamedayNameCountMap();
+  const samedayExemptMap = getSamedayExemptCounts(); // 「やむを得ない事情」として除外した件数
   const dupMap = buildDupGroups(data); // 同日同名検出（予約・キャンセル各リスト内）
   const furikaeSet = (tabId === 'cancellations') ? getFurikaeSet() : null; // キャンセル区分表示用
   // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人。
@@ -2420,8 +2966,21 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const nsCnt = Math.max(nsByPhone, nsByName);
       const noshowWarn = (isResTab && nsCnt > 0) ? ` <span class="badge-noshow-warn" title="過去の無断キャンセル ${nsCnt}回">⚠️無断${nsCnt}</span>` : '';
       // 当日キャンセル回数バッジ（予約・キャンセル両方に表示）
+      // 総数を主に出しつつ、「やむを得ない事情」で回数に数えなかった分を(情状N)として併記する
       const sdCnt = Math.max(pn ? (samedayPhoneMap[pn]||0) : 0, nn ? (samedayNameMap[nn]||0) : 0);
-      const samedayWarn = (sdCnt > 0) ? ` <span class="badge-sameday-warn" title="当日キャンセル ${sdCnt}回">🟠当日${sdCnt}</span>` : '';
+      const sdExempt = pn ? (samedayExemptMap[pn] || 0) : 0;
+      const sdSuffix = sdExempt > 0 ? `(情状${sdExempt})` : '';
+      const sdTitle = sdExempt > 0
+        ? `当日キャンセル ${sdCnt}回（うち${sdExempt}回はやむを得ない事情として回数に数えていません）`
+        : `当日キャンセル ${sdCnt}回`;
+      const samedayWarn = (sdCnt > 0) ? ` <span class="badge-sameday-warn" title="${sdTitle}">🟠当日${sdCnt}${sdSuffix}</span>` : '';
+      // 予約不可/確認待ちバッジ（予約リストのみ。最も強い警告）
+      let blockBadge = '';
+      if (isResTab && !isCancelled) {
+        const be = findBlockEntry(r.phone, r.name);
+        if (be && be.status === 'blocked') blockBadge = ` <span class="badge-blocked" title="予約不可のお客様です。${esc(be.note||'')}">🚷予約不可</span>`;
+        else if (be && be.status === 'pending') blockBadge = ` <span class="badge-blockpending" title="予約不可にするか確認待ちです。${esc(be.note||'')}">⏳確認待ち</span>`;
+      }
       // 同日同名の重複/同名検出
       const dupBadge = dupBadgeFor(r, dupMap);
       const dupLv = dupLevelFor(r, dupMap);
@@ -2429,6 +2988,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       const isPast = isResTab && isPastDateTime(r.datetime);
       let rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
       if (isResTab && nsCnt > 0) rowClass = 'row-warn-noshow';
+      // 予約不可の人の行は、無断警告より更に強い扱いで上書きする
+      if (blockBadge) rowClass = isBlockedCustomer(r.phone, r.name) ? 'row-blocked' : 'row-blockpending';
       if (dupLv === 'dup') rowClass = (rowClass ? rowClass + ' ' : '') + 'row-dup';
       else if (dupLv === 'samename') rowClass = (rowClass ? rowClass + ' ' : '') + 'row-samename';
       if (isPast) rowClass = (rowClass ? rowClass + ' ' : '') + 'row-past';
@@ -2493,7 +3054,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         }
       }
       const cancelledTag = isCancelled ? ` <span class="tag-cancelled">キャンセル済</span>` : '';
-      const cautionContent = `${cancelledTag}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}`;
+      // 予約不可バッジは最優先で先頭に置く(スタッフが最初に気づくべき情報のため)
+      const cautionContent = `${blockBadge}${cancelledTag}${repeatBadge}${noshowWarn}${samedayWarn}${dupBadge}`;
       const recvLabel = isCancelTab ? 'キャンセル日時' : '受付日時';
       return `<tr class="${rowClass}" data-id="${r.id}">
       <td class="card-header-cell"><span class="ch-time">${timeOnly(r.datetime)}</span><span class="ch-name">${esc(r.name)}</span></td>
@@ -2608,6 +3170,7 @@ function renderSamedayTable(q, dateFrom, dateTo) {
         ? `<button class="btn btn-outline btn-sm" title="キャンセルタブで編集" data-search-key="${esc(r.phone||r.name||'')}" onclick="switchTab('cancellations');searchByBadge(this)">🔍</button>`
         : `<button class="btn btn-outline btn-sm" onclick="openSamedayModal('${r.id}')">✏️</button>
            <button class="btn btn-danger btn-sm" onclick="deleteSameday('${r.id}')">🗑️</button>`;
+      const reasonCell = reasonChipHTML(r);
       return `<tr class="${rc}" data-id="${r.id}">
         <td class="card-header-cell"><span class="ch-time">${chDate} ${esc(r.time)}</span><span class="ch-name">${esc(r.name)}</span></td>
         <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
@@ -2616,6 +3179,7 @@ function renderSamedayTable(q, dateFrom, dateTo) {
         <td data-label="電話" class="phone-cell">${telLink(r.phone, q)}</td>
         <td data-label="メール" style="font-size:13px;color:var(--color-neutral-muted)">${esc(r.email)}</td>
         <td data-label="区分">${tag}</td>
+        <td data-label="理由">${reasonCell}</td>
         <td data-label="備考" class="note-cell">${esc(r.note)}</td>
         <td data-label="回数" style="text-align:center"><span class="badge ${bc}">${cnt}</span></td>
         <td class="actions-cell"><div style="display:flex;gap:5px">${actions}</div></td>
@@ -2633,6 +3197,15 @@ function openSamedayModal(id) {
   document.getElementById('samedayModalTitle').textContent = '当日キャンセル 追加';
   document.getElementById('samedaySaveBtn').textContent = '追加する';
   ['sd-date','sd-time','sd-name','sd-phone','sd-email','sd-note'].forEach(x => document.getElementById(x).value = '');
+  // 理由セレクトを毎回組み立て直す(グループごとに分けて選びやすくする)
+  const sel = document.getElementById('sd-reason');
+  sel.innerHTML = '<option value="">⚪ 未設定（回数に数えます）</option>' +
+    '<optgroup label="🟢 やむを得ない事情（回数に数えません）">' +
+    SAMEDAY_REASONS.filter(r => !r.counts).map(r => `<option value="${r.key}">${r.icon} ${esc(r.label)}</option>`).join('') +
+    '</optgroup><optgroup label="🟠 自己都合（回数に数えます）">' +
+    SAMEDAY_REASONS.filter(r => r.counts).map(r => `<option value="${r.key}">${r.icon} ${esc(r.label)}</option>`).join('') +
+    '</optgroup>';
+  sel.value = '';
   document.getElementById('samedayRepeatWarning').style.display = 'none';
   if (id) {
     const r = samedayManual.find(x => x.id === id);
@@ -2646,6 +3219,7 @@ function openSamedayModal(id) {
       document.getElementById('sd-phone').value = r.phone || '';
       document.getElementById('sd-email').value = r.email || '';
       document.getElementById('sd-note').value = r.note || '';
+      sel.value = r.reason || '';
     }
   }
   document.getElementById('samedayModal').classList.add('open');
@@ -2658,14 +3232,15 @@ function saveSameday() {
   const phone = document.getElementById('sd-phone').value.trim();
   const email = document.getElementById('sd-email').value.trim();
   const note = document.getElementById('sd-note').value.trim();
+  const reason = document.getElementById('sd-reason').value;
   if (!date || !name || !phone) { showToast('予約日・氏名・電話番号は必須です', 'error'); return; }
   if (editSamedayId) {
     const idx = samedayManual.findIndex(r => r.id === editSamedayId);
-    if (idx >= 0) samedayManual[idx] = { ...samedayManual[idx], date, time, name, phone, email, note };
+    if (idx >= 0) samedayManual[idx] = { ...samedayManual[idx], date, time, name, phone, email, note, reason };
     showToast('更新しました ✓', 'success');
   } else {
     const newId = 'sd_' + Date.now() + '_' + Math.floor(Math.random()*1000);
-    samedayManual.push({ id: newId, date, time, name, phone, email, note });
+    samedayManual.push({ id: newId, date, time, name, phone, email, note, reason });
     showToast('当日キャンセルを追加しました ✓', 'success');
   }
   saveData(); closeSamedayModal(); render();
@@ -2708,9 +3283,14 @@ function getCautionReservations() {
     const pn = normPhone(r.phone), nn = normName(r.name);
     const ns = Math.max(pn ? (nsP[pn]||0) : 0, nn ? (nsN[nn]||0) : 0);
     const sd = Math.max(pn ? (sdP[pn]||0) : 0, nn ? (sdN[nn]||0) : 0);
-    if (ns > 0 || sd > 0) out.push({ r, ns, sd, d });
+    const blocked = isBlockedCustomer(r.phone, r.name);
+    if (ns > 0 || sd > 0 || blocked) out.push({ r, ns, sd, d, blocked });
   });
-  out.sort((a, b) => (a.r.datetime||'').localeCompare(b.r.datetime||''));
+  // 予約不可の人を最上部に集め、その中は予約日時順にする
+  out.sort((a, b) => {
+    if (!!a.blocked !== !!b.blocked) return a.blocked ? -1 : 1;
+    return (a.r.datetime||'').localeCompare(b.r.datetime||'');
+  });
   return out;
 }
 // 取得時アラート用: 新規に入った今日以降の予約のうち要注意客を返す
@@ -2726,19 +3306,34 @@ function getNewCautionAlerts(beforeIds) {
     const pn = normPhone(r.phone), nn = normName(r.name);
     const ns = Math.max(pn ? (nsP[pn]||0) : 0, nn ? (nsN[nn]||0) : 0);
     const sd = Math.max(pn ? (sdP[pn]||0) : 0, nn ? (sdN[nn]||0) : 0);
-    if (ns > 0 || sd > 0) out.push({ r, ns, sd });
+    const blocked = isBlockedCustomer(r.phone, r.name);
+    if (ns > 0 || sd > 0 || blocked) out.push({ r, ns, sd, blocked });
   });
   return out;
 }
 function alertNewCaution(alerts) {
   if (!alerts || alerts.length === 0) return;
-  const names = alerts.slice(0, 3).map(a => {
+  // 予約不可のお客様は別枠・最優先で通知する(受付で断る判断が必要なため)
+  const blocked = alerts.filter(a => a.blocked);
+  if (blocked.length > 0) {
+    const bn = blocked.slice(0, 3).map(a => a.r.name).join('、') + (blocked.length > 3 ? ` 他${blocked.length-3}件` : '');
+    setTimeout(() => showToast(`🚷 予約不可のお客様が予約しました: ${bn}　対応をご確認ください`, 'error'), 600);
+    if (('Notification' in window) && Notification.permission === 'granted') {
+      try {
+        const n = new Notification('🚷 予約不可のお客様が予約', { body: bn, tag: 'blocked-' + STORAGE_KEY });
+        n.onclick = () => { window.focus(); n.close(); };
+      } catch(e) {}
+    }
+  }
+  const rest = alerts.filter(a => !a.blocked);
+  if (rest.length === 0) return;
+  const names = rest.slice(0, 3).map(a => {
     const tags = [];
     if (a.ns > 0) tags.push(`無断${a.ns}`);
     if (a.sd > 0) tags.push(`当日${a.sd}`);
     return `${a.r.name}（${tags.join('・')}）`;
   }).join('、');
-  const more = alerts.length > 3 ? ` 他${alerts.length - 3}件` : '';
+  const more = rest.length > 3 ? ` 他${rest.length - 3}件` : '';
   setTimeout(() => showToast(`🚨 要注意のお客様が予約しました: ${names}${more}`, 'error'), 1200);
   if (('Notification' in window) && Notification.permission === 'granted') {
     try {
@@ -2767,14 +3362,15 @@ function renderCautionBanner() {
     const r = o.r;
     const m = (r.datetime||'').match(/(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})?/);
     const when = m ? fmtDateRel(`${m[1]}-${m[2]}-${m[3]}`, m[4] || '') : esc(r.datetime||'');
-    const sev = o.ns > 0 ? '' : ' sev-amber';
+    const sev = (o.blocked || o.ns > 0) ? '' : ' sev-amber';
+    const blB = o.blocked ? `<span class="badge-blocked">🚷予約不可</span>` : '';
     const nsB = o.ns > 0 ? `<span class="badge-noshow-warn">⚠️無断${o.ns}</span>` : '';
     const sdB = o.sd > 0 ? `<span class="badge-sameday-warn">🟠当日${o.sd}</span>` : '';
     const key = r.phone || r.name || '';
     return `<div class="caution-item${sev}" data-search-key="${esc(key)}" onclick="searchByBadge(this)">
       <span class="caution-when">${when}</span>
       <span class="caution-name">${esc(r.name)}</span>
-      <span class="caution-badges">${nsB}${sdB}</span>
+      <span class="caution-badges">${blB}${nsB}${sdB}</span>
       <span class="caution-phone">${esc(r.phone)}</span>
     </div>`;
   }).join('');
@@ -2949,6 +3545,78 @@ function buildCancelHeatmapHTML() {
     <div class="heatmap-sub-title" style="margin-top:10px">🚫 無断キャンセル</div>${buildOneHeatmapHTML(noshows, '--color-danger')}`;
 }
 
+// ⑤ 当日キャンセルの理由内訳(横棒)。やむを得ない=中立グレー / 自己都合=注意オレンジ / 未設定=薄グレー
+function buildReasonBreakdownHTML() {
+  const list = getSamedayList();
+  if (list.length === 0) return `<div class="stats-heatmap-empty">データがありません</div>`;
+  const counts = {};
+  list.forEach(r => { const k = r.reason || '__unset'; counts[k] = (counts[k] || 0) + 1; });
+  const rows = SAMEDAY_REASONS
+    .map(d => ({ label: d.icon + ' ' + d.label, n: counts[d.key] || 0, counts: d.counts, unset: false }))
+    .concat([{ label: '⚪ 未設定', n: counts['__unset'] || 0, counts: true, unset: true }])
+    .filter(x => x.n > 0)
+    .sort((a, b) => b.n - a.n);
+  if (rows.length === 0) return `<div class="stats-heatmap-empty">データがありません</div>`;
+  const max = Math.max(1, ...rows.map(x => x.n));
+  const total = list.length;
+  const bars = rows.map(x => {
+    const w = Math.round(x.n / max * 100);
+    const color = x.unset ? 'var(--color-neutral-muted)' : (x.counts ? 'var(--color-caution)' : 'var(--color-neutral)');
+    const pct = Math.round(x.n / total * 100);
+    return `<div class="reason-bar-row">
+      <span class="reason-bar-label">${esc(x.label)}</span>
+      <span class="reason-bar-track"><span class="reason-bar-fill" style="width:${w}%;background:${color}"></span></span>
+      <span class="reason-bar-num">${x.n}件 (${pct}%)</span>
+    </div>`;
+  }).join('');
+  const unsetN = counts['__unset'] || 0;
+  const hint = unsetN > 0
+    ? `<div class="reason-bar-hint">⚪未設定が${unsetN}件あります。当日キャンセルタブで理由を選ぶと、より正確な傾向が分かります</div>` : '';
+  return bars + hint;
+}
+
+// ⑥ リマインド効果測定: 結果が確定した「過去の予約」を、リマインド実施の有無で比較する
+function buildRemindEffectHTML() {
+  const today = todayStr();
+  const g = { withR: { total: 0, bad: 0 }, without: { total: 0, bad: 0 } };
+  reservations.forEach(r => {
+    const d = (r.datetime || '').substring(0, 10);
+    if (!d || d >= today) return; // 未来の予約は結果が未確定なので除外
+    const t = (r.remindTel || r.remindMail) ? g.withR : g.without;
+    t.total++;
+    // 「来なかった」= キャンセル済み / 無断登録 / 当日キャンセル登録 のいずれか
+    if (isReservationCancelled(r) || r.movedToNoshow || r.movedToSameday) t.bad++;
+  });
+  if (g.withR.total === 0 && g.without.total === 0) {
+    return `<div class="stats-heatmap-empty">過去の予約データがまだありません</div>`;
+  }
+  const rate = o => o.total > 0 ? (o.bad / o.total * 100) : 0;
+  const rw = rate(g.withR), ro = rate(g.without);
+  const bar = (label, o, color) => {
+    const r0 = rate(o);
+    return `<div class="reason-bar-row">
+      <span class="reason-bar-label">${label}</span>
+      <span class="reason-bar-track"><span class="reason-bar-fill" style="width:${Math.round(r0)}%;background:${color}"></span></span>
+      <span class="reason-bar-num">${r0.toFixed(1)}% <span style="color:var(--color-neutral-muted);font-weight:500">(${o.bad}/${o.total}件)</span></span>
+    </div>`;
+  };
+  let verdict = '';
+  if (g.withR.total < 3) {
+    verdict = `<div class="reason-bar-hint">リマインド実施済みの過去予約が${g.withR.total}件のみです。もう少し実績が貯まると比較できます</div>`;
+  } else if (g.without.total < 3) {
+    verdict = `<div class="reason-bar-hint">リマインド未実施の過去予約が少ないため、比較の精度は参考程度です</div>`;
+  } else {
+    const diff = ro - rw;
+    verdict = diff > 0.5
+      ? `<div class="reason-bar-hint" style="color:var(--color-positive);font-weight:700">✅ リマインドした方がキャンセル率が ${diff.toFixed(1)}ポイント低い（効果が出ています）</div>`
+      : (diff < -0.5
+        ? `<div class="reason-bar-hint" style="color:var(--color-caution);font-weight:700">リマインドした方が ${Math.abs(diff).toFixed(1)}ポイント高い結果です（キャンセルしそうな人に優先して連絡している可能性もあります）</div>`
+        : `<div class="reason-bar-hint">現時点では差はほとんどありません</div>`);
+  }
+  return bar('📞✉️ リマインド実施済み', g.withR, 'var(--color-positive)') +
+         bar('— リマインド未実施', g.without, 'var(--color-caution)') + verdict;
+}
+
 // ④ 全期間キャンセル内訳(通常/当日/振替/無断)ドーナツ+凡例HTML
 function buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs) {
   const total = totCanNormal + totSd + totFk + totNs;
@@ -3025,7 +3693,9 @@ function renderStats() {
   const visualsEl = document.getElementById('statsVisuals');
   if (visualsEl) visualsEl.innerHTML = `
     <div class="stats-panel-box"><h4>🗓️ 曜日×時間帯 当日/無断キャンセル傾向</h4>${buildCancelHeatmapHTML()}</div>
-    <div class="stats-panel-box"><h4>🥯 キャンセル内訳(全期間)</h4>${buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs)}</div>`;
+    <div class="stats-panel-box"><h4>🥯 キャンセル内訳(全期間)</h4>${buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs)}</div>
+    <div class="stats-panel-box"><h4>📞 リマインドの効果（過去の予約で比較）</h4>${buildRemindEffectHTML()}</div>
+    <div class="stats-panel-box"><h4>📝 当日キャンセルの理由内訳</h4>${buildReasonBreakdownHTML()}</div>`;
 
   const maxRes = Math.max(1, ...keys.map(k => months[k].res));
   const tbody = document.getElementById('stats-tbody');
@@ -3308,6 +3978,8 @@ function moveToSameday(reservationId, checkbox) {
   saveData();
   render();
   showToast(`「${r.name}」を当日キャンセルに登録しました（${countAfter}回目）`, 'success');
+  // 続けて理由を聞く(お客様の事情によっては予約不可の回数に数えないため)
+  setTimeout(() => openReasonModal(newId, '', 'manual', r.name || '', '', ''), 350);
 }
 
 // ── Noshow CRUD ─────────────────────────────────────────────────────────
@@ -3453,6 +4125,20 @@ function exportExcel() {
     ws['!cols'] = [14,10,14,14,22,10,30,8].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, '当日キャンセル');
     XLSX.writeFile(wb, `当日キャンセルリスト川口_${today}.xlsx`);
+  } else if (activeTab === 'blocklist') {
+    const statusLabel = { blocked:'予約不可', pending:'確認待ち', exempt:'免除' };
+    const srcLabel = { noshow:'無断キャンセル', sameday:'当日キャンセル', manual:'手動登録' };
+    const nsC = getNoshowCounts(), sdC = getSamedayCountedCounts();
+    const h = ['状態','氏名','電話番号','きっかけ','メモ','登録日時','判断日時','無断回数','当日回数(実カウント)'];
+    const rows = blocklist.map(b => {
+      const p = normPhone(b.phone);
+      return [statusLabel[b.status]||b.status, b.name, b.phone, srcLabel[b.source]||b.source,
+        b.note, b.addedAt, b.decidedAt, p ? (nsC[p]||0) : 0, p ? (sdC[p]||0) : 0];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
+    ws['!cols'] = [10,14,14,16,30,18,18,10,18].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, '予約不可リスト');
+    XLSX.writeFile(wb, `予約不可リスト川口_${today}.xlsx`);
   } else if (activeTab === 'stats') {
     showToast('統計タブはExcel出力に対応していません', '');
     return;
@@ -3805,6 +4491,8 @@ document.getElementById('settingsModal').addEventListener('click', function(e) {
 document.getElementById('importModal').addEventListener('click', function(e) { if (e.target === this) closeImportModal(); });
 document.getElementById('samedayModal').addEventListener('click', function(e) { if (e.target === this) closeSamedayModal(); });
 document.getElementById('legendModal').addEventListener('click', function(e) { if (e.target === this) closeLegendModal(); });
+document.getElementById('blockModal').addEventListener('click', function(e) { if (e.target === this) closeBlockModal(); });
+document.getElementById('reasonModal').addEventListener('click', function(e) { if (e.target === this) closeReasonModal(); });
 document.getElementById('rowDetailSheetBackdrop').addEventListener('click', function(e) { if (e.target === this) closeRowDetailSheet(); });
 ['tbody-reservations', 'tbody-cancellations', 'tbody-noshow', 'tbody-sameday'].forEach(tbodyId => {
   const el = document.getElementById(tbodyId);
@@ -3818,7 +4506,7 @@ document.getElementById('rowDetailSheetBackdrop').addEventListener('click', func
   });
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); closeSamedayModal(); closeLegendModal(); closeRowDetailSheet(); }
+  if (e.key === 'Escape') { closeModal(); closeEmailModal(); closeSettingsModal(); closeImportModal(); closeSamedayModal(); closeLegendModal(); closeBlockModal(); closeReasonModal(); closeRowDetailSheet(); }
   if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveRecord();
   if (e.key === 'Enter' && document.getElementById('samedayModal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveSameday();
 });
@@ -3859,6 +4547,7 @@ async function autoLoadFromDrive() {
       cancellations = data.cancellations || [];
       noshows = data.noshows || [];
       samedayManual = data.samedayManual || [];
+      blocklist = data.blocklist || [];
       saveDataLocal();
       localStorage.setItem('lastSyncTime_kawaguchi', String(Date.now()));
       render();
