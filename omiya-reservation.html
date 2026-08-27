@@ -2745,7 +2745,10 @@ function parseSalonBoardEmail(body) {
     // 「山田 太郎（ヤマダ タロウ）」→ かな括弧を除いた氏名にする
     const name = field('氏名').replace(/[（(][^（()）]*[)）]\s*$/, '').trim();
     // メニュー欄にはクーポン名(初回オファー名)を優先して出し、実メニューはコメントへ
-    const coupon = field('ご利用クーポン');
+    // クーポン未使用のときHPBは「利用クーポンなし」と入れてくる。これをメニュー欄に
+    // 出すと実メニューが見えなくなるので、空(=クーポン無し)として扱う
+    const couponRaw = field('ご利用クーポン');
+    const coupon = (couponRaw === '利用クーポンなし' || couponRaw === '-') ? '' : couponRaw;
     const menuLine = field('メニュー');
     const menu = coupon || menuLine;
     const parts = [];
