@@ -249,6 +249,19 @@
   /* HOT PEPPER Beauty(サロンボード)経由の予約に付ける出所バッジ */
   .src-hpb { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; background: #f25c3d;
     border-radius: 4px; padding: 1px 5px; margin-right: 5px; letter-spacing: .5px; vertical-align: 1px; }
+  /* HPBバッジは小さすぎて見落とすため少し大きくする */
+  .src-hpb { font-size: 11px; padding: 1px 6px; }
+  .src-hpb[title] { cursor: help; }
+  /* 「電話番号・メールが元から無い」ことを示す表示。
+     行の背景色は使わない — 背景色は危険/注意を表すという既存ルールがあり、
+     経路の違いに使うと警告と紛らわしくなるため */
+  .hpb-nocontact { display: inline-block; font-size: 11px; line-height: 1.45; color: #c2410c;
+    background: #fff3ec; border: 1px solid #ffd7c2; border-radius: 6px; padding: 1px 6px;
+    white-space: nowrap; cursor: help; }
+  .hpb-dash { color: var(--color-neutral-muted); font-size: 12px; cursor: help; }
+  .remind-pill.is-na { background: transparent; color: var(--color-neutral-muted);
+    border-color: var(--color-neutral-tint); border-style: dotted; }
+  body.dark-mode .hpb-nocontact { color: #ffb08c; background: #3a241b; border-color: #5e3826; }
   .comment-cell { font-size: 12px; max-width: 150px; color: var(--color-neutral-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   .comment-cell:hover, .comment-cell.expanded { white-space: normal; overflow: visible; position: relative; z-index: 10; background: var(--color-surface); box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
   /* 検索語ハイライト(専用トークン。危険/注意等の意味色とは独立) */
@@ -1140,6 +1153,15 @@
     </div>
 
     <div class="legend-section">
+      <h3><span class="src-hpb">HPB</span> ホットペッパービューティー経由の予約</h3>
+      <div class="legend-row"><span class="src-hpb">HPB</span><span class="legend-desc">メニュー欄の先頭に付きます。サロンボードから届く予約通知を取り込んだものです</span></div>
+      <div class="legend-row"><span class="hpb-nocontact">📋サロンボードで確認</span><span class="legend-desc">電話番号の代わりに出ます。HPBの通知メールには電話番号が載らないため、かける前にサロンボードの予約詳細で番号を確認してください(予約番号は行をタップした詳細に出ます)</span></div>
+      <div class="legend-row"><span class="hpb-dash">—</span><span class="legend-desc">✉️メール列がこの表示 = メールアドレスも通知に載らないため、メールリマインドは対象外です。「📋リマインド未」の判定も📞電話リマインドだけで行います</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">検索欄に「hpb」「サロンボード」と入れると、HPB経由の予約だけに絞り込めます</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">電話番号が無いため、予約不可リストとの照合・重複チェックは<strong>氏名のみ</strong>で行われます(同姓同名は別人の可能性があるため 👥同名? として出ます)</span></div>
+    </div>
+
+    <div class="legend-section">
       <h3>✉️ キャンセルリスト</h3>
       <div class="legend-row"><span class="tag-furikae">🔀振替</span><span class="legend-desc">時間変更のための取り直し(24時間以内に同じ人の新規予約あり)。回数・率には数えない</span></div>
       <div class="legend-row"><span class="tag-kubun-sameday">🟠当日</span><span class="legend-desc">予約日と同じ日にキャンセルされた(振替を除く)</span></div>
@@ -1492,6 +1514,25 @@ function saveSbSkipped(set) {
 }
 
 // 電話番号をtel:リンク化(見た目は通常テキストに近く、スマホでタップすると発信できる)
+// ── HPB(ホットペッパービューティー / サロンボード)経由の予約 ──────────
+// サロンボードの予約通知メールには電話番号もメールアドレスも載らない。
+// 空欄のまま出すと「取り込み漏れ」に見えるので、理由が分かる表示に置き換える。
+function isHpb(r) { return !!r && r.source === 'hpb'; }
+function routeLabel(r) { return isHpb(r) ? 'HPB' : 'メール'; }
+function hpbBadge(r) {
+  if (!isHpb(r)) return '';
+  return '<span class="src-hpb" title="ホットペッパービューティー(サロンボード)経由の予約です。通知メールに電話番号・メールアドレスが含まれないため、電話番号はサロンボードの予約詳細で確認してください">HPB</span>';
+}
+// 電話番号欄に出す代替表示。予約番号を添えてサロンボードで引けるようにする
+function hpbPhoneNote(r) {
+  if (!isHpb(r) || (r && r.phone)) return '';
+  return '<span class="hpb-nocontact" title="サロンボードの通知メールには電話番号が含まれません。サロンボードの予約詳細(予約番号 ' + esc(r.id) + ')で確認してください">📋サロンボードで確認</span>';
+}
+// リマインド完了の判定。HPBはメールアドレスが無くメールリマインドを送れないため、
+// 電話リマインドだけで完了とみなす。そうしないと「リマインド未」に永久に残り続け、
+// 本当に未対応の予約が埋もれてしまう。
+function remindDone(r) { return isHpb(r) ? !!(r && r.remindTel) : !!(r && r.remindTel && r.remindMail); }
+
 function telLink(phone, query) {
   if (!phone) return '';
   const digits = normPhone(phone).replace(/[^\d+]/g, '');
@@ -3012,7 +3053,7 @@ function checkReminderGaps() {
     if (isReservationCancelled(r)) return false;
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today || d > tomorrow) return false;
-    return !(r.remindTel && r.remindMail);
+    return !remindDone(r);
   });
   if (targets.length > 0) {
     setTimeout(() => showToast(`📋 今日・明日の予約でリマインド未実施が ${targets.length}件あります(ツールバー「📋リマインド未」で確認できます)`, ''), 1200);
@@ -3051,13 +3092,18 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const qPhoneNorm = q ? normPhone(q) : ''; // phone search: strip hyphens etc from the query too, to match normPhone(r.phone)
   // 「要注意のみ」チップ: 予約タブでONの間だけ getCautionReservations() に載っているidに絞る
   const cautionIds = (tabId === 'reservations' && cautionFilterOn) ? new Set(getCautionReservations().map(o => o.r.id)) : null;
+  // 検索欄に「hpb」「サロンボード」等と入れたらHPB経由だけに絞り込めるようにする
+  // (1文字だと普通の検索を邪魔するので2文字以上・前方一致に限る)
+  const HPB_QUERY_KEYS = ['hpb', 'ホットペッパー', 'ホットペッパービューティー', 'サロンボード', 'salonboard'];
+  const isHpbQuery = qNorm.length >= 2 && HPB_QUERY_KEYS.some(k => k.startsWith(qNorm));
   let filtered = data.filter(r => {
     if (q) {
       const nameNorm = (r.name||'').replace(/[\s\u3000]/g, '').toLowerCase();
       const phoneNorm = normPhone(r.phone);
       const match = nameNorm.includes(qNorm) || (qPhoneNorm && phoneNorm.includes(qPhoneNorm)) || (r.phone||'').includes(q) ||
         (r.datetime||'').includes(q) || (r.menu||'').toLowerCase().includes(q) ||
-        (r.email||'').toLowerCase().includes(q) || (r.comment||'').toLowerCase().includes(q);
+        (r.email||'').toLowerCase().includes(q) || (r.comment||'').toLowerCase().includes(q) ||
+        (isHpbQuery && isHpb(r));
       if (!match) return false;
     }
     if (dateFrom || dateTo) {
@@ -3069,7 +3115,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
     if (tabId === 'reservations' && remindFilterOn) {
       const d = (r.datetime || '').substring(0, 10);
       if (!d || d < todayStr() || isReservationCancelled(r)) return false;
-      if (r.remindTel && r.remindMail) return false;
+      if (remindDone(r)) return false;
     }
     if (cautionIds && !cautionIds.has(r.id)) return false;
     return true;
@@ -3166,7 +3212,9 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
           const telDate = telDone ? `<div class="remind-date">${esc((r.remindTel||'').substring(5,10).replace('-','/'))}</div>` : '';
           const mailDate = mailDone ? `<div class="remind-date">${esc((r.remindMail||'').substring(5,10).replace('-','/'))}</div>` : '';
           remindCols = `<td data-label="📞電話" style="text-align:center"><label class="tap-check"><input type="checkbox" class="remind-check" ${telDone?'checked':''} onchange="toggleRemind('${r.id}','tel',this)" title="${telDone ? 'リマインド電話済: '+esc(r.remindTel) : 'リマインド電話をしたらチェック'}"></label>${telDate}</td>` +
-                       `<td data-label="✉️メール" style="text-align:center"><label class="tap-check"><input type="checkbox" class="remind-check" ${mailDone?'checked':''} onchange="toggleRemind('${r.id}','mail',this)" title="${mailDone ? 'リマインドメール済: '+esc(r.remindMail) : 'リマインドメールを送ったらチェック'}"></label>${mailDate}</td>`;
+                       (isHpb(r)
+                         ? `<td data-label="✉️メール" style="text-align:center" title="HPB経由は通知メールにメールアドレスが含まれないため、メールリマインドは送れません(対象外)"><span class="hpb-dash">—</span></td>`
+                         : `<td data-label="✉️メール" style="text-align:center"><label class="tap-check"><input type="checkbox" class="remind-check" ${mailDone?'checked':''} onchange="toggleRemind('${r.id}','mail',this)" title="${mailDone ? 'リマインドメール済: '+esc(r.remindMail) : 'リマインドメールを送ったらチェック'}"></label>${mailDate}</td>`);
         }
       }
       // リピーターバッジ（予約リストのみ）
@@ -3210,13 +3258,13 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td class="card-header-cell"><span class="ch-time">${timeOnly(r.datetime)}</span><span class="ch-name">${esc(r.name)}</span></td>
       <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
       <td data-label="予約日時" class="date-cell">${fmtDateCellHTML(r.datetime)}</td>
-      <td data-label="メニュー" class="menu-cell">${r.source === 'hpb' ? '<span class="src-hpb">HPB</span>' : ''}${highlightMatch(r.menu, q)}</td>
+      <td data-label="メニュー" class="menu-cell">${hpbBadge(r)}${highlightMatch(r.menu, q)}</td>
       <td data-label="氏名" class="name-cell">
         <div class="name-primary">${highlightMatch(r.name, q)}</div>
         ${r.email ? `<div class="name-email">${esc(r.email)}</div>` : ''}
       </td>
       <td data-label="注意" class="caution-cell">${cautionContent}</td>
-      <td data-label="電話" class="phone-cell">${telLink(r.phone, q)}</td>
+      <td data-label="電話" class="phone-cell">${telLink(r.phone, q) || hpbPhoneNote(r)}</td>
       <td data-label="コメント" class="comment-cell" onclick="this.classList.toggle('expanded')">${esc(r.comment)}</td>
       <td data-label="${recvLabel}" class="date-cell">${fmtDateCellHTML(r.receivedAt)}</td>
       ${remindCols}${samedayCol}${noshowCol}${kubunCol}${badgeCol}
@@ -3557,11 +3605,13 @@ function renderTodaySummary() {
       const itemCls = lv === 'dup' ? ' today-dup' : (lv === 'samename' ? ' today-samename' : '');
       const remind = ` <span class="remind-pill-group">` +
         `<span class="remind-pill ${r.remindTel?'is-done':'is-pending'}" title="📞電話リマインド${r.remindTel?'済':'未'}">📞${r.remindTel?'済':'未'}</span>` +
-        `<span class="remind-pill ${r.remindMail?'is-done':'is-pending'}" title="✉️メールリマインド${r.remindMail?'済':'未'}">✉️${r.remindMail?'済':'未'}</span>` +
+        (isHpb(r)
+          ? `<span class="remind-pill is-na" title="HPB経由はメールアドレスが無いため、メールリマインドは対象外です">✉️—</span>`
+          : `<span class="remind-pill ${r.remindMail?'is-done':'is-pending'}" title="✉️メールリマインド${r.remindMail?'済':'未'}">✉️${r.remindMail?'済':'未'}</span>`) +
         `</span>`;
       return `<div class="today-item${past ? ' today-past' : ''}${itemCls}">
         <span class="today-time">${time}</span>
-        <span class="today-name">${r.source === 'hpb' ? '<span class="src-hpb">HPB</span>' : ''}${esc(r.name)}${warn}${dup}${remind}</span>
+        <span class="today-name">${hpbBadge(r)}${esc(r.name)}${warn}${dup}${remind}</span>
         <span class="today-menu">${esc(r.menu)}</span>
         <span style="font-size:12px;color:var(--color-neutral-muted)" class="phone-cell">${telLink(r.phone)}</span>
       </div>`;
@@ -4242,23 +4292,23 @@ function exportExcel() {
   const wb = XLSX.utils.book_new();
   const today = new Date().toISOString().slice(0,10);
   if (activeTab === 'reservations') {
-    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','受付日時','キャンセル済','📞電話リマインド','✉️メールリマインド'];
+    const h = ['ID','経路','予約日時','メニュー','氏名','電話番号','メール','コメント','受付日時','キャンセル済','📞電話リマインド','✉️メールリマインド'];
     const rows = reservations.map(r => [
-      r.id, r.datetime, r.menu, r.name, r.phone, r.email, r.comment, r.receivedAt,
+      r.id, routeLabel(r), r.datetime, r.menu, r.name, r.phone, r.email, r.comment, r.receivedAt,
       isReservationCancelled(r) ? 'キャンセル済' : '',
       r.remindTel || '', r.remindMail || ''
     ]);
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
-    ws['!cols'] = [8,18,30,14,14,22,20,18,10,18,18].map(w=>({wch:w}));
+    ws['!cols'] = [12,6,18,30,14,14,22,20,18,10,18,18].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, '予約者リスト');
     XLSX.writeFile(wb, `予約者リスト市原_${today}.xlsx`);
   } else if (activeTab === 'cancellations') {
     const furikaeSet1 = getFurikaeSet();
     const kubunLabel = { furikae:'振替', sameday:'当日', normal:'通常' };
-    const h = ['ID','予約日時','メニュー','氏名','電話番号','メール','コメント','キャンセル日時','区分'];
-    const rows = cancellations.map(r => [r.id,r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt, kubunLabel[getCancelKubun(r, furikaeSet1)]]);
+    const h = ['ID','経路','予約日時','メニュー','氏名','電話番号','メール','コメント','キャンセル日時','区分'];
+    const rows = cancellations.map(r => [r.id,routeLabel(r),r.datetime,r.menu,r.name,r.phone,r.email,r.comment,r.receivedAt, kubunLabel[getCancelKubun(r, furikaeSet1)]]);
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
-    ws['!cols'] = [8,18,30,14,14,22,20,18,8].map(w=>({wch:w}));
+    ws['!cols'] = [12,6,18,30,14,14,22,20,18,8].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, 'キャンセルリスト');
     XLSX.writeFile(wb, `キャンセルリスト市原_${today}.xlsx`);
   } else if (activeTab === 'sameday') {
@@ -4470,9 +4520,11 @@ function openRowDetailSheet(tabId, id) {
     const isCancelTab = tabId === 'cancellations';
     const cancelled = !isCancelTab && isReservationCancelled(r);
     push(isCancelTab ? 'キャンセル日時' : '予約日時', esc(fmtDT(r.datetime)) || '—');
-    push('メニュー', (r.source === 'hpb' ? '<span class="src-hpb">HPB</span>' : '') + (esc(r.menu) || '—'));
-    push('電話番号', telLink(r.phone) || '—');
-    push('メールアドレス', esc(r.email) || '—');
+    push('メニュー', hpbBadge(r) + (esc(r.menu) || '—'));
+    push('電話番号', telLink(r.phone) || hpbPhoneNote(r) || '—');
+    push('メールアドレス', esc(r.email) || (isHpb(r) ? '<span class="hpb-nocontact" title="サロンボードの通知メールにはメールアドレスが含まれません">HPBのため取得できません</span>' : '—'));
+    // サロンボードで予約を引くための番号。HPBのときだけ出す
+    if (isHpb(r)) push('予約番号(サロンボード)', '<span style="font-family:ui-monospace,monospace;letter-spacing:.5px">' + esc(r.id) + '</span>');
     push('コメント', r.comment ? esc(r.comment).replace(/\n/g, '<br>') : '—');
     push(isCancelTab ? 'キャンセル受付日時' : '受付日時', esc(fmtDT(r.receivedAt)) || '—');
     if (!isCancelTab) {
@@ -4494,7 +4546,9 @@ function openRowDetailSheet(tabId, id) {
       const remindable = rd && rd >= todayStr() && !cancelled;
       if (remindable) {
         actionsHtml += `
-          <label class="rds-check-row"><input type="checkbox" class="remind-check" ${r.remindTel ? 'checked' : ''} onchange="toggleRemind('${r.id}','tel',this);openRowDetailSheet('${tabId}','${r.id}')"> 📞電話リマインド 実施済み</label>
+          <label class="rds-check-row"><input type="checkbox" class="remind-check" ${r.remindTel ? 'checked' : ''} onchange="toggleRemind('${r.id}','tel',this);openRowDetailSheet('${tabId}','${r.id}')"> 📞電話リマインド 実施済み</label>`;
+        // HPB経由は送る先が無いのでメールリマインドのチェックは出さない
+        if (!isHpb(r)) actionsHtml += `
           <label class="rds-check-row"><input type="checkbox" class="remind-check" ${r.remindMail ? 'checked' : ''} onchange="toggleRemind('${r.id}','mail',this);openRowDetailSheet('${tabId}','${r.id}')"> ✉️メールリマインド 実施済み</label>`;
       }
       if (!cancelled) {
