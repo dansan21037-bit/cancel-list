@@ -246,6 +246,9 @@
   .date-cell .date-full { font-size: 11px; color: var(--color-neutral-muted); margin-top: 1px; }
   .note-cell { color: var(--color-neutral-strong); font-size: 13px; max-width: 260px; }
   .menu-cell { font-size: 13px; max-width: 280px; color: var(--color-neutral); }
+  /* HOT PEPPER Beauty(サロンボード)経由の予約に付ける出所バッジ */
+  .src-hpb { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; background: #f25c3d;
+    border-radius: 4px; padding: 1px 5px; margin-right: 5px; letter-spacing: .5px; vertical-align: 1px; }
   .comment-cell { font-size: 12px; max-width: 150px; color: var(--color-neutral-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   .comment-cell:hover, .comment-cell.expanded { white-space: normal; overflow: visible; position: relative; z-index: 10; background: var(--color-surface); box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius: 4px; padding: 4px 6px; }
   /* 検索語ハイライト(専用トークン。危険/注意等の意味色とは独立) */
@@ -1458,6 +1461,36 @@ function normPhone(p) {
     .replace(/[-\s　ー－()（）]/g, '');
 }
 function normName(n) { return (n||'').replace(/[\s　]/g, '').trim(); }
+// ── 同一人物の名寄せ ────────────────────────────────────────────────────
+// 電話番号と氏名の両方でカウントし、参照時は大きい方を採る。
+// HPB(サロンボード)経由の予約は通知メールに電話番号が載らないため、氏名でしか名寄せできない。
+// キーに 'p:' / 'n:' の接頭辞を付けるのは、電話が空のレコード同士や
+// 「電話番号と同じ文字列の氏名」が偶然ぶつかるのを防ぐため。空のキーは数えない。
+function bumpCount(map, rec) {
+  const p = normPhone(rec && rec.phone); if (p) map['p:' + p] = (map['p:' + p] || 0) + 1;
+  const n = normName(rec && rec.name);   if (n) map['n:' + n] = (map['n:' + n] || 0) + 1;
+}
+function countOf(map, rec) {
+  if (!map) return 0;
+  const p = normPhone(rec && rec.phone), n = normName(rec && rec.name);
+  return Math.max(p ? (map['p:' + p] || 0) : 0, n ? (map['n:' + n] || 0) : 0);
+}
+// 1人を1つのキーで表す(電話が最優先、無ければ氏名)。両方無ければ '' を返す。
+// blockKeyOf と同じ規則。振替判定や当日キャンセルの二重計上除外で使う。
+function personKeyOf(rec) { return blockKeyOf(rec && rec.phone, rec && rec.name); }
+
+// ── サロンボードの取り込み対象外メールを記憶する ──────────────────────
+// 「ご予約内容の変更」など未対応種別のメールは解析できずに毎回捨てられるため、
+// 覚えておかないと毎回本文をダウンロードし直して取得枠(maxFetch)を食い潰す。
+const SB_SKIP_KEY = 'sbSkipped_kawaguchi';
+function loadSbSkipped() {
+  try { return new Set(JSON.parse(localStorage.getItem(SB_SKIP_KEY) || '[]')); } catch(e) { return new Set(); }
+}
+function saveSbSkipped(set) {
+  // 際限なく増えないよう直近500件だけ残す(古い分は窓から外れて再取得もされない)
+  try { localStorage.setItem(SB_SKIP_KEY, JSON.stringify(Array.from(set).slice(-500))); } catch(e) {}
+}
+
 // 電話番号をtel:リンク化(見た目は通常テキストに近く、スマホでタップすると発信できる)
 function telLink(phone, query) {
   if (!phone) return '';
@@ -1476,14 +1509,9 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function getNoshowPhoneCountMap() {
+function getNoshowCountMap() {
   const m = {};
-  noshows.forEach(n => { const p = normPhone(n.phone); if (p) m[p] = (m[p]||0)+1; });
-  return m;
-}
-function getNoshowNameCountMap() {
-  const m = {};
-  noshows.forEach(n => { const k = normName(n.name); if (k) m[k] = (m[k]||0)+1; });
+  noshows.forEach(n => bumpCount(m, n));
   return m;
 }
 
@@ -1521,20 +1549,20 @@ function parseDTms(s) {
 // 振替と判定したキャンセルの id を集めた Set を返す(手動区分を優先)
 function getFurikaeSet() {
   const set = new Set();
-  const resByPhone = {};
+  const resByKey = {};
   reservations.forEach(r => {
-    const pn = normPhone(r.phone);
+    const pn = personKeyOf(r);   // 電話が無ければ氏名で名寄せ(HPB経由は電話が載らない)
     const t = parseDTms(r.receivedAt);
     if (!pn || isNaN(t)) return;
-    (resByPhone[pn] = resByPhone[pn] || []).push({ id: String(r.id), t });
+    (resByKey[pn] = resByKey[pn] || []).push({ id: String(r.id), t });
   });
   cancellations.forEach(c => {
     if (c.kubunOverride === 'furikae') { set.add(c.id); return; }
     if (c.kubunOverride) return; // 手動で当日/通常に固定済み → 自動判定しない
-    const pn = normPhone(c.phone);
+    const pn = personKeyOf(c);
     const ct = parseDTms(c.receivedAt);
     if (!pn || isNaN(ct)) return;
-    const list = resByPhone[pn] || [];
+    const list = resByKey[pn] || [];
     if (list.some(x => x.id !== String(c.id) && Math.abs(x.t - ct) <= FURIKAE_WINDOW_MS)) set.add(c.id);
   });
   return set;
@@ -1563,15 +1591,17 @@ function getSamedayList() {
   });
   // 手動登録後に同一の出来事のキャンセルメールが届くと二重計上されるため、
   // 自動(メール)分と「電話番号+日付」が一致する手動分は表示・集計から除外する
-  const autoKeys = new Set(auto.map(a => normPhone(a.phone) + '|' + a.date).filter(k => k !== '|'));
+  // 電話も氏名も無いレコードはキーが空になる。空同士が「同じ人」と誤って一致して
+  // 手動登録分が黙って消えるのを防ぐため、キーが空の場合は除外判定に掛けない。
+  const autoKeys = new Set(auto.map(a => { const k = personKeyOf(a); return k ? k + '|' + a.date : ''; }).filter(Boolean));
   const manual = samedayManual
-    .filter(s => !autoKeys.has(normPhone(s.phone) + '|' + s.date))
+    .filter(s => { const k = personKeyOf(s); return !k || !autoKeys.has(k + '|' + s.date); })
     .map(s => Object.assign({ source: 'manual' }, s));
   return auto.concat(manual);
 }
 function getSamedayCounts() {
   const c = {};
-  getSamedayList().forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; });
+  getSamedayList().forEach(r => bumpCount(c, r));
   return c;
 }
 // 予約不可の判定に使う回数。「やむを得ない事情」の理由が付いた分は除外して数える
@@ -1579,7 +1609,7 @@ function getSamedayCountedCounts(list) {
   const c = {};
   (list || getSamedayList()).forEach(r => {
     if (!reasonCounts(r.reason)) return;
-    const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1;
+    bumpCount(c, r);
   });
   return c;
 }
@@ -1588,7 +1618,7 @@ function getSamedayExemptCounts(list) {
   const c = {};
   (list || getSamedayList()).forEach(r => {
     if (reasonCounts(r.reason)) return;
-    const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1;
+    bumpCount(c, r);
   });
   return c;
 }
@@ -1694,8 +1724,7 @@ function syncBlocklistAuto() {
     const k = blockKeyOf(n.phone, n.name);
     if (!k || nsSeen.has(k)) return;
     nsSeen.add(k);
-    const p = normPhone(n.phone);
-    const nsCnt = p ? (nsCounts[p] || 0) : 1;
+    const nsCnt = countOf(nsCounts, n) || 1;
     const e = findBlockEntry(n.phone, n.name);
     if (!e && isBlockRecentlyDeleted(n.phone, n.name)) return; // 「元に戻す」待ちの間は作り直さない
     if (!e) {
@@ -1722,10 +1751,11 @@ function syncBlocklistAuto() {
   const seen = new Set();
   list.forEach(s => {
     const k = blockKeyOf(s.phone, s.name);
-    const p = normPhone(s.phone);
-    if (!k || !p || seen.has(k)) return;
+    // 電話番号が無くても氏名で名寄せできるなら判定する(HPB経由は通知に電話が載らないため、
+    // ここで電話必須にすると HPB のお客様が何回当日キャンセルしても確認待ちに上がらない)
+    if (!k || seen.has(k)) return;
     seen.add(k);
-    const cnt = counted[p] || 0;
+    const cnt = countOf(counted, s);
     if (cnt < SAMEDAY_BLOCK_THRESHOLD) return;
     const e = findBlockEntry(s.phone, s.name);
     if (!e && isBlockRecentlyDeleted(s.phone, s.name)) return; // 「元に戻す」待ちの間は作り直さない
@@ -1746,8 +1776,7 @@ function syncBlocklistAuto() {
   const before = blocklist.length;
   blocklist = blocklist.filter(e => {
     if (e.status !== 'pending' || e.source !== 'sameday') return true;
-    const p = normPhone(e.phone);
-    return (p ? (counted[p] || 0) : 0) >= SAMEDAY_BLOCK_THRESHOLD;
+    return countOf(counted, e) >= SAMEDAY_BLOCK_THRESHOLD;
   });
   changed += (before - blocklist.length);
   return changed;
@@ -1916,9 +1945,8 @@ function renderBlocklistTable(q, dateFrom, dateTo) {
       const tag = b.status === 'blocked' ? `<span class="tag-blocked">🚷 予約不可</span>`
                 : b.status === 'pending' ? `<span class="tag-blockpending">⏳ 確認待ち</span>`
                 : `<span class="tag-blockexempt">✅ 免除</span>`;
-      const pn = normPhone(b.phone);
       const srcLabel = b.source === 'noshow' ? '🚫 無断キャンセル' : (b.source === 'sameday' ? '🟠 当日キャンセル' : '✍️ 手動登録');
-      const hist = `<span style="font-size:11px;color:var(--color-neutral-strong)">無断${pn ? (nsCounts[pn]||0) : 0}回 / 当日${pn ? (samedayCounted[pn]||0) : 0}回(実カウント)</span>`;
+      const hist = `<span style="font-size:11px;color:var(--color-neutral-strong)">無断${countOf(nsCounts, b)}回 / 当日${countOf(samedayCounted, b)}回(実カウント)</span>`;
       let actions = '';
       if (b.status === 'pending') {
         actions = `<button class="btn btn-danger btn-sm" onclick="blockSetBlocked('${b.id}')" title="予約不可にする">🚷 不可</button>
@@ -1947,12 +1975,7 @@ function renderBlocklistTable(q, dateFrom, dateTo) {
   document.getElementById('rowCount-blocklist').textContent =
     `${filtered.length}件 / 全${blocklist.length}件（🚷予約不可${nBlocked} ⏳確認待ち${nPending}）`;
 }
-function getSamedayPhoneCountMap() { return getSamedayCounts(); }
-function getSamedayNameCountMap() {
-  const m = {};
-  getSamedayList().forEach(r => { const k = normName(r.name); if (k) m[k] = (m[k]||0)+1; });
-  return m;
-}
+function getSamedayCountMap() { return getSamedayCounts(); }
 
 // ── 同日・同名の重複検出 ────────────────────────────────────────────────
 // 同じ「日付＋正規化氏名」で2件以上ある組を検出（スペース有無/全半角の違いは吸収）
@@ -2386,14 +2409,22 @@ async function autoFetchEmails() {
     const afterDate = getSearchDate('lastFetchTime_kawaguchi', '2025/06/01');
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
-    const [resMsg, canMsg] = await Promise.all([
-      fetchGmailMessages(q1, true, 30, 100),
-      fetchGmailMessages(q2, true, 30, 100)
+    const qSb = 'from:yoyaku_system@salonboard.com after:' + afterDate;
+    // 1つの検索が失敗しても他の取り込みを巻き添えにしない。
+    // ただし1つでも失敗したら「取得済み」の日付は進めず、次回もう一度その窓を見に行く
+    let fetchFailed = false;
+    const safeFetch = (p) => p.catch(e => { fetchFailed = true; console.warn('メール取得スキップ:', e && e.message); return []; });
+    const [resMsg, canMsg, sbMsg] = await Promise.all([
+      safeFetch(fetchGmailMessages(q1, true, 30, 100)),
+      safeFetch(fetchGmailMessages(q2, true, 30, 100)),
+      safeFetch(fetchGmailMessages(qSb, true, 30, 100))
     ]);
     const beforeIds = new Set(reservations.map(x => x.id));
-    const newRes = await processEmails(resMsg, 'reservation');
-    const newCan = await processEmails(canMsg, 'cancellation');
-    localStorage.setItem('lastFetchTime_kawaguchi', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
+    let newRes = await processEmails(resMsg, 'reservation');
+    let newCan = await processEmails(canMsg, 'cancellation');
+    const sb = processSalonBoardEmails(sbMsg);
+    newRes += sb.res; newCan += sb.can;
+    if (!fetchFailed) localStorage.setItem('lastFetchTime_kawaguchi', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
     localStorage.setItem('lastFetchAt_kawaguchi', String(Date.now()));
     updateLastFetchInfo();
     if (newRes > 0 || newCan > 0) {
@@ -2425,13 +2456,22 @@ async function fetchEmails() {
     const afterDate = getSearchDate('lastFetchTime_kawaguchi', '2025/06/01');
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + afterDate;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + afterDate;
+    const qSb = 'from:yoyaku_system@salonboard.com after:' + afterDate;
     const resMsg = await fetchGmailMessages(q1, false, 60, 200);
     if (fetchCancelled) return;
     const canMsg = await fetchGmailMessages(q2, false, 60, 200);
     if (fetchCancelled) return;
+    // HPB分の取得に失敗しても、現行システム分の取り込みは止めない
+    // (次回以降のさかのぼり再走査で拾い直せる)
+    let sbMsg = [];
+    try { sbMsg = await fetchGmailMessages(qSb, false, 60, 200); }
+    catch (e) { console.warn('サロンボード分の取得に失敗:', e && e.message); }
+    if (fetchCancelled) return;
     const beforeIds = new Set(reservations.map(x => x.id));
-    const newRes = await processEmails(resMsg, 'reservation');
-    const newCan = await processEmails(canMsg, 'cancellation');
+    let newRes = await processEmails(resMsg, 'reservation');
+    let newCan = await processEmails(canMsg, 'cancellation');
+    const sb = processSalonBoardEmails(sbMsg);
+    newRes += sb.res; newCan += sb.can;
     localStorage.setItem('lastFetchTime_kawaguchi', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
     localStorage.setItem('lastFetchAt_kawaguchi', String(Date.now()));
     updateLastFetchInfo();
@@ -2471,12 +2511,17 @@ async function fullRescan() {
     const after = startDate.trim();
     const q1 = 'subject:オンライン予約が入りました 1980 after:' + after;
     const q2 = 'subject:オンライン予約がキャンセルされました 1980 after:' + after;
+    const qSb = 'from:yoyaku_system@salonboard.com after:' + after;
     const resMsg = await fetchGmailMessages(q1, false, 1000, 1000);
     if (fetchCancelled) return;
     const canMsg = await fetchGmailMessages(q2, false, 1000, 1000);
     if (fetchCancelled) return;
-    const newRes = await processEmails(resMsg, 'reservation');
-    const newCan = await processEmails(canMsg, 'cancellation');
+    const sbMsg = await fetchGmailMessages(qSb, false, 1000, 1000);
+    if (fetchCancelled) return;
+    let newRes = await processEmails(resMsg, 'reservation');
+    let newCan = await processEmails(canMsg, 'cancellation');
+    const sb = processSalonBoardEmails(sbMsg);
+    newRes += sb.res; newCan += sb.can;
     localStorage.setItem('lastFetchTime_kawaguchi', new Date().toISOString().slice(0,10).replace(/-/g,'/'));
     localStorage.setItem('lastFetchAt_kawaguchi', String(Date.now()));
     updateLastFetchInfo();
@@ -2533,7 +2578,8 @@ async function fetchGmailMessages(query, silent, maxFetch, maxList) {
     ...reservations.filter(r => r.datetime).map(r => r.gmailMsgId).filter(Boolean),
     ...cancellations.filter(r => r.datetime).map(r => r.gmailMsgId).filter(Boolean)
   ]);
-  const toFetch = allListed.filter(m => !existingIds.has(m.id)).slice(0, maxFetch || 15);
+  const sbSkipped = loadSbSkipped();   // 解析できずに捨てたメールは本文を取り直さない
+  const toFetch = allListed.filter(m => !existingIds.has(m.id) && !sbSkipped.has(m.id)).slice(0, maxFetch || 15);
   if (toFetch.length === 0) return messages;
 
   // 1件ずつ順番に取得（安定性重視）
@@ -2550,7 +2596,8 @@ async function fetchGmailMessages(query, silent, maxFetch, maxList) {
       clearTimeout(timer);
       if (resp.ok) {
         const data = await resp.json();
-        messages.push({ id: m.id, body: getMessageBody(data) });
+        // internalDate はサロンボードのキャンセルメール(本文に時刻が無い)の受付時刻に使う
+        messages.push({ id: m.id, body: getMessageBody(data), internalDate: data.internalDate });
       }
     } catch(e) {
       clearTimeout(timer);
@@ -2668,6 +2715,109 @@ function parseCancellationEmail(body) {
   } catch(e) { console.error('Parse error:', e); return null; }
 }
 
+// ── SALON BOARD (HOT PEPPER Beauty) Parser ──────────────────────────────
+// HPB経由の通知(差出人 yoyaku_system@salonboard.com)は本文が「■ラベル」+次行に値、という
+// 現行システムとは別書式なので専用に解析する。クラウド版・GAS版と同じ実装。
+function parseSalonBoardEmail(body) {
+  try {
+    if (!body || body.indexOf('SALON BOARD') === -1) return null;
+    let type = null;
+    if (body.indexOf('ご予約のキャンセルがありました') !== -1) type = 'cancellation';
+    else if (body.indexOf('ご予約が入りました') !== -1) type = 'reservation';
+    if (!type) return null;   // 「ご予約内容の変更」等は未対応
+    const pad2 = (n) => String(n).padStart(2, '0');
+    // 「■ラベル」の次の行(全角スペース字下げ)を値として読む
+    const field = (label) => {
+      // 値はラベル行の「次の1行」に限定する。\s* が改行にもマッチする書き方だと、
+      // 値が空のフィールドがあったときに次のラベル行を値として拾ってしまう
+      // (例: 予約番号が空 → id が '■氏名' というゴミIDになる)
+      const lb = String(label).replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
+      const m = body.match(new RegExp('■' + lb + '[^\\S\\r\\n]*\\r?\\n[ \\t　]*([^\\r\\n]*)'));
+      return m ? m[1].trim() : '';
+    };
+    // 予約番号は data-id / onclick にそのまま埋め込まれるため、安全な文字だけに正規化する
+    // (予約側とキャンセル側で同じ正規化を通すので、突合は崩れない)
+    const id = field('予約番号').replace(/[^0-9A-Za-z_-]/g, '');
+    if (!id) return null;
+    const dm = field('来店日時').match(/(\d{4})年(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{2})/);
+    if (!dm) return null;
+    const datetime = dm[1] + '-' + pad2(dm[2]) + '-' + pad2(dm[3]) + ' ' + pad2(dm[4]) + ':' + pad2(dm[5]);
+    // 「山田 太郎（ヤマダ タロウ）」→ かな括弧を除いた氏名にする
+    const name = field('氏名').replace(/[（(][^（()）]*[)）]\s*$/, '').trim();
+    // メニュー欄にはクーポン名(初回オファー名)を優先して出し、実メニューはコメントへ
+    const coupon = field('ご利用クーポン');
+    const menuLine = field('メニュー');
+    const menu = coupon || menuLine;
+    const parts = [];
+    if (coupon && menuLine) parts.push('メニュー: ' + menuLine);
+    const wish = field('ご要望・ご相談');
+    if (wish && wish !== '-') parts.push('要望: ' + wish);
+    let receivedAt = '';
+    if (type === 'reservation') {
+      const rm = body.match(/予約受付日時[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{2})/);
+      if (rm) receivedAt = rm[1] + '-' + pad2(rm[2]) + '-' + pad2(rm[3]) + ' ' + pad2(rm[4]) + ':' + pad2(rm[5]);
+    }
+    return { source: 'hpb', type, id, datetime, menu, name, email: '', phone: '',
+             comment: parts.join(' / '), receivedAt };
+  } catch(e) { console.error('SalonBoard parse error:', e); return null; }
+}
+
+// 端末のタイムゾーンに関係なく日本時間で 'YYYY-MM-DD HH:MM' を作る
+function fmtJstFromEpoch(ms) {
+  // 空文字を Number() に通すと 0(=1970年)になってしまうので、値が無いときは先に弾く
+  if (ms === '' || ms === null || ms === undefined) return '';
+  const d = new Date(Number(ms));
+  if (isNaN(d.getTime())) return '';
+  // UTCに+9時間して getUTC* で読む。getTimezoneOffset() を使う方式だと
+  // サマータイムのある地域の端末で境界日に1時間ずれる
+  const j = new Date(d.getTime() + 9 * 3600 * 1000);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  return j.getUTCFullYear() + '-' + pad2(j.getUTCMonth() + 1) + '-' + pad2(j.getUTCDate())
+       + ' ' + pad2(j.getUTCHours()) + ':' + pad2(j.getUTCMinutes());
+}
+
+// HPB分はメニュー名が案件ごとに違うため 1980円フィルタは適用しない(全部取り込む方針)
+function processSalonBoardEmails(messages) {
+  let cRes = 0, cCan = 0;
+  const parsedList = [];
+  const skipped = loadSbSkipped();
+  let skipDirty = false;
+  for (const msg of messages) {
+    const parsed = parseSalonBoardEmail(msg.body);
+    if (!parsed) {
+      // 「ご予約内容の変更」など未対応種別。次回から本文を取り直さないようIDを覚える
+      if (msg.id) { skipped.add(msg.id); skipDirty = true; }
+      continue;
+    }
+    // キャンセル本文には「いつキャンセルしたか」が無いため、メール到着時刻を受付時刻にする
+    if (!parsed.receivedAt && msg.internalDate) parsed.receivedAt = fmtJstFromEpoch(msg.internalDate);
+    parsed.gmailMsgId = msg.id;
+    parsedList.push(parsed);
+  }
+  if (skipDirty) saveSbSkipped(skipped);
+  // 予約を先に、キャンセルを後に処理する。同じ取得の中に両方が入っていた場合でも、
+  // キャンセルを処理する時点で元の予約が既にリストにあるようにするため(打ち消し表示が出る)
+  const ordered = parsedList.filter(p => p.type !== 'cancellation')
+    .concat(parsedList.filter(p => p.type === 'cancellation'));
+  for (const parsed of ordered) {
+    const list = parsed.type === 'cancellation' ? cancellations : reservations;
+    const existing = list.find(r => r.id === parsed.id);
+    if (!existing) {
+      list.push(parsed);
+      if (parsed.type === 'cancellation') cCan++; else cRes++;
+    } else if (!existing.datetime && parsed.datetime) {
+      Object.assign(existing, parsed);   // 既存データが空欄なら更新
+      if (parsed.type === 'cancellation') cCan++; else cRes++;
+    }
+    // キャンセルメール到着時、対応する予約に「キャンセル済み」フラグを付与
+    if (parsed.type === 'cancellation') {
+      const origRes = reservations.find(r => r.id === parsed.id);
+      if (origRes && !origRes.cancelledAt) origRes.cancelledAt = parsed.receivedAt || parsed.datetime || '1';
+    }
+  }
+  return { res: cRes, can: cCan };
+}
+
 // ── Local Storage ───────────────────────────────────────────────────────
 function loadData() {
   try {
@@ -2729,7 +2879,7 @@ function saveSettings() {
 
 // ── Counts ──────────────────────────────────────────────────────────────
 function getNoshowCounts() {
-  const c = {}; noshows.forEach(r => { const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1; }); return c;
+  const c = {}; noshows.forEach(r => bumpCount(c, r)); return c;
 }
 // 実キャンセル回数(振替=時間変更は除外)。dataがcancellationsのときだけ振替判定が効く
 function getCancelCounts(data) {
@@ -2738,7 +2888,7 @@ function getCancelCounts(data) {
   const c = {};
   data.forEach(r => {
     if (isCancelList && getCancelKubun(r, furikaeSet) === 'furikae') return;
-    const p = normPhone(r.phone); if (p) c[p] = (c[p] || 0) + 1;
+    bumpCount(c, r);
   });
   return c;
 }
@@ -2930,10 +3080,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const tbody = document.getElementById('tbody-' + tabId);
   const empty = document.getElementById('empty-' + tabId);
   const counts = getCancelCounts(data);
-  const noshowPhoneMap = getNoshowPhoneCountMap();
-  const noshowNameMap = getNoshowNameCountMap();
-  const samedayPhoneMap = getSamedayPhoneCountMap();
-  const samedayNameMap = getSamedayNameCountMap();
+  const noshowMap = getNoshowCountMap();
+  const samedayMap = getSamedayCountMap();
   const samedayExemptMap = getSamedayExemptCounts(); // 「やむを得ない事情」として除外した件数
   const dupMap = buildDupGroups(data); // 同日同名検出（予約・キャンセル各リスト内）
   const furikaeSet = (tabId === 'cancellations') ? getFurikaeSet() : null; // キャンセル区分表示用
@@ -2956,19 +3104,17 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
     tbody.innerHTML = filtered.map((r, i) => {
       const pn = normPhone(r.phone);
       const nn = normName(r.name);
-      const cnt = pn ? (counts[pn] || 1) : 1;
+      const cnt = countOf(counts, r) || 1;
       const isCancelTab = (tabId === 'cancellations');
       const isResTab = (tabId === 'reservations');
       const isCancelled = isResTab && isReservationCancelled(r);
       // 過去無断キャンセル者の警告（予約リストのみ）
-      const nsByPhone = pn ? (noshowPhoneMap[pn] || 0) : 0;
-      const nsByName = nn ? (noshowNameMap[nn] || 0) : 0;
-      const nsCnt = Math.max(nsByPhone, nsByName);
+      const nsCnt = countOf(noshowMap, r);
       const noshowWarn = (isResTab && nsCnt > 0) ? ` <span class="badge-noshow-warn" title="過去の無断キャンセル ${nsCnt}回">⚠️無断${nsCnt}</span>` : '';
       // 当日キャンセル回数バッジ（予約・キャンセル両方に表示）
       // 総数を主に出しつつ、「やむを得ない事情」で回数に数えなかった分を(情状N)として併記する
-      const sdCnt = Math.max(pn ? (samedayPhoneMap[pn]||0) : 0, nn ? (samedayNameMap[nn]||0) : 0);
-      const sdExempt = pn ? (samedayExemptMap[pn] || 0) : 0;
+      const sdCnt = countOf(samedayMap, r);
+      const sdExempt = countOf(samedayExemptMap, r);
       const sdSuffix = sdExempt > 0 ? `(情状${sdExempt})` : '';
       const sdTitle = sdExempt > 0
         ? `当日キャンセル ${sdCnt}回（うち${sdExempt}回はやむを得ない事情として回数に数えていません）`
@@ -3061,7 +3207,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       <td class="card-header-cell"><span class="ch-time">${timeOnly(r.datetime)}</span><span class="ch-name">${esc(r.name)}</span></td>
       <td class="row-index-cell" style="color:var(--color-neutral-muted);font-size:12px">${i+1}</td>
       <td data-label="予約日時" class="date-cell">${fmtDateCellHTML(r.datetime)}</td>
-      <td data-label="メニュー" class="menu-cell">${highlightMatch(r.menu, q)}</td>
+      <td data-label="メニュー" class="menu-cell">${r.source === 'hpb' ? '<span class="src-hpb">HPB</span>' : ''}${highlightMatch(r.menu, q)}</td>
       <td data-label="氏名" class="name-cell">
         <div class="name-primary">${highlightMatch(r.name, q)}</div>
         ${r.email ? `<div class="name-email">${esc(r.email)}</div>` : ''}
@@ -3095,8 +3241,8 @@ function renderNoshowTable(q, dateFrom, dateTo) {
     return true;
   });
   filtered.sort((a, b) => {
-    const va = sortKey === 'count' ? (counts[normPhone(a.phone)]||1) : (a[sortKey]||'');
-    const vb = sortKey === 'count' ? (counts[normPhone(b.phone)]||1) : (b[sortKey]||'');
+    const va = sortKey === 'count' ? (countOf(counts, a)||1) : (a[sortKey]||'');
+    const vb = sortKey === 'count' ? (countOf(counts, b)||1) : (b[sortKey]||'');
     if (va < vb) return -sortDir;
     if (va > vb) return sortDir;
     return 0;
@@ -3107,7 +3253,7 @@ function renderNoshowTable(q, dateFrom, dateTo) {
   else {
     empty.style.display = 'none';
     tbody.innerHTML = filtered.map((r, i) => {
-      const cnt = counts[normPhone(r.phone)] || 1;
+      const cnt = countOf(counts, r) || 1;
       const rc = cnt >= 3 ? 'row-red' : cnt === 2 ? 'row-orange' : '';
       const bc = cnt >= 3 ? 'badge-3' : cnt === 2 ? 'badge-2' : 'badge-1';
       const dateCellHTML = fmtDateCellPartsHTML(r.date);
@@ -3147,8 +3293,8 @@ function renderSamedayTable(q, dateFrom, dateTo) {
     return true;
   });
   filtered.sort((a, b) => {
-    const va = sortKey === 'count' ? (counts[normPhone(a.phone)]||1) : (a[sortKey]||'');
-    const vb = sortKey === 'count' ? (counts[normPhone(b.phone)]||1) : (b[sortKey]||'');
+    const va = sortKey === 'count' ? (countOf(counts, a)||1) : (a[sortKey]||'');
+    const vb = sortKey === 'count' ? (countOf(counts, b)||1) : (b[sortKey]||'');
     if (va < vb) return -sortDir;
     if (va > vb) return sortDir;
     return 0;
@@ -3159,7 +3305,7 @@ function renderSamedayTable(q, dateFrom, dateTo) {
   else {
     empty.style.display = 'none';
     tbody.innerHTML = filtered.map((r, i) => {
-      const cnt = counts[normPhone(r.phone)] || 1;
+      const cnt = countOf(counts, r) || 1;
       const rc = cnt >= 3 ? 'row-sameday-3' : cnt === 2 ? 'row-sameday-2' : '';
       const bc = cnt >= 3 ? 'badge-sd3' : cnt === 2 ? 'badge-sd2' : 'badge-1';
       const dateCellHTML = fmtDateCellPartsHTML(r.date);
@@ -3273,16 +3419,14 @@ function deleteSameday(id) {
 // 今日以降の予約のうち、過去に無断 or 当日キャンセルが1回でもある人を抽出
 function getCautionReservations() {
   const today = todayStr();
-  const nsP = getNoshowPhoneCountMap(), nsN = getNoshowNameCountMap();
-  const sdP = getSamedayPhoneCountMap(), sdN = getSamedayNameCountMap();
+  const nsMap = getNoshowCountMap(), sdMap = getSamedayCountMap();
   const out = [];
   reservations.forEach(r => {
     if (isReservationCancelled(r)) return; // キャンセル済みは「来る予定」から除外
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today) return; // 今日以降のみ
-    const pn = normPhone(r.phone), nn = normName(r.name);
-    const ns = Math.max(pn ? (nsP[pn]||0) : 0, nn ? (nsN[nn]||0) : 0);
-    const sd = Math.max(pn ? (sdP[pn]||0) : 0, nn ? (sdN[nn]||0) : 0);
+    const ns = countOf(nsMap, r);
+    const sd = countOf(sdMap, r);
     const blocked = isBlockedCustomer(r.phone, r.name);
     if (ns > 0 || sd > 0 || blocked) out.push({ r, ns, sd, d, blocked });
   });
@@ -3295,17 +3439,15 @@ function getCautionReservations() {
 }
 // 取得時アラート用: 新規に入った今日以降の予約のうち要注意客を返す
 function getNewCautionAlerts(beforeIds) {
-  const nsP = getNoshowPhoneCountMap(), nsN = getNoshowNameCountMap();
-  const sdP = getSamedayPhoneCountMap(), sdN = getSamedayNameCountMap();
+  const nsMap = getNoshowCountMap(), sdMap = getSamedayCountMap();
   const today = todayStr();
   const out = [];
   reservations.forEach(r => {
     if (beforeIds.has(r.id) || isReservationCancelled(r)) return;
     const d = (r.datetime || '').substring(0, 10);
     if (!d || d < today) return;
-    const pn = normPhone(r.phone), nn = normName(r.name);
-    const ns = Math.max(pn ? (nsP[pn]||0) : 0, nn ? (nsN[nn]||0) : 0);
-    const sd = Math.max(pn ? (sdP[pn]||0) : 0, nn ? (sdN[nn]||0) : 0);
+    const ns = countOf(nsMap, r);
+    const sd = countOf(sdMap, r);
     const blocked = isBlockedCustomer(r.phone, r.name);
     if (ns > 0 || sd > 0 || blocked) out.push({ r, ns, sd, blocked });
   });
@@ -3399,15 +3541,13 @@ function renderTodaySummary() {
   if (list.length === 0) {
     cont.innerHTML = `<div style="padding:8px 12px;color:var(--color-neutral-strong);font-size:13px;background:var(--color-surface);border-radius:8px">本日の予約はありません</div>`;
   } else {
-    const noshowPhoneMap = getNoshowPhoneCountMap();
-    const noshowNameMap = getNoshowNameCountMap();
+    const noshowMap = getNoshowCountMap();
     const dupMap = buildDupGroups(list); // 本日内の同日同名検出
     cont.innerHTML = list.map(r => {
       const m = (r.datetime||'').match(/(\d{1,2}:\d{2})/);
       const time = m ? m[1] : '--:--';
       const past = isPastDateTime(r.datetime);
-      const pn = normPhone(r.phone), nn = normName(r.name);
-      const nsCnt = Math.max(pn ? (noshowPhoneMap[pn]||0) : 0, nn ? (noshowNameMap[nn]||0) : 0);
+      const nsCnt = countOf(noshowMap, r);
       const warn = nsCnt > 0 ? ` <span class="badge-noshow-warn">⚠️無断${nsCnt}</span>` : '';
       const dup = dupBadgeFor(r, dupMap);
       const lv = dupLevelFor(r, dupMap);
@@ -3418,7 +3558,7 @@ function renderTodaySummary() {
         `</span>`;
       return `<div class="today-item${past ? ' today-past' : ''}${itemCls}">
         <span class="today-time">${time}</span>
-        <span class="today-name">${esc(r.name)}${warn}${dup}${remind}</span>
+        <span class="today-name">${r.source === 'hpb' ? '<span class="src-hpb">HPB</span>' : ''}${esc(r.name)}${warn}${dup}${remind}</span>
         <span class="today-menu">${esc(r.menu)}</span>
         <span style="font-size:12px;color:var(--color-neutral-muted)" class="phone-cell">${telLink(r.phone)}</span>
       </div>`;
@@ -3739,7 +3879,7 @@ function timeOnly(dt) {
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // 検索ハイライト用: 正規表現の特殊文字をエスケープ(ユーザー入力をそのまま正規表現に渡さないため)
-function escRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function escRegExp(s) { return s.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&'); }
 // esc()でHTMLエスケープした「後」に、一致箇所だけ<mark>で囲む(順序が逆だと二重エスケープ/構造破壊の危険)。
 // マッチ結果mはescText由来の部分文字列そのものなので、そのまま挿入して安全。
 // normPhone正規化桁だけが一致するケース(表示は"090-1234-5678"だが検索語がハイフン無し等)は、
@@ -3915,11 +4055,13 @@ function moveToNoshow(reservationId, checkbox) {
   const r = reservations.find(x => x.id === reservationId);
   if (!r) { if (checkbox) checkbox.checked = false; return; }
   // 既に登録済みか確認
-  const existingNoshow = noshows.filter(n => n.phone === r.phone);
+  // 電話番号の生比較だと「電話が空同士」が一致してしまい、無関係な人の件数を警告していた
+  const rk = personKeyOf(r);
+  const existingNoshow = rk ? noshows.filter(n => personKeyOf(n) === rk) : [];
   const countAfter = existingNoshow.length + 1;
   let msg = `「${r.name}」（${r.datetime}）を無断キャンセルリストに登録しますか？`;
   if (existingNoshow.length > 0) {
-    msg += `\n\n⚠️ この電話番号は既に${existingNoshow.length}件登録済みです。追加後は合計${countAfter}回になります。`;
+    msg += `\n\n⚠️ この方は既に${existingNoshow.length}件登録済みです。追加後は合計${countAfter}回になります。`;
   }
   if (!confirm(msg)) { if (checkbox) checkbox.checked = false; return; }
   // 予約日時を日付と時間に分割
@@ -3951,11 +4093,10 @@ function moveToNoshow(reservationId, checkbox) {
 function moveToSameday(reservationId, checkbox) {
   const r = reservations.find(x => x.id === reservationId);
   if (!r) { if (checkbox) checkbox.checked = false; return; }
-  const pn = normPhone(r.phone);
-  const already = getSamedayCounts()[pn] || 0;
+  const already = countOf(getSamedayCounts(), r);
   const countAfter = already + 1;
   let msg = `「${r.name}」（${r.datetime}）を当日キャンセルに登録しますか？\n（電話など、メール以外のキャンセル用）`;
-  if (already > 0) msg += `\n\n🟠 この電話番号は当日キャンセルが既に${already}回。追加後は合計${countAfter}回になります。`;
+  if (already > 0) msg += `\n\n🟠 この方は当日キャンセルが既に${already}回。追加後は合計${countAfter}回になります。`;
   if (!confirm(msg)) { if (checkbox) checkbox.checked = false; return; }
   // 予約日時を日付と時間に分割
   let date = '', time = '';
@@ -4029,7 +4170,7 @@ document.getElementById('sd-phone').addEventListener('input', function() {
   const warn = document.getElementById('samedayRepeatWarning');
   if (!pn) { warn.style.display = 'none'; return; }
   const counts = getSamedayCounts();
-  const existing = counts[pn] || 0;
+  const existing = countOf(counts, { phone: this.value });
   if (existing > 0) {
     warn.style.display = 'block';
     warn.innerHTML = `🟠 この電話番号は当日キャンセルが既に <strong>${existing}回</strong>。追加後は合計 <strong>${existing + 1}回</strong>。`;
@@ -4120,7 +4261,7 @@ function exportExcel() {
   } else if (activeTab === 'sameday') {
     const counts = getSamedayCounts();
     const h = ['予約日','時間','氏名','電話番号','メール','区分','備考','回数'];
-    const rows = getSamedayList().map(r => [r.date,r.time,r.name,r.phone,r.email,(r.source==='auto'?'メール':'手動'),r.note,counts[normPhone(r.phone)]||1]);
+    const rows = getSamedayList().map(r => [r.date,r.time,r.name,r.phone,r.email,(r.source==='auto'?'メール':'手動'),r.note,countOf(counts, r)||1]);
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
     ws['!cols'] = [14,10,14,14,22,10,30,8].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, '当日キャンセル');
@@ -4131,9 +4272,8 @@ function exportExcel() {
     const nsC = getNoshowCounts(), sdC = getSamedayCountedCounts();
     const h = ['状態','氏名','電話番号','きっかけ','メモ','登録日時','判断日時','無断回数','当日回数(実カウント)'];
     const rows = blocklist.map(b => {
-      const p = normPhone(b.phone);
       return [statusLabel[b.status]||b.status, b.name, b.phone, srcLabel[b.source]||b.source,
-        b.note, b.addedAt, b.decidedAt, p ? (nsC[p]||0) : 0, p ? (sdC[p]||0) : 0];
+        b.note, b.addedAt, b.decidedAt, countOf(nsC, b), countOf(sdC, b)];
     });
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
     ws['!cols'] = [10,14,14,16,30,18,18,10,18].map(w=>({wch:w}));
@@ -4145,7 +4285,7 @@ function exportExcel() {
   } else {
     const counts = getNoshowCounts();
     const h = ['日付','予約時間','氏名','電話番号','メール','備考','回数'];
-    const rows = noshows.map(r => [r.date,r.time,r.name,r.phone,r.email,r.note,counts[normPhone(r.phone)]||1]);
+    const rows = noshows.map(r => [r.date,r.time,r.name,r.phone,r.email,r.note,countOf(counts, r)||1]);
     const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
     ws['!cols'] = [14,10,14,14,22,30,10].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, '無断キャンセル');
@@ -4327,7 +4467,7 @@ function openRowDetailSheet(tabId, id) {
     const isCancelTab = tabId === 'cancellations';
     const cancelled = !isCancelTab && isReservationCancelled(r);
     push(isCancelTab ? 'キャンセル日時' : '予約日時', esc(fmtDT(r.datetime)) || '—');
-    push('メニュー', esc(r.menu) || '—');
+    push('メニュー', (r.source === 'hpb' ? '<span class="src-hpb">HPB</span>' : '') + (esc(r.menu) || '—'));
     push('電話番号', telLink(r.phone) || '—');
     push('メールアドレス', esc(r.email) || '—');
     push('コメント', r.comment ? esc(r.comment).replace(/\n/g, '<br>') : '—');
@@ -4365,7 +4505,7 @@ function openRowDetailSheet(tabId, id) {
     push('電話番号', telLink(r.phone) || '—');
     push('メールアドレス', esc(r.email) || '—');
     push('備考', r.note ? esc(r.note).replace(/\n/g, '<br>') : '—');
-    push('無断キャンセル回数', (getNoshowCounts()[normPhone(r.phone)] || 1) + '回');
+    push('無断キャンセル回数', (countOf(getNoshowCounts(), r) || 1) + '回');
     actionsHtml = `
       <button class="btn btn-outline" onclick="openEditModal(${r.id})">✏️ 編集</button>
       <button class="btn btn-danger" onclick="deleteRecord(${r.id})">🗑️ 削除</button>`;
@@ -4376,7 +4516,7 @@ function openRowDetailSheet(tabId, id) {
     push('メールアドレス', esc(r.email) || '—');
     push('区分', r.source === 'auto' ? '<span class="tag-auto">✉️メール</span>' : '<span class="tag-manual">📞手動</span>');
     push('備考', r.note ? esc(r.note).replace(/\n/g, '<br>') : '—');
-    push('当日キャンセル回数', (getSamedayCounts()[normPhone(r.phone)] || 1) + '回');
+    push('当日キャンセル回数', (countOf(getSamedayCounts(), r) || 1) + '回');
     actionsHtml = r.source === 'auto'
       ? `<button class="btn btn-outline" data-search-key="${esc(r.phone || r.name || '')}" onclick="switchTab('cancellations');searchByBadge(this)">🔍 キャンセルタブで編集</button>`
       : `<button class="btn btn-outline" onclick="openSamedayModal('${r.id}')">✏️ 編集</button>
