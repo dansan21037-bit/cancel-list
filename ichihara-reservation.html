@@ -178,10 +178,11 @@
   }
   tbody tr { border-bottom: 1px solid var(--color-neutral-tint); transition: background 0.15s, transform 0.15s ease, box-shadow 0.15s ease; }
   tbody tr:last-child { border-bottom: none; }
-  /* 縞模様。状態色を持つ行(row-*)では:not()により無効化し、状態色が必ず優先される */
-  tbody tr:nth-child(even):not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
-    :not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red)
-    :not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
+  /* 縞模様。状態色を持つ行(row-*)では:not()により無効化し、状態色が必ず優先される。
+     ★このセレクタは絶対に途中で改行しないこと。CSSでは改行が子孫結合子になるため、
+     折り返すと「偶数行の中のすべての子要素」に縞色が当たり、バッジや棒グラフの
+     背景色が白に近い縞色で塗り潰されて見えなくなる。 */
+  tbody tr:nth-child(even):not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename):not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red):not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
     background: var(--color-zebra-tint);
   }
   /* 状態色を持つ行(row-*)はhover時も自身の色を維持させる(:not()で除外) */
@@ -739,6 +740,47 @@
     .reason-bar-row { grid-template-columns: 1fr auto; gap: 6px 8px; }
     .reason-bar-track { grid-column: 1 / -1; }
   }
+
+  /* ==== 統計タブ: 読みやすさの改善 ==== */
+  /* グラフは軸ラベルを持つので縦横比を保って伸縮させる。
+     以前は高さ64px固定＋preserveAspectRatio=none で横に引き伸ばしており、
+     線も文字も歪んだうえ目盛が無く「どの月が何件か」が読めなかった */
+  .stats-trend-chart { width: 100%; height: auto; display: block; }
+  .stats-trend-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 2px; }
+  .stats-legend { display: flex; gap: 12px; font-size: 11px; color: var(--color-neutral-strong); }
+  .stats-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .stats-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .stats-note { font-size: 11px; color: var(--color-neutral-muted); margin-top: 4px; line-height: 1.5; }
+
+  /* ヒートマップ: 縦積みだと縦を食いすぎるので横に並べる */
+  .heatmap-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 1100px) { .heatmap-pair { grid-template-columns: 1fr; } }
+  .heatmap-grid { grid-template-columns: 40px repeat(8, 1fr); }
+  .heatmap-grid .hm-cell.hm-total { background: var(--color-neutral-bg); color: var(--color-neutral-strong); }
+  .heatmap-grid .hm-cell.hm-grand { font-weight: 800; color: var(--color-text); }
+  .hm-scale { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--color-neutral-muted); margin-top: 5px; }
+  .hm-scale i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  /* ドーナツ: 件数だけでは多少が判断できないので中央に合計・凡例に割合を出す */
+  .donut-chart { display: flex; align-items: center; justify-content: center; }
+  .donut-center { position: relative; z-index: 1; text-align: center; line-height: 1.1; color: var(--color-text); }
+  .donut-center b { display: block; font-size: 20px; font-weight: 800; }
+  .donut-center i { font-style: normal; font-size: 10px; color: var(--color-neutral-strong); }
+  .donut-pct { font-weight: 700; color: var(--color-neutral-muted); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+
+  /* 月次表: 行を詰め、数字は右揃え・等幅にする(桁が揃わないと月どうしを比較しづらい) */
+  .stats-table th, .stats-table td { padding: 9px 12px; }
+  .stats-table th.num, .stats-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .stats-table td.num .stats-bar-visual { margin-left: auto; }
+  .stats-table td.num .stats-delta { justify-content: flex-end; }
+  .stats-month-tag { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 700; padding: 1px 6px;
+    border-radius: 6px; background: var(--color-neutral-bg); color: var(--color-neutral-strong);
+    border: 1px solid var(--color-neutral-tint); vertical-align: 1px; cursor: help; }
+  .rate-cell { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .rate-bar { width: 62px; height: 5px; border-radius: 3px; background: var(--color-neutral-tint); overflow: hidden; }
+  .rate-bar i { display: block; height: 100%; border-radius: 3px; }
+  tr.stats-total-row td { background: var(--color-neutral-bg); font-weight: 800; color: var(--color-text);
+    border-top: 2px solid var(--color-neutral-tint); }
 
   /* インポートモーダル */
   .btn-import { background: #ed8936; color: white; }
@@ -3678,33 +3720,64 @@ function deltaBadgeHTML(metric, curr, prev) {
   return `<div class="stats-delta ${cls}"><span class="arrow">${arrow}</span>先月比 ${sign}${diff}件</div>`;
 }
 
-// ① 月次キャンセル件数のミニ折れ線SVG(chronKeysは昇順=古→新)。0/1件でも壊れない。
-function buildTrendSparklineSVG(chronKeys, months) {
+// ① 月次チャート。以前は軸もラベルも無いスパークラインで「どの月が何件だったか」が
+//    まったく読めなかったので、目盛・月ラベル・数値を出した棒グラフにする。
+//    予約件数(薄い青)とキャンセル件数(オレンジ)を同じ目盛に並べているのは、
+//    「キャンセルが増えたのは予約が増えたからなのか」を同時に判断したいため。
+function niceCeil(v) {
+  if (!(v > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 2.5, 5, 10]) { if (v <= m * mag) return m * mag; }
+  return 10 * mag;
+}
+// 'YYYY-MM' → 'YY/MM'
+function ymShort(k) { return k.substring(2, 4) + '/' + k.substring(5, 7); }
+// 当月はまだ集計途中、未来月はこれからの予約。同じ見た目で並べると前月比を誤読するので区別する
+function ymPhase(k, nowYm) { return k === nowYm ? 'current' : (k > nowYm ? 'future' : 'done'); }
+
+function buildMonthlyChartSVG(chronKeys, months) {
   if (chronKeys.length === 0) return `<div class="stats-trend-empty">データがありません</div>`;
-  const W = 300, H = 60, PAD = 6;
-  const vals = chronKeys.map(k => months[k].can);
-  const max = Math.max(1, ...vals);
-  if (chronKeys.length === 1) {
-    const y = H - PAD - (vals[0] / max) * (H - PAD * 2);
-    return `<svg class="stats-trend-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <circle cx="${W/2}" cy="${y.toFixed(1)}" r="4" fill="var(--color-caution)"></circle>
-      <text x="${W/2}" y="${H-2}" font-size="9" text-anchor="middle" fill="var(--color-neutral-strong)">${chronKeys[0]}のみ</text>
-    </svg>`;
-  }
-  const stepX = (W - PAD * 2) / (chronKeys.length - 1);
-  const pts = vals.map((v, i) => [PAD + i * stepX, H - PAD - (v / max) * (H - PAD * 2)]);
-  const line = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-  const area = `${PAD},${H-PAD} ${line} ${(W-PAD).toFixed(1)},${H-PAD}`;
-  return `<svg class="stats-trend-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <polygon points="${area}" fill="var(--color-caution)" opacity="0.15"></polygon>
-    <polyline points="${line}" fill="none" stroke="var(--color-caution)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
-    ${pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="var(--color-caution)"></circle>`).join('')}
-  </svg>`;
+  const nowYm = todayStr().substring(0, 7);
+  const n = chronKeys.length;
+  const W = 900, H = 220, PAD_L = 46, PAD_R = 12, PAD_T = 18, PAD_B = 44;
+  const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+  const slot = plotW / n;
+  const maxV = niceCeil(Math.max(1, ...chronKeys.map(k => Math.max(months[k].res, months[k].can))));
+  const y = v => PAD_T + plotH - (v / maxV) * plotH;
+  const gw = Math.min(slot * 0.64, 40);
+  const bw = Math.max(3, gw / 2 - 1);
+  const every = Math.max(1, Math.ceil(n / 14));   // 月が増えたら月ラベルを間引く
+
+  const grid = [0, maxV / 2, maxV].map(t => {
+    const yy = y(t).toFixed(1);
+    return `<line x1="${PAD_L}" x2="${W - PAD_R}" y1="${yy}" y2="${yy}" stroke="var(--color-neutral-tint)"></line>` +
+      `<text x="${PAD_L - 7}" y="${(y(t) + 3.5).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--color-neutral-strong)">${Math.round(t)}</text>`;
+  }).join('');
+
+  const bars = chronKeys.map((k, i) => {
+    const m = months[k];
+    const cx = PAD_L + slot * (i + 0.5);
+    const phase = ymPhase(k, nowYm);
+    const dim = phase !== 'done';
+    const xRes = cx - gw / 2, xCan = cx + 1;
+    const p = [];
+    p.push(`<rect x="${xRes.toFixed(1)}" y="${y(m.res).toFixed(1)}" width="${bw.toFixed(1)}" height="${(y(0) - y(m.res)).toFixed(1)}" rx="2" fill="var(--color-info)" opacity="${dim ? 0.16 : 0.34}"></rect>`);
+    p.push(`<rect x="${xCan.toFixed(1)}" y="${y(m.can).toFixed(1)}" width="${bw.toFixed(1)}" height="${(y(0) - y(m.can)).toFixed(1)}" rx="2" fill="var(--color-caution)" opacity="${dim ? 0.45 : 1}"></rect>`);
+    if (m.can > 0) p.push(`<text x="${(xCan + bw / 2).toFixed(1)}" y="${(y(m.can) - 4).toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="var(--color-caution)" opacity="${dim ? 0.6 : 1}">${m.can}</text>`);
+    if (i % every === 0 || i === n - 1) p.push(`<text x="${cx.toFixed(1)}" y="${H - 22}" font-size="10" text-anchor="middle" fill="var(--color-neutral-strong)">${ymShort(k)}</text>`);
+    if (dim) p.push(`<text x="${cx.toFixed(1)}" y="${H - 8}" font-size="9" text-anchor="middle" fill="var(--color-neutral-muted)">${phase === 'current' ? '集計中' : '予定'}</text>`);
+    return p.join('');
+  }).join('');
+
+  return `<svg class="stats-trend-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="月ごとの予約件数とキャンセル件数">${grid}` +
+    `<line x1="${PAD_L}" x2="${W - PAD_R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--color-neutral)"></line>${bars}</svg>`;
 }
 
 // ③ 曜日(月-日)×時間帯 当日+無断キャンセルのヒートマップHTML
 // 単一データ源(当日 or 無断)の曜日×時間帯グリッドを1つ作る。色は呼び出し側から渡す
 // (当日=caution-strong/無断=dangerと、既存のバッジ・タグと同じ色分けを維持するため、1つの赤一色グラデーションに混ぜない)
+// 右端と最下段に合計を出し、下に濃さの凡例を付ける(色だけでは件数の多少が読み取れないため)。
+// 「不明」行は時刻が取れなかった件数の受け皿なので、0件なら縦を食うだけになるため出さない。
 function buildOneHeatmapHTML(items, colorVarName) {
   if (items.length === 0) return `<div class="stats-heatmap-empty">データがありません</div>`;
   const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // 月火水木金土日
@@ -3718,24 +3791,38 @@ function buildOneHeatmapHTML(items, colorVarName) {
     const b = timeBucketIndex(it.time);
     grid[b === null ? 3 : b][col]++;
   });
+  const rowIdx = [0, 1, 2].concat(grid[3].some(v => v > 0) ? [3] : []);
   let max = 0;
-  grid.forEach(row => row.forEach(v => { if (v > max) max = v; }));
+  rowIdx.forEach(r => grid[r].forEach(v => { if (v > max) max = v; }));
+  const colTotal = [0, 0, 0, 0, 0, 0, 0];
+  rowIdx.forEach(r => grid[r].forEach((v, c) => { colTotal[c] += v; }));
   const rgb = resolveHexVar(colorVarName);
   const cell = v => v === 0
     ? `<div class="hm-cell hm-zero" style="background:var(--color-neutral-bg)">0</div>`
     : `<div class="hm-cell" style="background:${rgbaStr(rgb, 0.15 + 0.65 * (v / max))}">${v}</div>`;
   let html = `<div class="heatmap-grid"><div></div>`;
   dayLabel.forEach(d => html += `<div class="hm-head">${d}</div>`);
-  bucketLabel.forEach((lb, r) => {
-    html += `<div class="hm-rowlabel">${lb}</div>`;
+  html += `<div class="hm-head">計</div>`;
+  rowIdx.forEach(r => {
+    html += `<div class="hm-rowlabel">${bucketLabel[r]}</div>`;
     for (let c = 0; c < 7; c++) html += cell(grid[r][c]);
+    html += `<div class="hm-cell hm-total">${grid[r].reduce((a, b) => a + b, 0)}</div>`;
   });
-  return html + `</div>`;
+  html += `<div class="hm-rowlabel">計</div>`;
+  colTotal.forEach(v => html += `<div class="hm-cell hm-total">${v}</div>`);
+  html += `<div class="hm-cell hm-total hm-grand">${colTotal.reduce((a, b) => a + b, 0)}</div>`;
+  html += `</div><div class="hm-scale"><span>少</span>` +
+    [0.15, 0.31, 0.47, 0.64, 0.80].map(a => `<i style="background:${rgbaStr(rgb, a)}"></i>`).join('') +
+    `<span>多（最大 ${max}件）</span></div>`;
+  return html;
 }
 // 当日(caution-strong)と無断(danger)を別々のヒートマップにする(1つの赤一色に混ぜると色の意味が区別できなくなるため)
+// 縦積みだと画面の縦を食いすぎるので、横に並べて比較しやすくする
 function buildCancelHeatmapHTML() {
-  return `<div class="heatmap-sub-title">🟠 当日キャンセル</div>${buildOneHeatmapHTML(getSamedayList(), '--color-caution-strong')}
-    <div class="heatmap-sub-title" style="margin-top:10px">🚫 無断キャンセル</div>${buildOneHeatmapHTML(noshows, '--color-danger')}`;
+  return `<div class="heatmap-pair">
+    <div><div class="heatmap-sub-title">🟠 当日キャンセル</div>${buildOneHeatmapHTML(getSamedayList(), '--color-caution-strong')}</div>
+    <div><div class="heatmap-sub-title">🚫 無断キャンセル</div>${buildOneHeatmapHTML(noshows, '--color-danger')}</div>
+  </div>`;
 }
 
 // ⑤ 当日キャンセルの理由内訳(横棒)。やむを得ない=中立グレー / 自己都合=注意オレンジ / 未設定=薄グレー
@@ -3794,10 +3881,13 @@ function buildRemindEffectHTML() {
     </div>`;
   };
   let verdict = '';
-  if (g.withR.total < 3) {
-    verdict = `<div class="reason-bar-hint">リマインド実施済みの過去予約が${g.withR.total}件のみです。もう少し実績が貯まると比較できます</div>`;
-  } else if (g.without.total < 3) {
-    verdict = `<div class="reason-bar-hint">リマインド未実施の過去予約が少ないため、比較の精度は参考程度です</div>`;
+  // しきい値3件では「0/3件 vs 445/1477件」でも「効果が出ています」と断定してしまい、
+  // 意思決定を誤らせる。割合の比較に最低限必要な件数まで引き上げる。
+  const MIN_SAMPLE = 30;
+  if (g.withR.total < MIN_SAMPLE) {
+    verdict = `<div class="reason-bar-hint">リマインド実施済みの過去予約が${g.withR.total}件しかないため、まだ効果は判断できません（${MIN_SAMPLE}件ほど貯まると比較できます）</div>`;
+  } else if (g.without.total < MIN_SAMPLE) {
+    verdict = `<div class="reason-bar-hint">リマインド未実施の過去予約が${g.without.total}件しかないため、比較は参考程度に留めてください</div>`;
   } else {
     const diff = ro - rw;
     verdict = diff > 0.5
@@ -3811,6 +3901,7 @@ function buildRemindEffectHTML() {
 }
 
 // ④ 全期間キャンセル内訳(通常/当日/振替/無断)ドーナツ+凡例HTML
+// 件数だけでは「多いのか少ないのか」が判断できないので、割合と合計も出す
 function buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs) {
   const total = totCanNormal + totSd + totFk + totNs;
   const rows = [
@@ -3830,8 +3921,11 @@ function buildCancelDonutHTML(totCanNormal, totSd, totFk, totNs) {
   }).join(', ');
   const legend = rows.map(r => `<div class="donut-legend-row">
     <span class="donut-dot" style="background:${r.color}"></span>
-    <span class="donut-label">${r.label}</span><span class="donut-count">${r.count}件</span></div>`).join('');
-  return `<div class="donut-row"><div class="donut-chart" style="background:conic-gradient(${stops})"></div>
+    <span class="donut-label">${r.label}</span>
+    <span class="donut-count">${r.count}件</span>
+    <span class="donut-pct">${Math.round(r.count / total * 100)}%</span></div>`).join('');
+  return `<div class="donut-row">
+    <div class="donut-chart" style="background:conic-gradient(${stops})"><span class="donut-center"><b>${total}</b><i>件</i></span></div>
     <div class="donut-legend">${legend}</div></div>`;
 }
 
@@ -3878,10 +3972,22 @@ function renderStats() {
     <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div>${deltaCan}</div>
     <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div>${deltaSd}</div>
     <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div>${deltaNs}</div>
-    <div class="stats-summary-card purple"><div class="label">📊 対象月数</div><div class="value">${keys.length}</div></div>`;
+    <div class="stats-summary-card purple"><div class="label">📊 集計期間</div><div class="value">${keys.length}<span style="font-size:13px;font-weight:600">ヶ月</span></div><div class="sub">${keys.length ? ymShort(chronKeys[0]) + ' 〜 ' + ymShort(keys[0]) : '—'}</div></div>`;
 
   const trendEl = document.getElementById('statsTrend');
-  if (trendEl) trendEl.innerHTML = `<div class="stats-trend-title">📈 月次キャンセル件数の推移</div>${buildTrendSparklineSVG(chronKeys, months)}`;
+  if (trendEl) {
+    const nowYm2 = todayStr().substring(0, 7);
+    const hasPartial = chronKeys.some(k => k >= nowYm2);
+    trendEl.innerHTML =
+      `<div class="stats-trend-head">
+        <div class="stats-trend-title">📈 月ごとの予約件数とキャンセル件数</div>
+        <div class="stats-legend">
+          <span><i style="background:var(--color-info);opacity:.34"></i>予約件数</span>
+          <span><i style="background:var(--color-caution)"></i>キャンセル件数</span>
+        </div>
+      </div>${buildMonthlyChartSVG(chronKeys, months)}`
+      + (hasPartial ? `<div class="stats-note">薄い棒は「集計中（今月）」または「予定（来月以降の予約）」です。まだ確定していないので、前の月と単純に比べないでください</div>` : '');
+  }
 
   const visualsEl = document.getElementById('statsVisuals');
   if (visualsEl) visualsEl.innerHTML = `
@@ -3895,26 +4001,56 @@ function renderStats() {
   if (keys.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--color-neutral-muted);padding:40px">データがありません</td></tr>`;
   } else {
-    tbody.innerHTML = keys.map(k => {
+    const nowYm3 = todayStr().substring(0, 7);
+    // 率のバーは「その院の中で高い月/低い月」が分かればよいので、その列の最大率を基準にする。
+    // キャンセル率(〜26%)と無断率(〜4%)は桁が違うため、同じ基準にすると無断率のバーがほぼ見えなくなる。
+    const rateOf = (k, field) => { const m = months[k]; const b = m.res + m.can; return b > 0 ? m[field] / b * 100 : 0; };
+    const maxCr = Math.max(1, ...keys.map(k => rateOf(k, 'can')));
+    const maxNr = Math.max(1, ...keys.map(k => rateOf(k, 'ns')));
+    const sum = { res: 0, can: 0, fk: 0, sd: 0, ns: 0 };
+    keys.forEach(k => { const m = months[k]; sum.res += m.res; sum.can += m.can; sum.fk += m.fk; sum.sd += m.sd; sum.ns += m.ns; });
+    const rateCell = (label, val, max, color) =>
+      `<td data-label="${label}" class="num" title="バーの長さはこの列の中での相対値です（この期間の最大 ${max.toFixed(1)}%）"><span class="rate-cell"><span>${val.toFixed(1)}%</span>` +
+      `<span class="rate-bar"><i style="width:${Math.min(100, Math.round(val / max * 100))}%;background:${color}"></i></span></span></td>`;
+    const rows = keys.map(k => {
       const m = months[k];
       const base = m.res + m.can;
-      const cr = base > 0 ? ((m.can / base) * 100).toFixed(1) : '0.0';
-      const nr = base > 0 ? ((m.ns / base) * 100).toFixed(1) : '0.0';
+      const cr = base > 0 ? (m.can / base) * 100 : 0;
+      const nr = base > 0 ? (m.ns / base) * 100 : 0;
       const ym = k.replace(/(\d{4})-(\d{2})/, '$1年$2月');
+      const phase = ymPhase(k, nowYm3);
+      const tag = phase === 'current'
+        ? `<span class="stats-month-tag" title="今月はまだ途中です。前の月と単純に比べないでください">集計中</span>`
+        : (phase === 'future' ? `<span class="stats-month-tag" title="これから来店予定の予約です">予定</span>` : '');
       const barW = Math.round((m.res / maxRes) * 100);
       const pm = months[prevYmKey(k)];
       const rowDelta = pm ? deltaBadgeHTML('can', m.can, pm.can) : `<div class="stats-delta d-none">ー</div>`;
       return `<tr>
-        <td data-label="月" style="font-weight:700;color:var(--color-text)">${ym}</td>
-        <td data-label="予約">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
-        <td data-label="キャンセル" style="color:var(--color-caution)">${m.can}${rowDelta}</td>
-        <td data-label="振替" style="color:var(--color-info)">${m.fk}</td>
-        <td data-label="当日" style="color:var(--color-caution-strong)">${m.sd}</td>
-        <td data-label="無断" style="color:var(--color-danger)">${m.ns}</td>
-        <td data-label="ｷｬﾝｾﾙ率">${cr}%</td>
-        <td data-label="無断率">${nr}%</td>
+        <td data-label="月" style="font-weight:700;color:var(--color-text)">${ym}${tag}</td>
+        <td data-label="予約" class="num">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
+        <td data-label="キャンセル" class="num" style="color:var(--color-caution)">${m.can}${rowDelta}</td>
+        <td data-label="振替" class="num" style="color:var(--color-info)">${m.fk}</td>
+        <td data-label="当日" class="num" style="color:var(--color-caution-strong)">${m.sd}</td>
+        <td data-label="無断" class="num" style="color:var(--color-danger)">${m.ns}</td>
+        ${rateCell('ｷｬﾝｾﾙ率', cr, maxCr, 'var(--color-caution)')}
+        ${rateCell('無断率', nr, maxNr, 'var(--color-danger)')}
       </tr>`;
     }).join('');
+    const sBase = sum.res + sum.can;
+    const sCr = sBase > 0 ? (sum.can / sBase * 100).toFixed(1) : '0.0';
+    const sNr = sBase > 0 ? (sum.ns / sBase * 100).toFixed(1) : '0.0';
+    // 合計行。各月を足し合わせた総数と通算の率を出す(月ごとの率の平均ではない)
+    const totalRow = `<tr class="stats-total-row">
+      <td data-label="月">合計（${keys.length}ヶ月）</td>
+      <td data-label="予約" class="num">${sum.res}</td>
+      <td data-label="キャンセル" class="num">${sum.can}</td>
+      <td data-label="振替" class="num">${sum.fk}</td>
+      <td data-label="当日" class="num">${sum.sd}</td>
+      <td data-label="無断" class="num">${sum.ns}</td>
+      <td data-label="ｷｬﾝｾﾙ率" class="num">${sCr}%</td>
+      <td data-label="無断率" class="num">${sNr}%</td>
+    </tr>`;
+    tbody.innerHTML = rows + totalRow;
   }
   document.getElementById('rowCount-stats').textContent = `${keys.length}ヶ月`;
 }
