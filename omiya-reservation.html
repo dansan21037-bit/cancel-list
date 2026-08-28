@@ -1180,7 +1180,7 @@
 
     <div class="legend-section">
       <h3>📋 予約者リスト</h3>
-      <div class="legend-row"><span class="badge badge-repeat">再2</span><span class="legend-desc">リピーター。同じ電話番号でキャンセル済みを除く実予約が2回以上(クリックでその人だけ検索)</span></div>
+      <div class="legend-row"><span class="badge badge-repeat">再2</span><span class="legend-desc">リピーター（再来）。キャンセル済みを除く実予約が2回以上ある人。<strong>電話番号がある予約は電話番号で、電話番号が無い予約（HPB経由）は氏名だけで</strong>数えます（HPBの場合は同姓同名の別人が混ざる可能性があります）。クリックするとその人だけ検索できます</span></div>
       <div class="legend-row"><span class="badge-noshow-warn">⚠️無断2</span><span class="legend-desc">この人は過去に無断キャンセルが2回ある(要注意)</span></div>
       <div class="legend-row"><span class="badge-sameday-warn">🟠当日2</span><span class="legend-desc">この人は過去に当日キャンセルが2回ある(振替は含まない)</span></div>
       <div class="legend-row"><span class="badge-dup">🔁重複?</span><span class="legend-desc">同じ日・同じ名前・同じ電話番号の予約が他にもある。二重登録の可能性</span></div>
@@ -1201,6 +1201,13 @@
       <div class="legend-row"><span class="hpb-dash">—</span><span class="legend-desc">✉️メール列がこの表示 = メールアドレスも通知に載らないため、メールリマインドは対象外です。「📋リマインド未」の判定も📞電話リマインドだけで行います</span></div>
       <div class="legend-row"><span class="legend-desc" style="margin-left:0">検索欄に「hpb」「サロンボード」と入れると、HPB経由の予約だけに絞り込めます</span></div>
       <div class="legend-row"><span class="legend-desc" style="margin-left:0">電話番号が無いため、予約不可リストとの照合・重複チェックは<strong>氏名のみ</strong>で行われます(同姓同名は別人の可能性があるため 👥同名? として出ます)</span></div>
+    </div>
+
+    <div class="legend-section">
+      <h3>🔎 同じお客様かどうかの見分け方</h3>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">無断キャンセル歴・当日キャンセル歴・予約不可リストとの照合は、<strong>電話番号・メールアドレス・氏名</strong>のいずれかで行います</span></div>
+      <div class="legend-row"><span class="legend-desc" style="margin-left:0">電話番号どうし（またはメールアドレスどうし）を突き合わせられる場合は、それで判定します。番号が違えば同姓同名でも別人として扱います</span></div>
+      <div class="legend-row"><span class="badge-blocked">🚷予約不可?</span><span class="legend-desc">末尾の「?」は<strong>氏名だけが一致</strong>したことを表します。電話番号もメールアドレスも無い予約（HPB経由など）で出ます。同姓同名の別人の可能性があるので、サロンボード等で本人か確認してください</span></div>
     </div>
 
     <div class="legend-section">
@@ -1525,19 +1532,34 @@ function normPhone(p) {
     .replace(/[-\s　ー－()（）]/g, '');
 }
 function normName(n) { return (n||'').replace(/[\s　]/g, '').trim(); }
+// メールアドレスは大文字小文字を区別しない。コピペで混ざりやすい全角英数記号だけ
+// 半角に寄せる。Gmailのドット/プラス表記の同一視まではしない(別人のアドレスを
+// 同一人物と誤判定する危険があるため)
+function normEmail(e) {
+  return String(e || '')
+    .replace(/[Ａ-Ｚａ-ｚ０-９＠．＿－]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .trim().toLowerCase();
+}
 // ── 同一人物の名寄せ ────────────────────────────────────────────────────
 // 電話番号と氏名の両方でカウントし、参照時は大きい方を採る。
 // HPB(サロンボード)経由の予約は通知メールに電話番号が載らないため、氏名でしか名寄せできない。
 // キーに 'p:' / 'n:' の接頭辞を付けるのは、電話が空のレコード同士や
 // 「電話番号と同じ文字列の氏名」が偶然ぶつかるのを防ぐため。空のキーは数えない。
+// 1人ぶんの件数を、電話番号・氏名・メールアドレスそれぞれのキーで数える
 function bumpCount(map, rec) {
   const p = normPhone(rec && rec.phone); if (p) map['p:' + p] = (map['p:' + p] || 0) + 1;
   const n = normName(rec && rec.name);   if (n) map['n:' + n] = (map['n:' + n] || 0) + 1;
+  const e = normEmail(rec && rec.email); if (e) map['e:' + e] = (map['e:' + e] || 0) + 1;
 }
+// どれかのキーで一致した件数の「最大値」を採る
+// (同じ人を電話とメールで二重に数えないよう、合計にはしない)
 function countOf(map, rec) {
   if (!map) return 0;
-  const p = normPhone(rec && rec.phone), n = normName(rec && rec.name);
-  return Math.max(p ? (map['p:' + p] || 0) : 0, n ? (map['n:' + n] || 0) : 0);
+  const p = normPhone(rec && rec.phone), n = normName(rec && rec.name), e = normEmail(rec && rec.email);
+  return Math.max(
+    p ? (map['p:' + p] || 0) : 0,
+    n ? (map['n:' + n] || 0) : 0,
+    e ? (map['e:' + e] || 0) : 0);
 }
 // 1人を1つのキーで表す(電話が最優先、無ければ氏名)。両方無ければ '' を返す。
 // blockKeyOf と同じ規則。振替判定や当日キャンセルの二重計上除外で使う。
@@ -1745,19 +1767,49 @@ function nowStamp() {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 // 電話番号を主キーにする(無い場合のみ氏名で代用)。他の集計と同じ正規化ルールに揃える
+// 「元に戻す」猶予の抑止や振替判定で使う単一キー。同一人物かの判定ではなく
+// 「同じ行か」を表すだけなので、従来どおり電話優先・無ければ氏名でよい
 function blockKeyOf(phone, name) {
   const p = normPhone(phone);
   if (p) return 'p:' + p;
   const n = normName(name);
   return n ? 'n:' + n : '';
 }
-function findBlockEntry(phone, name) {
-  const k = blockKeyOf(phone, name);
-  if (!k) return null;
-  return blocklist.find(b => blockKeyOf(b.phone, b.name) === k) || null;
+// 2件の連絡先が同一人物かを判定する。
+//   電話番号どうし・メールアドレスどうしが「両方に有って」比較できるなら、それで確定する(強い一致)。
+//   どちらも比較できないときだけ氏名で判定する(弱い一致 = 同姓同名の別人がありうる)。
+// 従来は「電話番号があれば電話番号だけ」で照合していたため、電話番号付きで予約不可に
+// 登録した人に対して、電話番号の載らないHPB経由の予約が素通りしていた。
+// 逆に「氏名が一致すれば常に一致」にすると電話番号の違う同姓同名の別人まで予約不可に
+// なってしまうので、強い識別子を突き合わせられるときはそちらを優先する。
+function matchCustomer(a, b) {
+  if (!a || !b) return { hit: false, strong: false };
+  const ap = normPhone(a.phone), bp = normPhone(b.phone);
+  if (ap && bp && ap === bp) return { hit: true, strong: true };
+  const ae = normEmail(a.email), be = normEmail(b.email);
+  if (ae && be && ae === be) return { hit: true, strong: true };
+  // 強い識別子を1組でも突き合わせられたなら、一致しなかった時点で別人とみなす
+  if ((ap && bp) || (ae && be)) return { hit: false, strong: true };
+  const an = normName(a.name), bn = normName(b.name);
+  return { hit: !!(an && bn && an === bn), strong: false };
 }
-function isBlockedCustomer(phone, name) {
-  const e = findBlockEntry(phone, name);
+// 予約不可リストから該当者を探す。強い一致(電話/メール)を弱い一致(氏名のみ)より優先する
+function findBlockEntry(rec) {
+  let weak = null;
+  for (const b of blocklist) {
+    const m = matchCustomer(rec, b);
+    if (!m.hit) continue;
+    if (m.strong) return b;
+    if (!weak) weak = b;
+  }
+  return weak;
+}
+// 氏名だけの一致か(= 同姓同名の別人かもしれない)
+function isWeakBlockMatch(rec, entry) {
+  return !!(entry && !matchCustomer(rec, entry).strong);
+}
+function isBlockedCustomer(rec) {
+  const e = findBlockEntry(rec);
   return !!(e && e.status === 'blocked');
 }
 function newBlockId() { return 'bl_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
@@ -1808,10 +1860,10 @@ function syncBlocklistAuto() {
     if (!k || nsSeen.has(k)) return;
     nsSeen.add(k);
     const nsCnt = countOf(nsCounts, n) || 1;
-    const e = findBlockEntry(n.phone, n.name);
+    const e = findBlockEntry(n);
     if (!e && isBlockRecentlyDeleted(n.phone, n.name)) return; // 「元に戻す」待ちの間は作り直さない
     if (!e) {
-      blocklist.push({ id: newBlockId(), name: n.name || '', phone: n.phone || '',
+      blocklist.push({ id: newBlockId(), name: n.name || '', phone: n.phone || '', email: n.email || '',
         status: 'blocked', source: 'noshow', note: '無断キャンセルのため自動登録',
         addedAt: now, decidedAt: now, exemptAtCount: 0, exemptAtNoshowCount: 0 });
       changed++;
@@ -1840,10 +1892,10 @@ function syncBlocklistAuto() {
     seen.add(k);
     const cnt = countOf(counted, s);
     if (cnt < SAMEDAY_BLOCK_THRESHOLD) return;
-    const e = findBlockEntry(s.phone, s.name);
+    const e = findBlockEntry(s);
     if (!e && isBlockRecentlyDeleted(s.phone, s.name)) return; // 「元に戻す」待ちの間は作り直さない
     if (!e) {
-      blocklist.push({ id: newBlockId(), name: s.name || '', phone: s.phone || '',
+      blocklist.push({ id: newBlockId(), name: s.name || '', phone: s.phone || '', email: s.email || '',
         status: 'pending', source: 'sameday', note: `当日キャンセル${cnt}回のため確認待ち`,
         addedAt: now, decidedAt: '', exemptAtCount: 0 });
       changed++;
@@ -1970,7 +2022,7 @@ function addBlockManual() {
   const phone = document.getElementById('bl-phone').value.trim();
   const note = document.getElementById('bl-note').value.trim();
   if (!name || !phone) { showToast('氏名・電話番号は必須です', 'error'); return; }
-  const exist = findBlockEntry(phone, name);
+  const exist = findBlockEntry({ phone, name });
   if (exist) {
     exist.status = 'blocked'; exist.decidedAt = nowStamp();
     exist.note = note || exist.note;
@@ -3214,9 +3266,13 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       // 予約不可/確認待ちバッジ（予約リストのみ。最も強い警告）
       let blockBadge = '';
       if (isResTab && !isCancelled) {
-        const be = findBlockEntry(r.phone, r.name);
-        if (be && be.status === 'blocked') blockBadge = ` <span class="badge-blocked" title="予約不可のお客様です。${esc(be.note||'')}">🚷予約不可</span>`;
-        else if (be && be.status === 'pending') blockBadge = ` <span class="badge-blockpending" title="予約不可にするか確認待ちです。${esc(be.note||'')}">⏳確認待ち</span>`;
+        const be = findBlockEntry(r);
+        // 氏名だけの一致は「?」を付ける。電話番号もメールも無い予約(HPB経由など)は
+        // 同姓同名の別人の可能性が残るため、断定的に見せない
+        const weakHit = be ? isWeakBlockMatch(r, be) : false;
+        const weakNote = weakHit ? '（氏名のみの一致です。同姓同名の別人の可能性があります）' : '';
+        if (be && be.status === 'blocked') blockBadge = ` <span class="badge-blocked" title="予約不可のお客様です。${esc(be.note||'')}${weakNote}">🚷予約不可${weakHit ? '?' : ''}</span>`;
+        else if (be && be.status === 'pending') blockBadge = ` <span class="badge-blockpending" title="予約不可にするか確認待ちです。${esc(be.note||'')}${weakNote}">⏳確認待ち${weakHit ? '?' : ''}</span>`;
       }
       // 同日同名の重複/同名検出
       const dupBadge = dupBadgeFor(r, dupMap);
@@ -3226,7 +3282,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       let rowClass = isCancelTab ? (cnt >= 4 ? 'row-cancel-4' : cnt >= 3 ? 'row-cancel-3' : '') : '';
       if (isResTab && nsCnt > 0) rowClass = 'row-warn-noshow';
       // 予約不可の人の行は、無断警告より更に強い扱いで上書きする
-      if (blockBadge) rowClass = isBlockedCustomer(r.phone, r.name) ? 'row-blocked' : 'row-blockpending';
+      if (blockBadge) rowClass = isBlockedCustomer(r) ? 'row-blocked' : 'row-blockpending';
       if (dupLv === 'dup') rowClass = (rowClass ? rowClass + ' ' : '') + 'row-dup';
       else if (dupLv === 'samename') rowClass = (rowClass ? rowClass + ' ' : '') + 'row-samename';
       if (isPast) rowClass = (rowClass ? rowClass + ' ' : '') + 'row-past';
@@ -3520,7 +3576,7 @@ function getCautionReservations() {
     if (!d || d < today) return; // 今日以降のみ
     const ns = countOf(nsMap, r);
     const sd = countOf(sdMap, r);
-    const blocked = isBlockedCustomer(r.phone, r.name);
+    const blocked = isBlockedCustomer(r);
     if (ns > 0 || sd > 0 || blocked) out.push({ r, ns, sd, d, blocked });
   });
   // 予約不可の人を最上部に集め、その中は予約日時順にする
@@ -3541,7 +3597,7 @@ function getNewCautionAlerts(beforeIds) {
     if (!d || d < today) return;
     const ns = countOf(nsMap, r);
     const sd = countOf(sdMap, r);
-    const blocked = isBlockedCustomer(r.phone, r.name);
+    const blocked = isBlockedCustomer(r);
     if (ns > 0 || sd > 0 || blocked) out.push({ r, ns, sd, blocked });
   });
   return out;
