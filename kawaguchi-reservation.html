@@ -254,6 +254,11 @@
   .date-cell .date-full { font-size: 11px; color: var(--color-neutral-muted); margin-top: 1px; }
   .note-cell { color: var(--color-neutral-strong); font-size: 13px; max-width: 260px; }
   .menu-cell { font-size: 13px; max-width: 280px; color: var(--color-neutral); }
+  /* 狭い幅で列が数十pxまで潰れて「【期間限定価格】初回…」が7行に折れていた。
+     表の箱は横スクロールするので、列の最小幅は画面幅に関係なく保ってよい。
+     (900px以下で min-width:0 にする既存ルールに勝つため !important) */
+  td.menu-cell { min-width: 200px !important; max-width: 320px; font-size: 12.5px; line-height: 1.45; }
+  td.name-cell { min-width: 110px !important; }
   /* HOT PEPPER Beauty(サロンボード)経由の予約に付ける出所バッジ */
   .src-hpb { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; background: #f25c3d;
     border-radius: 4px; padding: 1px 5px; margin-right: 5px; letter-spacing: .5px; vertical-align: 1px; }
@@ -593,6 +598,13 @@
   .quick-chip:hover { border-color: var(--color-info); color: var(--color-info); background: var(--color-info-tint); }
   .quick-chip.chip-active { background: var(--color-info); border-color: var(--color-info); color: #fff; box-shadow: 0 1px 4px rgba(66,153,225,0.35); }
   .quick-chip.chip-active-warn { background: var(--color-danger); border-color: var(--color-danger); color: #fff; box-shadow: 0 1px 4px rgba(197,48,48,0.3); }
+  /* 列の表示/非表示 */
+  .col-hide { display: none !important; }
+  .colpick { position: absolute; z-index: 60; background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-neutral-tint); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.18); padding: 10px 12px; min-width: 190px; }
+  .colpick .cp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--color-neutral); margin-bottom: 6px; }
+  .colpick .cp-head button { font: inherit; font-size: 12px; background: none; border: 1px solid var(--color-neutral-tint); border-radius: 6px; padding: 2px 8px; cursor: pointer; color: var(--color-neutral); }
+  .colpick label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 2px; cursor: pointer; white-space: nowrap; }
+  .colpick input { width: 15px; height: 15px; }
   /* チェック時のポップアニメーション(リマインド📞✉️・当日🟠・無断🚫チェック共通) */
   @keyframes checkPop { 0% { transform: scale(1); } 45% { transform: scale(1.32); } 100% { transform: scale(1); } }
   .remind-check:checked, .noshow-check:checked, .sameday-check:checked { animation: checkPop 0.28s ease; }
@@ -1020,6 +1032,8 @@
     <button type="button" class="quick-chip" id="chip-week" onclick="applyQuickFilter('week')" aria-pressed="false">今週</button>
     <button type="button" class="quick-chip chip-res-only" id="chip-caution" onclick="applyQuickFilter('caution')" title="無断・当日キャンセル履歴のある要注意客の予約だけを表示" aria-pressed="false">🚨 要注意のみ</button>
     <button type="button" class="quick-chip chip-res-only" id="chip-remind" onclick="applyQuickFilter('remind')" title="今日以降でリマインド(📞か✉️)が未実施の予約だけを表示" aria-pressed="false">📋 リマインド未</button>
+    <button type="button" class="quick-chip chip-res-only" id="chip-dup" onclick="applyQuickFilter('dup')" title="同じ日・同じ氏名・同じ電話番号の予約(🔁重複?)だけを表示。二重登録の確認用" aria-pressed="false">🔁 重複?のみ</button>
+    <button type="button" class="quick-chip" id="chip-cols" onclick="openColPicker(this)" title="表示する列を選ぶ(この端末に保存)" aria-haspopup="true">☰ 列</button>
   </div>
 </div>
 
@@ -3099,6 +3113,7 @@ function toggleRemindFilter() {
 
 // ── クイックフィルタチップ(今日/明日/今週/要注意のみ/リマインド未) ─────
 let cautionFilterOn = false; // 「要注意のみ」チップ。remindFilterOnと同じ着脱式フィルタのパターン
+let dupFilterOn = false;     // 「🔁重複?のみ」チップ。同上
 function addDaysStr(dateStr, days) {
   const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return dateStr;
@@ -3118,6 +3133,62 @@ function mondayOfWeekStr(dateStr) {
   const pad = n => String(n).padStart(2, '0');
   return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
 }
+// ── 列の表示/非表示 ──────────────────────────────────────────
+// 「☰ 列」で選んだ非表示列を、タブごとに端末へ保存(localStorage)。列は見出しの文字で覚える
+// (列の追加・並び替えがあっても壊れにくい)。#と操作の列は隠せない。
+const COL_KEY = 'colHidden_v1';
+function colHiddenSet(tabId) {
+  try { const all = JSON.parse(localStorage.getItem(COL_KEY) || '{}'); return new Set(all[tabId] || []); } catch (e) { return new Set(); }
+}
+function saveColHidden(tabId, set) {
+  try { const all = JSON.parse(localStorage.getItem(COL_KEY) || '{}'); all[tabId] = Array.from(set); localStorage.setItem(COL_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function colLabel(th) { return (th.textContent || '').replace(/↕/g, '').replace(/\s+/g, ' ').trim(); }
+function applyColumnVisibility(tabId) {
+  const panel = document.getElementById('panel-' + tabId);
+  if (!panel) return;
+  const ths = panel.querySelectorAll('thead th');
+  if (!ths.length) return;
+  const hidden = colHiddenSet(tabId);
+  const hideIdx = [];
+  ths.forEach((th, i) => { const on = hidden.has(colLabel(th)); th.classList.toggle('col-hide', on); if (on) hideIdx.push(i); });
+  panel.querySelectorAll('tbody tr').forEach(tr => {
+    const tds = tr.children;
+    for (let i = 0; i < tds.length; i++) tds[i].classList.toggle('col-hide', hideIdx.indexOf(i) >= 0);
+  });
+}
+function openColPicker(btn) {
+  const old = document.getElementById('colPicker');
+  if (old) { old.remove(); return; }
+  const tabId = activeTab;
+  const panel = document.getElementById('panel-' + tabId);
+  const ths = panel ? Array.from(panel.querySelectorAll('thead th')) : [];
+  if (!ths.length) { showToast('この画面には列の設定がありません', 'error'); return; }
+  const hidden = colHiddenSet(tabId);
+  const box = document.createElement('div');
+  box.id = 'colPicker'; box.className = 'colpick';
+  const fixed = new Set(['#', '操作', '']);
+  box.innerHTML = '<div class="cp-head"><span>表示する列</span><button type="button" id="cpAll">すべて表示</button></div>' +
+    ths.map(th => { const lb = colLabel(th); if (fixed.has(lb)) return '';
+      return '<label><input type="checkbox" data-col="' + esc(lb) + '"' + (hidden.has(lb) ? '' : ' checked') + '> ' + esc(lb) + '</label>'; }).join('');
+  document.body.appendChild(box);
+  const r = btn.getBoundingClientRect();
+  box.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - box.offsetWidth - 8)) + 'px';
+  box.style.top = (r.bottom + window.scrollY + 6) + 'px';
+  box.addEventListener('change', e => {
+    const cb = e.target; if (!cb || !cb.dataset.col) return;
+    if (cb.checked) hidden.delete(cb.dataset.col); else hidden.add(cb.dataset.col);
+    saveColHidden(tabId, hidden); applyColumnVisibility(tabId);
+  });
+  box.querySelector('#cpAll').onclick = () => { hidden.clear(); saveColHidden(tabId, hidden); box.querySelectorAll('input[data-col]').forEach(i => { i.checked = true; }); applyColumnVisibility(tabId); };
+  const close = ev => {
+    if (ev.type === 'keydown' && ev.key !== 'Escape') return;
+    if (ev.type === 'click' && (box.contains(ev.target) || btn.contains(ev.target))) return;
+    box.remove(); document.removeEventListener('click', close, true); document.removeEventListener('keydown', close);
+  };
+  setTimeout(() => { document.addEventListener('click', close, true); document.addEventListener('keydown', close); }, 0);
+}
+
 function applyQuickFilter(kind) {
   const fromEl = document.getElementById('filterDateFrom');
   const toEl = document.getElementById('filterDateTo');
@@ -3137,6 +3208,10 @@ function applyQuickFilter(kind) {
     else render();
   } else if (kind === 'remind') {
     toggleRemindFilter(); // 既存のトグルをそのまま利用(render()も内部で呼ばれる)
+  } else if (kind === 'dup') {
+    dupFilterOn = !dupFilterOn;
+    if (dupFilterOn && activeTab !== 'reservations') switchTab('reservations');
+    else render();
   }
 }
 // チップの押下(active)状態を現在のフィルタ状態から再計算する。render()末尾から呼ぶ
@@ -3155,6 +3230,10 @@ function updateQuickFilterChips() {
   set('chip-week', 'chip-active', from === weekFrom && to === weekTo);
   set('chip-caution', 'chip-active-warn', cautionFilterOn);
   set('chip-remind', 'chip-active', remindFilterOn);
+  set('chip-dup', 'chip-active-warn', dupFilterOn);
+  // 「☰ 列」は列見出しのある予約/キャンセルの一覧でだけ意味がある
+  const colsBtn = document.getElementById('chip-cols');
+  if (colsBtn) colsBtn.style.display = (activeTab === 'reservations' || activeTab === 'cancellations') ? '' : 'none';
 }
 
 // 今日・明日の予約でリマインド(📞か✉️)が未実施の件数をトースト通知する。
@@ -3210,6 +3289,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   const qPhoneNorm = q ? normPhone(q) : ''; // phone search: strip hyphens etc from the query too, to match normPhone(r.phone)
   // 「要注意のみ」チップ: 予約タブでONの間だけ getCautionReservations() に載っているidに絞る
   const cautionIds = (tabId === 'reservations' && cautionFilterOn) ? new Set(getCautionReservations().map(o => o.r.id)) : null;
+  const dupMapPre = (tabId === 'reservations' && dupFilterOn) ? buildDupGroups(data) : null;
   // 検索欄に「hpb」「サロンボード」等と入れたらHPB経由だけに絞り込めるようにする
   // (1文字だと普通の検索を邪魔するので2文字以上・前方一致に限る)
   const HPB_QUERY_KEYS = ['hpb', 'ホットペッパー', 'ホットペッパービューティー', 'サロンボード', 'salonboard'];
@@ -3236,6 +3316,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       if (remindDone(r)) return false;
     }
     if (cautionIds && !cautionIds.has(r.id)) return false;
+    // 「🔁重複?のみ」: 同日・同氏名・同電話の組に属する行だけ(バッジと同じ判定を使う)
+    if (dupMapPre && dupLevelFor(r, dupMapPre) !== 'dup') return false;
     return true;
   });
   filtered.sort((a, b) => {
@@ -3398,6 +3480,7 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
     }).join('');
   }
   // 予約者リストだけ、🔁重複?を1件に数えた実質の件数も添える(重複が無ければ出さない)
+  applyColumnVisibility(tabId);   // 端末に保存した列の表示/非表示を反映
   const uniqNote = (tabId === 'reservations')
     ? (() => { const u = countUniqueReservations(filtered), ua = countUniqueReservations(data);
                return (u < filtered.length || ua < data.length) ? `（重複を除くと ${u}件 / 全${ua}件）` : ''; })()
