@@ -148,13 +148,14 @@
   .date-filter input[type="date"] { width: auto; padding: 6px 10px; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px; }
   .table-wrap { padding: 16px 24px; }
   .table-container { background: var(--color-surface); border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); }
-  /* 見出し(th)を sticky でページに追従させるための決まりごと:
-     .table-scroll に overflow-x:auto を付けると、それ自体が「スクロール容器」になり
-     sticky はページではなくその箱(縦には動かない)に貼り付いて、見出しが下スクロールで消える。
-     → 通常幅では overflow を持たせない。横スクロールが必要な狭い幅(≤1100px)だけ auto にする
-       (768px以下はカード表示になり見出し自体を出さない)。 */
-  .table-scroll { border-radius: 12px; }
-  @media (max-width: 1100px) { body:not(.force-card) .table-scroll { overflow-x: auto; } }
+  /* 見出し(th)の固定について:
+     表は横にはみ出すことが多く(列が多い)、横スクロール容器が必須。ところが sticky は
+     「いちばん近いスクロール容器」に貼り付くため、ページ全体をスクロールすると見出しは消える。
+     → 表の箱そのものを縦スクロール領域にし、見出しはその箱の上端に固定する(メール一覧と同じ方式)。
+       画面幅に関係なく効き、件数表示(フッター)も常に見える。
+       カード表示(768px以下 / force-card)では見出しを出さないので解除する。 */
+  .table-scroll { overflow: auto; border-radius: 12px; max-height: calc(100vh - 170px); min-height: 280px; overscroll-behavior: contain; }
+  @media (max-width: 768px) { .table-scroll { max-height: none; overflow: visible; } }
   table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
   thead tr { background: var(--color-neutral-bg); }
   th {
