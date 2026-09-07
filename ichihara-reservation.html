@@ -148,16 +148,22 @@
   .date-filter input[type="date"] { width: auto; padding: 6px 10px; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px; }
   .table-wrap { padding: 16px 24px; }
   .table-container { background: var(--color-surface); border-radius: 12px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); }
-  /* thead を sticky にするため、table-scroll/table-container に overflow-y の制約を持たせない
-     (overflow:hidden を持つとページ全体スクロールへの追従が壊れるため意図的に外している) */
-  .table-scroll { overflow-x: auto; border-radius: 12px; }
+  /* 見出し(th)を sticky でページに追従させるための決まりごと:
+     .table-scroll に overflow-x:auto を付けると、それ自体が「スクロール容器」になり
+     sticky はページではなくその箱(縦には動かない)に貼り付いて、見出しが下スクロールで消える。
+     → 通常幅では overflow を持たせない。横スクロールが必要な狭い幅(≤1100px)だけ auto にする
+       (768px以下はカード表示になり見出し自体を出さない)。 */
+  .table-scroll { border-radius: 12px; }
+  @media (max-width: 1100px) { body:not(.force-card) .table-scroll { overflow-x: auto; } }
   table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
   thead tr { background: var(--color-neutral-bg); }
   th {
     padding: 14px 14px; text-align: left; font-weight: 700; color: var(--color-neutral);
-    font-size: 13px; border-bottom: 2px solid var(--color-neutral-tint); white-space: nowrap;
+    font-size: 13px; white-space: nowrap;
     user-select: none;
     position: sticky; top: 0; z-index: 5; background: var(--color-neutral-bg);
+    /* border-collapse の表では sticky セルの border が動かず線だけ置き去りになる(Chrome)。影で描く */
+    box-shadow: inset 0 -2px 0 var(--color-neutral-tint);
   }
   th[onclick] {
     cursor: pointer; transition: all 0.15s;
@@ -2113,6 +2119,21 @@ function renderBlocklistTable(q, dateFrom, dateTo) {
 function getSamedayCountMap() { return getSamedayCounts(); }
 
 // ── 同日・同名の重複検出 ────────────────────────────────────────────────
+// 🔁重複?(同日・同氏名・同電話)を1件に数えたときの件数。
+// 電話番号が無い予約は照合できないので、そのまま1件ずつ数える(👥同名?は別人の可能性があるため除外しない)。
+function countUniqueReservations(records) {
+  const seen = new Set();
+  let n = 0;
+  (records || []).forEach(r => {
+    const d = (r.datetime || r.date || '').substring(0, 10);
+    const nm = normName(r.name);
+    const ph = normPhone(r.phone);
+    const k = (d && nm && ph) ? d + '|' + nm + '|' + ph : null;
+    if (k) { if (seen.has(k)) return; seen.add(k); }
+    n++;
+  });
+  return n;
+}
 // 同じ「日付＋正規化氏名」で2件以上ある組を検出（スペース有無/全半角の違いは吸収）
 function buildDupGroups(records) {
   const map = {};
@@ -3168,6 +3189,8 @@ function render() {
   renderCautionBanner();
   updateQuickFilterChips();
   document.getElementById('stat-reservations').textContent = reservations.length;
+  { const u = countUniqueReservations(reservations);
+    document.getElementById('stat-reservations').title = (u < reservations.length) ? `重複(🔁)を1件に数えると ${u}件` : ''; }
   document.getElementById('stat-cancellations').textContent = cancellations.length;
   document.getElementById('stat-noshow').textContent = noshows.length;
   document.getElementById('stat-sameday').textContent = getSamedayList().length;
@@ -3373,7 +3396,12 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
     </tr>`;
     }).join('');
   }
-  document.getElementById('rowCount-' + tabId).textContent = `${filtered.length}件 / 全${data.length}件`;
+  // 予約者リストだけ、🔁重複?を1件に数えた実質の件数も添える(重複が無ければ出さない)
+  const uniqNote = (tabId === 'reservations')
+    ? (() => { const u = countUniqueReservations(filtered), ua = countUniqueReservations(data);
+               return (u < filtered.length || ua < data.length) ? `（重複を除くと ${u}件 / 全${ua}件）` : ''; })()
+    : '';
+  document.getElementById('rowCount-' + tabId).textContent = `${filtered.length}件 / 全${data.length}件${uniqNote}`;
 }
 
 function renderNoshowTable(q, dateFrom, dateTo) {
