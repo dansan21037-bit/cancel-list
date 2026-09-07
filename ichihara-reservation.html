@@ -3143,7 +3143,7 @@ function colHiddenSet(tabId) {
 function saveColHidden(tabId, set) {
   try { const all = JSON.parse(localStorage.getItem(COL_KEY) || '{}'); all[tabId] = Array.from(set); localStorage.setItem(COL_KEY, JSON.stringify(all)); } catch (e) {}
 }
-function colLabel(th) { return (th.textContent || '').replace(/↕/g, '').replace(/\s+/g, ' ').trim(); }
+function colLabel(th) { return (th.textContent || '').replace(/[↕▼▲]/g, '').replace(/\s+/g, ' ').trim(); }   // 並び替えの印は含めない(列名が変わって設定が外れるため)
 function applyColumnVisibility(tabId) {
   const panel = document.getElementById('panel-' + tabId);
   if (!panel) return;
@@ -3153,7 +3153,8 @@ function applyColumnVisibility(tabId) {
   const hideIdx = [];
   ths.forEach((th, i) => { const on = hidden.has(colLabel(th)); th.classList.toggle('col-hide', on); if (on) hideIdx.push(i); });
   panel.querySelectorAll('tbody tr').forEach(tr => {
-    const tds = tr.children;
+    // 行の先頭にはカード表示用の見出しセル(card-header-cell)が1つ余分にあり、そのままだと th と番号がずれる。除いて揃える
+    const tds = Array.from(tr.children).filter(td => !td.classList.contains('card-header-cell'));
     for (let i = 0; i < tds.length; i++) tds[i].classList.toggle('col-hide', hideIdx.indexOf(i) >= 0);
   });
 }
