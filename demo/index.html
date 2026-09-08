@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="ja" data-theme="">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>【デモ】整体院向け アプリ入口</title>
+<meta name="theme-color" content="#432710" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="寿アプリ" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --brand:#B79434; --gold:#B79434; --goldtext:#8A6B2E;
+    --ink:#432710; --on-ink:#F6F1E7;
+    --bg:#F6F3F1; --surface:#FFFFFF; --text:#564C45; --muted:#8F8175;
+    --border:#E5DED4; --border-strong:#CBBBA6; --danger:#A63A2B;
+    --chip-bg:#FFFFFF; --chip-on:#432710; --chip-on-fg:#F6F1E7;
+    --title:#432710;
+    --shadow:0 1px 2px rgba(67,39,16,.05);
+    --serif:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+  }
+  html[data-theme="dark"]{
+    --brand:#C9A94E; --gold:#C9A94E; --goldtext:#D9BC6A;
+    --ink:#EDE5D8; --on-ink:#211D18;
+    --bg:#211D18; --surface:#2C2721; --text:#EDE5D8; --muted:#A79781;
+    --border:rgba(237,229,216,.15); --border-strong:rgba(237,229,216,.32); --danger:#E08A73;
+    --chip-bg:#2C2721; --chip-on:#EDE5D8; --chip-on-fg:#211D18;
+    --title:#EDE5D8; --shadow:none;
+  }
+  @media (prefers-color-scheme:dark){
+    html:not([data-theme="light"]){
+      --brand:#C9A94E; --gold:#C9A94E; --goldtext:#D9BC6A;
+      --ink:#EDE5D8; --on-ink:#211D18;
+      --bg:#211D18; --surface:#2C2721; --text:#EDE5D8; --muted:#A79781;
+      --border:rgba(237,229,216,.15); --border-strong:rgba(237,229,216,.32); --danger:#E08A73;
+      --chip-bg:#2C2721; --chip-on:#EDE5D8; --chip-on-fg:#211D18;
+      --title:#EDE5D8; --shadow:none;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.6;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:18px 16px 96px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .brandline{display:flex;align-items:center;gap:12px;min-width:0}
+  .crest{width:40px;height:40px;border-radius:50%;background:#432710;color:#F6F1E7;flex:0 0 auto;
+    font-family:var(--serif);font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;
+    border:1px solid #B79434;box-shadow:inset 0 0 0 2px #432710,inset 0 0 0 3px rgba(183,148,52,.55)}
+  .title{font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:.12em;color:var(--title);line-height:1.3;white-space:nowrap}
+  .sub{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.08em}
+  .brandrule{height:1px;background:var(--gold);opacity:.65;margin:12px 0 14px}
+  .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);
+    display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .iconbtn:active{transform:scale(.96)}
+  .iconbtn.spin{animation:lspin .8s linear infinite}
+  @keyframes lspin{to{transform:rotate(360deg)}}
+  .bico{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .bico.s{width:16px;height:16px}
+  .tico{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .tools{display:flex;gap:7px}
+  .idbar{display:none;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .who{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;padding:8px 14px;border-radius:999px;border:1px solid var(--border-strong);background:var(--chip-bg);color:var(--text);cursor:pointer}
+  .scopesel{height:38px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);padding:0 10px;font-size:13.5px}
+  .search{position:relative;margin-bottom:12px}
+  .search input{width:100%;height:44px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);
+    font-size:16px;padding:0 14px 0 42px;outline:none}
+  .search input::placeholder{color:var(--muted)}
+  .search input:focus{border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 24%,transparent)}
+  .search .gl{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);display:flex}
+  .chips{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;font-size:12.5px;padding:7px 14px;border-radius:7px;border:1px solid var(--border-strong);
+    background:transparent;color:var(--text);cursor:pointer;white-space:nowrap;letter-spacing:.04em}
+  .chip.on{background:var(--chip-on);color:var(--chip-on-fg);border-color:var(--chip-on)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:11px}
+  .card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;
+    cursor:pointer;box-shadow:var(--shadow);transition:transform .08s,border-color .15s;text-align:left;display:flex;flex-direction:column;gap:10px;min-height:118px}
+  .card:active{transform:scale(.98)}
+  .card:hover{border-color:var(--border-strong)}
+  .card.dim{opacity:.45}
+  body.styling .card{outline:1px dashed var(--gold);outline-offset:-2px}
+  body.styling .editrow.admin{display:flex}
+  .newbadge{position:absolute;top:9px;left:9px;width:20px;height:20px;font-family:var(--serif);font-size:11.5px;font-weight:600;
+    color:#F6F1E7;background:#A63A2B;border-radius:4px;display:flex;align-items:center;justify-content:center}
+  .pe.txt{width:auto;padding:0 12px;font-size:13px;font-weight:600}
+  .tile{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1}
+  .name{font-family:var(--serif);font-size:14.5px;font-weight:600;line-height:1.4;color:var(--title);letter-spacing:.02em}
+  .desc{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .unset{font-size:11px;color:var(--goldtext);margin-top:3px}
+  .scopetag{display:inline-block;font-size:11px;color:var(--muted);margin-top:4px;border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;letter-spacing:.04em}
+  .fav{position:absolute;top:8px;right:8px;width:30px;height:30px;border:none;background:transparent;cursor:pointer;font-size:16px;color:var(--muted);opacity:.5;padding:0}
+  .fav.on{color:var(--gold);opacity:1}
+  .editrow{display:none;gap:6px;margin-top:auto}
+  body.editing .editrow.local{display:flex}
+  body.personalizing .editrow.personal{display:flex}
+  body.editing .fav{display:none}
+  .mini{flex:1;font-size:12px;padding:6px 0;border-radius:7px;border:1px solid var(--border-strong);background:transparent;color:var(--text);cursor:pointer}
+  .mini.del{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--border))}
+  .addcard{align-items:center;justify-content:center;text-align:center;border-style:dashed;border-color:var(--border-strong);color:var(--muted);gap:8px;background:transparent}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px;font-size:14px}
+  .foot{margin-top:26px;font-size:11.5px;color:var(--muted);text-align:center;letter-spacing:.06em;line-height:1.8}
+  .ov{position:fixed;inset:0;background:rgba(33,24,14,.5);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .ov.show{display:flex}
+  .sheet{background:var(--surface);width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto;border-top:2px solid var(--gold)}
+  @media(min-width:560px){.ov{align-items:center}.sheet{border-radius:14px;border:1px solid var(--border);border-top:2px solid var(--gold)}}
+  .sheet h2{font-family:var(--serif);font-size:16.5px;font-weight:600;letter-spacing:.08em;color:var(--title);margin:2px 0 14px}
+  .idgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;letter-spacing:.04em}
+  .field input,.field select{width:100%;height:44px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:16px;padding:0 12px;outline:none}
+  .field input:focus,.field select:focus{border-color:var(--gold)}
+  .picker{display:flex;flex-wrap:wrap;gap:6px}
+  .pe{width:40px;height:40px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:19px;cursor:pointer;padding:0;color:var(--text);display:inline-flex;align-items:center;justify-content:center}
+  .pe.on{border-color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 34%,transparent)}
+  .pc{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+  .pc.on{border-color:var(--gold)}
+  .row2{display:flex;gap:10px}.row2>*{flex:1}
+  .actions{display:flex;gap:10px;margin-top:8px}
+  .btn{flex:1;height:46px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:14.5px;font-weight:600;cursor:pointer;letter-spacing:.06em}
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+  .btn:active{transform:scale(.98)}
+  .link{background:none;border:none;color:var(--goldtext);font-size:13px;cursor:pointer;padding:6px 2px}
+  .settings .srow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 2px;border-top:1px solid var(--border)}
+  .settings .srow:first-of-type{border-top:none}
+  /* 入口ページ固有 */
+  .who{cursor:default}
+  .who .mail{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who .role{font-size:11px;color:var(--goldtext);border:1px solid var(--border-strong);border-radius:4px;padding:0 6px;letter-spacing:.06em}
+  .logout{margin-left:auto;background:none;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px;padding:7px 12px;cursor:pointer;text-decoration:none}
+  .card.primary{border-color:var(--gold);box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 40%,transparent)}
+  .note{font-size:12px;color:var(--muted);text-align:center;padding:10px 0 0}
+  .skeleton{height:118px;border-radius:12px;background:linear-gradient(90deg,var(--surface),var(--bg),var(--surface));background-size:200% 100%;animation:sk 1.2s ease-in-out infinite;border:1px solid var(--border)}
+  @keyframes sk{to{background-position:-200% 0}}
+  /* 利用ログ(オーナーのみ) */
+  .logsheet{max-width:920px;width:94vw}
+  .logbar{display:flex;gap:8px 10px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+  .logbar .f{display:flex;flex-direction:column;gap:3px}
+  .logbar label{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .logbar input,.logbar select{border:1px solid var(--border);border-radius:8px;padding:0 9px;height:36px;font:inherit;font-size:13px;background:var(--surface);color:var(--text)}
+  .logbar .btn{flex:none;height:36px;padding:0 14px;font-size:13px}
+  .lgq{display:flex;gap:4px}
+  .lgq .qb{height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
+  .lgq .qb.on{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+  .logsum{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}
+  .logsum .c{font-size:11.5px;border:1px solid var(--border);border-radius:999px;padding:3px 10px;color:var(--muted);background:var(--bg)}
+  .logsum .c b{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+  .logarch{font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:8px}
+  .logarch.ok{color:#3E7A4A}
+  .logarch.warn{color:var(--danger)}
+  html[data-theme="dark"] .logarch.ok{color:#93C9A0}
+  .logwrap{max-height:56vh;overflow:auto;border:1px solid var(--border);border-radius:10px}
+  table.logtbl{width:100%;border-collapse:collapse;font-size:13px}
+  table.logtbl th{position:sticky;top:0;z-index:1;background:var(--surface);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);white-space:nowrap;letter-spacing:.04em}
+  table.logtbl td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5}
+  /* ★セレクタは1行で書く。改行すると子孫結合子になって別の要素まで塗る(統計画面で実際に起きた) */
+  table.logtbl tbody tr:not(.logday):hover td{background:var(--bg)}
+  table.logtbl tr:last-child td{border-bottom:none}
+  table.logtbl tr.logday td{background:var(--bg);color:var(--muted);font-size:11.5px;letter-spacing:.06em;padding:5px 10px;font-weight:600}
+  .logtime{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted);width:1%}
+  .logwho{white-space:nowrap;font-weight:600}
+  .logapp{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--border-strong);white-space:nowrap;margin-right:6px;color:var(--muted)}
+  .logtag{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:4px;background:var(--bg);border:1px solid var(--border);color:var(--muted);margin-left:6px;white-space:nowrap}
+  .loglink{color:var(--goldtext);text-decoration:none;font-size:11.5px;margin-left:6px;word-break:break-all}
+  .loglink:hover{text-decoration:underline}
+  .lognote{color:var(--muted);padding:14px 10px;font-size:12.5px}
+  .lghelp{font-size:11px;color:var(--muted);line-height:1.7;margin-top:8px}
+  @media (max-width:640px){
+    .logsheet{width:100%}
+    .logwrap{max-height:60vh}
+    table.logtbl{font-size:12.5px}
+    table.logtbl td{padding:7px 7px}
+    .logwho{white-space:nowrap}          /* 名前は折らない。折るなら内容側 */
+    .logbar .f{flex:1 1 44%}             /* 日付2つ・選択2つを2列に並べて高さを詰める */
+    .logbar .f:first-child{flex:1 1 100%}  /* 期間のクイック選択だけ1行使う */
+    .logbar input,.logbar select{width:100%;min-width:0}
+    .logbar .lgq .btn{flex:1}
+  }
+  /* スマホに追加(QRコード)。QRは暗色テーマでも読み取れるよう常に白地に載せる */
+  .qrsheet{max-width:380px;text-align:center}
+  .qrbox{display:inline-block;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px;line-height:0}
+  .qrbox svg{width:196px;height:196px;display:block}
+  .qrurl{font-size:12px;color:var(--muted);word-break:break-all;margin-top:10px}
+  .qrsteps{text-align:left;font-size:12.5px;line-height:1.9;margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+  .qrsteps b{color:var(--title)}
+  .qrcaution{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.7}
+  /* 編集モード(オーナーのみ) */
+  #editBtn.on{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+  body.editing .card{outline:1px dashed var(--gold);outline-offset:-3px}
+  body.editing .editrow{display:flex}
+  .editrow{display:none;gap:5px;margin-top:auto;flex-wrap:wrap}
+  .mini{flex:1;min-width:38px;font-size:12px;padding:7px 0;border-radius:7px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);cursor:pointer}
+  .mini.del{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--border))}
+  .mini:disabled{opacity:.35;cursor:default}
+  .card.hiddencard{opacity:.5}
+  .scopetag{display:inline-block;font-size:10.5px;color:var(--muted);margin-top:5px;border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;letter-spacing:.04em}
+  .editbanner{display:none;background:color-mix(in srgb,var(--gold) 14%,transparent);border:1px solid var(--border-strong);border-radius:9px;padding:9px 12px;font-size:12.5px;color:var(--text);margin-bottom:12px;line-height:1.6}
+  body.editing .editbanner{display:block}
+  .scopegrid{display:flex;flex-wrap:wrap;gap:7px}
+  .scopeopt{display:inline-flex;align-items:center;gap:6px;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;cursor:pointer;background:var(--bg);min-height:var(--tap-min)}
+  .scopeopt.on{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent)}
+  .scopeopt input{width:16px;height:16px;margin:0;accent-color:var(--ink)}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--on-ink);padding:11px 18px;border-radius:10px;font-size:13.5px;z-index:80;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
+  .toast.err{background:var(--danger)}
+  /* プレビュー(スタッフの画面を確認) */
+  .previewbar{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--ink);color:var(--on-ink);border-radius:9px;padding:10px 13px;font-size:13px;margin-bottom:12px}
+  body.previewing .previewbar{display:flex}
+  body.previewing .editbanner{display:none}
+  .previewbar .pvname{font-weight:600;font-family:var(--serif);letter-spacing:.04em}
+  .previewbar .pvend{margin-left:auto;background:var(--on-ink);color:var(--ink);border:none;border-radius:999px;font-size:12px;font-weight:600;padding:7px 14px;cursor:pointer}
+  .pvsel{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+  .pvbtn{font-size:13px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);padding:9px 13px;cursor:pointer;min-height:var(--tap-min)}
+  .pvbtn:active{transform:scale(.98)}
+  .scopesection{font-size:11px;color:var(--muted);letter-spacing:.08em;width:100%;margin:6px 0 1px}
+  /* ブランド表記(2行目=社名)。狭い画面ではヘッダーが折り返さないよう縮める */
+  .corp{font-family:var(--serif);font-size:12px;letter-spacing:.1em;color:var(--goldtext);margin-top:3px;white-space:nowrap}
+  @media (max-width:400px){
+    .title{font-size:16px;letter-spacing:.06em}
+    .corp{font-size:11px;letter-spacing:.06em}
+    .crest{width:34px;height:34px;font-size:17px}
+    .brandline{gap:9px}
+  }
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="ic-refresh" viewBox="0 0 24 24"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></symbol>
+  <symbol id="ic-pencil" viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.828 2.828 0 1 0-4-4L4 16v4"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="ic-palette" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 1 0-18 9 8 0 0 1 9 8 4.5 4.5 0 0 1-4.5 4.5h-2.5a2 2 0 0 0-1 3.75 1.3 1.3 0 0 1-1 1.75"/><circle cx="7.5" cy="10.5" r=".6"/><circle cx="12" cy="7.5" r=".6"/><circle cx="16.5" cy="10.5" r=".6"/></symbol>
+  <symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065"/></symbol>
+  <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M20 20l-5.4-5.4"/></symbol>
+  <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></symbol>
+  <symbol id="ic-cash" viewBox="0 0 24 24"><rect x="7" y="9" width="14" height="10" rx="2"/><circle cx="14" cy="14" r="2"/><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="ic-chart-bar" viewBox="0 0 24 24"><rect x="4" y="12" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="16" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="ic-trend" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></symbol>
+  <symbol id="ic-receipt" viewBox="0 0 24 24"><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-2 2-2-2-2 2-2-2-3 2"/><path d="M9 8h6M9 12h6"/></symbol>
+  <symbol id="ic-notes" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+  <symbol id="ic-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M16 3v4M8 3v4M4 11h16"/></symbol>
+  <symbol id="ic-cal-ev" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M16 3v4M8 3v4M4 11h16"/><rect x="8" y="14" width="2.5" height="2.5"/></symbol>
+  <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></symbol>
+  <symbol id="ic-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85"/></symbol>
+  <symbol id="ic-folders" viewBox="0 0 24 24"><path d="M9 4h3l2 2h5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2"/><path d="M17 17v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2"/></symbol>
+  <symbol id="ic-world" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"/></symbol>
+  <symbol id="ic-cart" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M17 17H6V3H4"/><path d="M6 5l14 1-1 7H6"/></symbol>
+  <symbol id="ic-box" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></symbol>
+  <symbol id="ic-hosp" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/><path d="M12 8v4M10 10h4"/><path d="M10 21v-4h4v4"/></symbol>
+  <symbol id="ic-heart" viewBox="0 0 24 24"><path d="M19.5 12.572L12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566"/></symbol>
+  <symbol id="ic-bone" viewBox="0 0 24 24"><path d="M15 3a3 3 0 0 1 3 3 3 3 0 1 1-2.6 4.5l-2.9 2.9A3 3 0 1 1 6 18a3 3 0 1 1 3-4.5l2.9-2.9A3 3 0 0 1 15 3z"/></symbol>
+  <symbol id="ic-bell" viewBox="0 0 24 24"><path d="M10 5a2 2 0 1 1 4 0 7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></symbol>
+  <symbol id="ic-speaker" viewBox="0 0 24 24"><path d="M18 8a3 3 0 0 1 0 6"/><path d="M10 8v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5"/><path d="M12 8l4.5-3.8a.9.9 0 0 1 1.5.7v14.2a.9.9 0 0 1-1.5.7L12 14H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/></symbol>
+  <symbol id="ic-camera" viewBox="0 0 24 24"><path d="M5 7h1a2 2 0 0 0 2-2 1 1 0 0 1 1-1h6a1 1 0 0 1 1 1 2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="ic-star" viewBox="0 0 24 24"><path d="M12 17.75l-6.172 3.245 1.179-6.873-5-4.867 6.9-1L12 2l3.086 6.253 6.9 1-5 4.867 1.179 6.873z"/></symbol>
+  <symbol id="ic-link" viewBox="0 0 24 24"><path d="M9 15l6-6"/><path d="M11 6l.463-.536a5 5 0 0 1 7.071 7.072L18 13"/><path d="M13 18l-.397.534a5.068 5.068 0 0 1-7.127 0 4.972 4.972 0 0 1 0-7.071L6 11"/></symbol>
+</svg>
+<svg style="display:none" aria-hidden="true"><symbol id="ic-log" viewBox="0 0 24 24"><path d="M4 5.5h16M4 12h16M4 18.5h10"/><circle cx="19" cy="18.5" r="2.2"/></symbol></svg>
+<svg style="display:none" aria-hidden="true"><symbol id="ic-qr" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.6" height="6.6" rx="1"/><rect x="13.9" y="3.5" width="6.6" height="6.6" rx="1"/><rect x="3.5" y="13.9" width="6.6" height="6.6" rx="1"/><path d="M14 14h3v3h-3zM20.4 14v2.5M20.4 20.4h-3M14 20.4v-1.5"/></symbol></svg>
+<div class="wrap">
+  <header>
+    <div class="brandline">
+      <div class="crest">寿</div>
+      <div>
+        <div class="title">整体KOTOBUKI -寿-</div>
+        <div class="corp">LINUS Co., Ltd.</div>
+        <div class="sub" id="sub">読み込み中…</div>
+      </div>
+    </div>
+    <div class="tools">
+      <button class="iconbtn" id="qrBtn" title="スマホに追加（QRコード・手順）" aria-label="スマホに追加（QRコード・手順）"><svg class="bico"><use href="#ic-qr"/></svg></button>
+      <button class="iconbtn" id="refreshBtn" title="更新" aria-label="更新"><svg class="bico"><use href="#ic-refresh"/></svg></button>
+      <button class="iconbtn" id="logBtn" title="利用ログ" aria-label="利用ログ" style="display:none"><svg class="bico"><use href="#ic-log"/></svg></button>
+      <button class="iconbtn" id="editBtn" title="アプリを管理" aria-label="アプリを管理" style="display:none"><svg class="bico"><use href="#ic-pencil"/></svg></button>
+    </div>
+  </header>
+  <div class="brandrule"></div>
+
+  <div class="idbar" id="idbar" style="display:flex">
+    <span class="who"><svg class="bico s"><use href="#ic-user"/></svg><span class="mail" id="whoMail">…</span><span class="role" id="whoRole"></span></span>
+    <a class="logout" href="/cdn-cgi/access/logout">ログアウト</a>
+  </div>
+
+  <div class="editbanner">
+    <strong>管理モード</strong>：カードの「編集」「↑」「↓」「削除」が使えます。表示範囲でスタッフに見せるカードを選べます。<br>
+    もう一度 ✎ を押すと通常表示に戻ります。
+    <div class="scopesection" style="margin-top:9px">スタッフの画面を確認する</div>
+    <div class="pvsel" id="pvSel"></div>
+  </div>
+
+  <div class="previewbar">
+    <span>👁 <span class="pvname" id="pvName"></span> の画面を表示中</span>
+    <button class="pvend" id="pvEnd">確認をやめる</button>
+  </div>
+
+  <div class="search">
+    <span class="gl"><svg class="bico s"><use href="#ic-search"/></svg></span>
+    <input id="q" type="search" placeholder="アプリをさがす" autocomplete="off" />
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <div class="grid" id="grid"><div class="skeleton"></div><div class="skeleton"></div></div>
+  <div class="note" id="note"></div>
+  <div class="foot">スマホの登録は右上のQRボタンから（QRコード・手順を表示）<br>― 整体KOTOBUKI -寿- ―</div>
+</div>
+
+<!-- 利用ログ(オーナーのみ)。サーバー側でも role=owner 以外は403 -->
+<div class="ov" id="logOv">
+  <div class="sheet logsheet">
+    <h2>利用ログ</h2>
+    <div class="logbar">
+      <div class="f"><label>期間</label><div class="lgq">
+        <button type="button" class="qb" data-days="1">今日</button>
+        <button type="button" class="qb" data-days="7">7日</button>
+        <button type="button" class="qb" data-days="30">30日</button>
+      </div></div>
+      <div class="f"><label>開始日</label><input type="date" id="lgFrom"></div>
+      <div class="f"><label>終了日</label><input type="date" id="lgTo"></div>
+      <div class="f"><label>アプリ</label><select id="lgApp">
+        <option value="">すべて</option>
+        <option value="entrance">入口</option>
+        <option value="yoyaku">キャンセル管理</option>
+        <option value="shukei">集計アプリ</option>
+        <option value="card">カードを押した</option>
+      </select></div>
+      <div class="f"><label>だれが</label><select id="lgWho"><option value="">すべて</option></select></div>
+      <div class="f"><label>&nbsp;</label><div class="lgq"><button class="btn" id="lgGo">再読み込み</button><button class="btn" id="lgCsv">CSV出力</button></div></div>
+    </div>
+    <div class="logsum" id="lgSum"></div>
+    <div class="logarch" id="lgArch"></div>
+    <div class="logwrap"><table class="logtbl"><thead><tr>
+      <th>時刻</th><th>だれが</th><th>内容</th>
+    </tr></thead><tbody id="lgBody"></tbody></table></div>
+    <div class="lghelp">「開いた」は画面を開いた1回だけを記録します（自動更新では増えません）。ホーム画面から外部アプリを直接開いた場合は入口を通らないため残りません。</div>
+    <div class="actions" style="margin-top:14px"><button class="btn" id="lgClose">閉じる</button></div>
+  </div>
+</div>
+
+<!-- スマホに追加(QRコード・手順)。QRは build 時に生成した固定SVG(本番URL)。
+     URLを変えたときは scripts の説明に従いQRを作り直すこと -->
+<div class="ov" id="qrOv">
+  <div class="sheet qrsheet">
+    <h2>スマホに追加</h2>
+    <div class="qrbox"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h33v33H0z"/><path stroke="#000000" d="M2 2.5h7m1 0h3m1 0h1m2 0h6m1 0h7M2 3.5h1m5 0h1m1 0h3m3 0h2m1 0h1m2 0h1m1 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m2 0h1m3 0h3m2 0h3m1 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h3m6 0h1m1 0h1m2 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m2 0h1m3 0h1m5 0h1m2 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m2 0h3m2 0h1m2 0h4m1 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h1m2 0h7M2 10.5h1m1 0h2m1 0h3m1 0h3m1 0h6m3 0h1m2 0h1m1 0h2M2 11.5h1m2 0h1m4 0h1m3 0h1m6 0h1m1 0h4m3 0h1M2 12.5h1m1 0h3m1 0h5m1 0h1m1 0h1m1 0h3m3 0h3m1 0h2M2 13.5h1m2 0h3m3 0h1m1 0h1m1 0h2m3 0h2m1 0h1m1 0h2m3 0h1M3 14.5h1m1 0h1m2 0h1m1 0h2m2 0h1m4 0h1m1 0h1m5 0h2M3 15.5h3m1 0h1m2 0h2m1 0h3m1 0h5m2 0h2m2 0h3M4 16.5h1m2 0h4m2 0h2m1 0h1m2 0h1m1 0h3m4 0h3M2 17.5h1m4 0h1m1 0h1m1 0h1m1 0h3m2 0h1m2 0h1m2 0h1m1 0h1m2 0h1M2 18.5h2m1 0h2m1 0h1m4 0h1m3 0h1m3 0h3m2 0h2m1 0h1M3 19.5h1m1 0h1m1 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h1m2 0h2m1 0h1m1 0h3M2 20.5h1m3 0h5m2 0h1m3 0h2m3 0h1m3 0h1m1 0h1M4 21.5h1m2 0h1m1 0h2m6 0h1m1 0h2m4 0h1m2 0h1M3 22.5h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m2 0h11M10 23.5h1m4 0h2m1 0h1m1 0h3m3 0h5M2 24.5h7m1 0h6m3 0h1m1 0h2m1 0h1m1 0h2m1 0h1M2 25.5h1m5 0h1m1 0h1m2 0h1m3 0h1m2 0h1m1 0h1m3 0h2m1 0h1M2 26.5h1m1 0h3m1 0h1m2 0h3m2 0h1m2 0h1m2 0h5m1 0h2M2 27.5h1m1 0h3m1 0h1m1 0h1m2 0h5m1 0h2m2 0h1m2 0h2m2 0h1M2 28.5h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h1m2 0h1m3 0h1m2 0h1m1 0h1M2 29.5h1m5 0h1m8 0h1m2 0h1m1 0h1m1 0h4m1 0h1M2 30.5h7m1 0h2m1 0h1m4 0h1m1 0h6m3 0h1"/></svg></div>
+    <div class="qrurl">https://app.kotobuki-linus-app.com/</div>
+    <div class="qrsteps">
+      <div><b>iPhone</b>：QRを読み込む → 共有ボタン →「ホーム画面に追加」</div>
+      <div><b>Android</b>：QRを読み込む → 右上「⋮」→「ホーム画面に追加」</div>
+    </div>
+    <div class="qrcaution">開くにはスタッフ登録済みメールへの認証コード入力が必要です。<br>このQR・URLは当院スタッフ専用です。外部の方に渡さないでください。</div>
+    <div class="actions"><button class="btn" id="qrClose">閉じる</button><button class="btn" id="qrCopy">URLをコピー</button></div>
+  </div>
+</div>
+
+<!-- カード編集(オーナーのみ) -->
+<div class="ov" id="editOv">
+  <div class="sheet">
+    <h2 id="editTitle">アプリを追加</h2>
+    <div class="field"><label>アプリ名 <span style="color:var(--danger)">*</span></label><input id="fName" type="text" placeholder="例: 売上チェック" /></div>
+    <div class="field">
+      <label>URL</label>
+      <input id="fUrl" type="url" placeholder="https://…" inputmode="url" />
+      <div class="hint">https:// で始まるアドレス。このサイト内なら <code>/yoyaku/</code> のように / から書きます</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>カテゴリ</label><input id="fCat" type="text" list="catlist" placeholder="予約 / 売上 など" /><datalist id="catlist"></datalist></div>
+      <div class="field"><label>説明</label><input id="fDesc" type="text" placeholder="カードの2行目" /></div>
+    </div>
+    <div class="field">
+      <label>表示範囲（誰に見せるか）</label>
+      <div class="scopegrid" id="fScope"></div>
+      <div class="hint">院を選ぶと、その院の担当者に表示されます。特定の人だけに見せたいときは下から選んでください（院と併用できます）</div>
+      <div class="scopesection">個人を指定する（任意）</div>
+      <div class="scopegrid" id="fScopeUsers"></div>
+    </div>
+    <div class="field"><label>アイコン</label><div class="picker" id="fEmoji"></div></div>
+    <div class="field"><label>色</label><div class="picker" id="fColor"></div></div>
+    <div class="field" id="fHiddenWrap">
+      <label class="scopeopt" style="width:100%"><input type="checkbox" id="fHidden" /> 一時的に非表示にする（消さずに隠す）</label>
+    </div>
+    <div class="actions">
+      <button class="btn" id="editCancel">キャンセル</button>
+      <button class="btn primary" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script id="demo-pre">
+/* ── デモ用: /api/* をブラウザ内で偽装する(サーバー無しで入口ページを動かす) ── */
+(function(){
+  var COLORS=["blue","gray"];
+  function col(i){return COLORS[i%COLORS.length]||'gray';}
+  var STORES=[{key:'omiya',name:'大宮'},{key:'kawaguchi',name:'川口'},{key:'ichihara',name:'市原'}];
+  var ME={email:'owner@example.com',role:'owner',stores:['omiya','kawaguchi','ichihara'],name:'オーナー(デモ)'};
+  var PEOPLE=[{email:'owner@example.com',name:'オーナー(デモ)',role:'owner',stores:['omiya','kawaguchi','ichihara']},
+    {email:'staff-a@example.com',name:'スタッフA',role:'staff',stores:['omiya']},
+    {email:'staff-b@example.com',name:'スタッフB',role:'staff',stores:['kawaguchi']},
+    {email:'staff-c@example.com',name:'スタッフC',role:'staff',stores:['ichihara']}];
+  var cards=[
+    {id:'c1',name:'3院 売上LTV集計',url:'#demo',cat:'売上',desc:'個人の週別売上・ランキング',emoji:'📈',color:col(1),scope:'*',order:10,sameTab:false,hidden:false,added:''},
+    {id:'c2',name:'Quick Reserve',url:'#demo',cat:'予約',desc:'クイックリザーブ',emoji:'📅',color:col(2),scope:'*',order:20,sameTab:false,hidden:false,added:''},
+    {id:'c3',name:'HPB サロンボード',url:'#demo',cat:'予約',desc:'サロンボードTOP',emoji:'👥',color:col(3),scope:'*',order:30,sameTab:false,hidden:false,added:''},
+    {id:'c4',name:'大宮院スプシ',url:'#demo',cat:'売上',desc:'大宮院の集計シート',emoji:'📊',color:col(4),scope:'omiya',order:40,sameTab:false,hidden:false,added:''},
+    {id:'c5',name:'川口院スプシ',url:'#demo',cat:'売上',desc:'川口院の集計シート',emoji:'📊',color:col(4),scope:'kawaguchi',order:50,sameTab:false,hidden:false,added:''},
+    {id:'c6',name:'市原院スプシ',url:'#demo',cat:'売上',desc:'市原院の集計シート',emoji:'📊',color:col(4),scope:'ichihara',order:60,sameTab:false,hidden:false,added:''},
+    {id:'c7',name:'交通費・手当等 申請フォーム',url:'#demo',cat:'申請',desc:'給与・手当の申請',emoji:'🔔',color:col(5),scope:'*',order:70,sameTab:false,hidden:false,added:''},
+    {id:'c8',name:'顧客対応文 作成アプリ',url:'#demo',cat:'資料',desc:'メール等の返信文作成',emoji:'📝',color:col(6),scope:'*',order:80,sameTab:false,hidden:false,added:''},
+    {id:'c9',name:'社内マニュアル',url:'#demo',cat:'資料',desc:'受付・施術の手順書',emoji:'📖',color:col(7),scope:'owner',order:90,sameTab:false,hidden:false,added:''}
+  ];
+  function builtin(u){var names=u.stores.map(function(k){var s=STORES.filter(function(x){return x.key===k;})[0];return s?s.name+'院':'';}).filter(Boolean).join('・');
+    return {id:'__yoyaku__',name:'キャンセル管理',url:'omiya-reservation.html',cat:'予約',desc:'キャンセル・無断・予約不可 ('+names+')',emoji:'📅',color:'blue',scope:'*',order:-1000,sameTab:true,builtin:true,added:''};}
+  function visible(c,u){var sc=c.scope||'*';if(sc==='*')return true;if(sc==='owner')return u.role==='owner';return sc.split(',').some(function(v){v=v.trim();return v.indexOf('u:')===0?v.slice(2)===u.email:u.stores.indexOf(v)>=0;});}
+  function json(o){return new Response(JSON.stringify(o),{status:200,headers:{'content-type':'application/json'}});}
+  function nowJst(){var d=new Date(Date.now()+9*3600000);return d.toISOString().slice(0,19).replace('T',' ');}
+  // 利用ログ(架空)
+  function logs(){var out=[],seq=1;var names=PEOPLE;var apps=['entrance','yoyaku','shukei','card'];
+    for(var d=13;d>=0;d--){for(var i=0;i<6;i++){var p=names[(d+i)%names.length];var a=apps[(d*3+i)%apps.length];var dt=new Date(Date.now()-d*86400000-(i*97)%600*60000);
+      var at=new Date(dt.getTime()+9*3600000).toISOString().slice(0,19).replace('T',' ');
+      out.push({at:at,email:p.email,name:p.name,app:a,kind:a==='card'?'click':'open',detail:a==='yoyaku'?['omiya','kawaguchi','ichihara'][i%3]:(a==='card'?'3院 売上LTV集計 | https://example.com/':'')});}}
+    return out.sort(function(x,y){return x.at<y.at?1:-1;});}
+  function demoApi(path,opt){
+    var m=(opt.method||'GET').toUpperCase(); var url=new URL(path,location.href); var p=url.pathname; var body={};
+    try{ body=opt.body?JSON.parse(opt.body):{}; }catch(e){}
+    if(p==='/api/me') return json({user:ME,stores:STORES,serverTime:nowJst()});
+    if(p==='/api/cards' && m==='GET'){
+      var as=url.searchParams.get('as'); var viewer=ME, previewOf=null;
+      if(as && as!==ME.email){var pp=PEOPLE.filter(function(x){return x.email===as;})[0]; if(pp){viewer=pp;previewOf=pp;}}
+      var list=cards.filter(function(c){return visible(c,viewer)&&(previewOf?!c.hidden:true);});
+      var out={cards:[builtin(viewer)].concat(list),canEdit:!previewOf,stores:STORES,people:PEOPLE}; if(previewOf) out.previewOf=previewOf; return json(out);
+    }
+    if(p==='/api/cards' && m==='POST'){
+      if(!body.name) return json({error:'アプリ名を入力してください'});
+      if(body.id){var c0=cards.filter(function(c){return c.id===body.id;})[0]; if(c0) Object.assign(c0,body);}
+      else cards.push(Object.assign({id:'c'+Date.now(),order:(cards.length+1)*10,color:'gray',scope:'*',hidden:false,sameTab:false,added:nowJst()},body,{url:body.url||'#demo'}));
+      return json({ok:true});
+    }
+    if(p.indexOf('/api/cards/reorder')===0){var ids=body.ids||body.order||[]; ids.forEach(function(id,i){var c=cards.filter(function(x){return x.id===id;})[0]; if(c) c.order=(i+1)*10;}); return json({ok:true});}
+    if(p.indexOf('/api/cards')===0 && m==='DELETE'){var id=url.searchParams.get('id')||p.split('/').pop()||body.id; cards=cards.filter(function(c){return c.id!==id;}); return json({ok:true});}
+    if(p==='/api/access-logs'){var L=logs();var byApp={};L.forEach(function(x){byApp[x.app]=(byApp[x.app]||0)+1;});
+      return json({logs:L.slice(0,500),rows:Math.min(500,L.length),matched:L.length,byApp:byApp,people:PEOPLE.map(function(x){return {email:x.email,name:x.name,n:Math.round(L.length/PEOPLE.length)};}),
+        stores:{omiya:'大宮院',kawaguchi:'川口院',ichihara:'市原院'},keepDays:90,totalRows:L.length,pendingArchive:0,archiveConfigured:true,archiveStatus:{at:nowJst().slice(0,10)+' 00:00:41',ok:true}});}
+    if(p==='/api/hit') return json({ok:true});
+    return json({ok:true});
+  }
+  var realFetch=window.fetch;
+  window.fetch=function(u,o){var p=(typeof u==='string')?u:((u&&u.url)||''); if(p.indexOf('/api/')===0) return Promise.resolve(demoApi(p,o||{})); return realFetch.apply(this,arguments);};
+  navigator.sendBeacon=function(){return true;};
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  /* ===== 入口(ランチャー) クラウド版 =====
+     ・ログインは Cloudflare Access が済ませている(PINなし)。誰かは /api/cards が判定して返す
+     ・カード一覧はD1に保存。編集はオーナーのみ(サーバー側でも403で遮断)
+     ・「キャンセル管理」は組み込みカード。常に先頭・同一タブで /yoyaku/ へ(ホーム画面アプリの中に留まる) */
+  var $=function(s){return document.querySelector(s);};
+  var grid=$("#grid"), chips=$("#chips");
+  var EMOJI_ICON={"💰":"cash","📊":"chart-bar","📈":"trend","🧾":"receipt","✍️":"pencil","📝":"notes","📅":"cal","📆":"cal-ev","⏰":"clock","👥":"users","🗂️":"folders","📁":"folder","🌐":"world","🛒":"cart","📦":"box","🏥":"hosp","💆":"heart","🦴":"bone","🔧":"gear","🔔":"bell","📣":"speaker","📷":"camera","⭐":"star","🔗":"link"};
+
+  var EMOJIS=["💰","📊","📈","🧾","✍️","📝","📅","📆","⏰","👥","🗂️","📁","🌐","🛒","📦","🏥","💆","🦴","🔧","🔔","📣","📷","⭐","🔗"];
+
+  function iconOf(emoji,cls){var sym=EMOJI_ICON[emoji];return sym?'<svg class="'+(cls||"tico")+'"><use href="#ic-'+sym+'"/></svg>':null;}
+  var COLORS=[
+    {k:"teal",bg:"#E4EEE8",fg:"#3E6353"},{k:"blue",bg:"#E4EAF0",fg:"#3C5A78"},
+    {k:"green",bg:"#EAEDDC",fg:"#5A6839"},{k:"amber",bg:"#F3EAD2",fg:"#8A6B2E"},
+    {k:"purple",bg:"#EAE6F0",fg:"#5D5378"},{k:"pink",bg:"#F5E6E8",fg:"#8A5560"},
+    {k:"coral",bg:"#F5E6DA",fg:"#96562F"},{k:"gray",bg:"#EDE8E0",fg:"#6B6156"}
+  ];
+  function colorOf(k){for(var i=0;i<COLORS.length;i++){if(COLORS[i].k===k)return COLORS[i];}return COLORS[7];}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m];});}
+
+  var me=null, stores=[], apps=[], canEdit=false, editing=false;
+  var people=[], previewAs="", previewOf=null;   // previewAs=プレビュー中のメール("" なら通常)
+  var activeCat="すべて", query="", editId=null, fEmoji=EMOJIS[0], fColor=COLORS[0].k, busy=false;
+
+  /* ===== API ===== */
+  function api(path,opt){
+    opt=opt||{}; opt.credentials="same-origin"; opt.cache="no-store";
+    opt.headers=opt.headers||{};
+    var devEmail=localStorage.getItem("dev_email_cloud"); if(devEmail)opt.headers["x-dev-email"]=devEmail; // ローカル検証用(本番では無視)
+    if(opt.body)opt.headers["content-type"]="application/json";
+    return fetch(path,opt).then(function(r){
+      if(r.status===401||r.status===403&&!opt.body){ location.reload(); throw new Error("再ログインが必要です"); }
+      return r.json().catch(function(){throw new Error("サーバーの応答を読めませんでした");}).then(function(j){
+        if(!r.ok||j.error) throw new Error(j.error||("エラー "+r.status));
+        return j;
+      });
+    });
+  }
+  var toastTimer=null;
+  function toast(msg,isErr){
+    var t=$("#toast"); t.textContent=msg; t.className="toast show"+(isErr?" err":"");
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.className="toast";},isErr?4200:2200);
+  }
+
+  /* ===== 表示範囲のラベル ===== */
+  function personLabel(email){
+    for(var i=0;i<people.length;i++) if(people[i].email===email) return people[i].name||people[i].email;
+    return email;
+  }
+  function scopeLabel(sc){
+    sc=String(sc||"*");
+    if(sc==="*")return "全員";
+    if(sc==="owner")return "オーナーのみ";
+    return sc.split(",").map(function(k){
+      k=k.trim();
+      if(k.indexOf("u:")===0) return personLabel(k.slice(2))+"さん";
+      for(var i=0;i<stores.length;i++) if(stores[i].key===k) return stores[i].name+"院";
+      return k;
+    }).join("・");
+  }
+
+  /* ===== 一覧の描画 ===== */
+  function cats(){var set=[];apps.forEach(function(a){if(a.cat&&set.indexOf(a.cat)<0)set.push(a.cat);});return set;}
+  function renderChips(){
+    var list=["すべて"].concat(cats());
+    chips.innerHTML="";
+    if(list.length<=2){chips.style.display="none";return;}
+    chips.style.display="";
+    list.forEach(function(c){var b=document.createElement("button");b.className="chip"+(c===activeCat?" on":"");b.textContent=c;b.onclick=function(){activeCat=c;render();};chips.appendChild(b);});
+  }
+  function visible(){
+    var q=query.trim().toLowerCase();
+    return apps.filter(function(a){
+      if(activeCat!=="すべて"&&a.cat!==activeCat)return false;
+      if(q&&(a.name+" "+(a.desc||"")+" "+(a.cat||"")).toLowerCase().indexOf(q)<0)return false;
+      return true;
+    });
+  }
+  /* 利用ログを1件送る。画面を止めないため待たない。
+     遷移で消えないよう sendBeacon を優先する(未対応なら keepalive fetch) */
+  /* 送信を試みて、送れたと言えるなら true を返す。
+     sendBeacon はキューに入れられないと false を返すので、それを見て
+     「記録済み」にしてしまわないようにする(でないとその回の記録が永久に消える) */
+  function hit(app,kind,detail){
+    try{
+      var body=JSON.stringify({app:app,kind:kind||"open",detail:detail||""});
+      if(navigator.sendBeacon){
+        return navigator.sendBeacon("/api/hit",new Blob([body],{type:"application/json"}));
+      }
+      fetch("/api/hit",{method:"POST",headers:{"Content-Type":"application/json"},body:body,keepalive:true});
+      return true;
+    }catch(e){ return false; }
+  }
+  /* スマホのホーム画面アプリは復帰しても再読込されない。
+     30分以上離れてから戻ったら「開き直した」とみなして1回記録する */
+  var hiddenAt=0;
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="hidden"){hiddenAt=Date.now();return;}
+    if(hiddenAt&&Date.now()-hiddenAt>30*60*1000){hit("entrance","open","復帰");}
+    hiddenAt=0;
+  });
+
+  function openApp(a){
+    if(!a.url){ if(canEdit){openEdit(a);}else{toast("このアプリはURLが未設定です",true);} return; }
+    /* 押した記録。ホーム画面から直接開かれた外部アプリはここを通らないので残らない(仕組み上の限界) */
+    hit("card","click",(a.name||"")+" | "+a.url);
+    if(a.sameTab||a.url.charAt(0)==="/"){location.href=a.url;return;}
+    window.open(a.url,"_blank","noopener");
+  }
+  /* 並び替え可能な(=組み込みでない)カードのidを、表示順で返す */
+  function movableIds(){ return apps.filter(function(a){return !a.builtin;}).map(function(a){return a.id;}); }
+
+  function render(){
+    renderChips();
+    var list=visible();
+    grid.innerHTML="";
+    var movable=movableIds();
+    list.forEach(function(a){
+      var c=colorOf(a.color);
+      var card=document.createElement("div");
+      card.className="card"+(a.builtin?" primary":"")+(a.hidden?" hiddencard":"");
+      card.setAttribute("role","button"); card.tabIndex=0;
+      var isNew=a.added && (Date.now()-Date.parse(a.added) < 7*86400000);
+      var mi=movable.indexOf(a.id);
+      var rows="";
+      if(canEdit && !previewAs && !a.builtin){
+        rows='<div class="editrow">'+
+          '<button class="mini ed">編集</button>'+
+          '<button class="mini up"'+(mi<=0?" disabled":"")+'>↑</button>'+
+          '<button class="mini dn"'+(mi<0||mi>=movable.length-1?" disabled":"")+'>↓</button>'+
+          '<button class="mini del">削除</button></div>';
+      }
+      card.innerHTML=
+        (isNew?'<span class="newbadge">新</span>':'')+
+        '<div class="tile" style="background:'+c.bg+';color:'+c.fg+'">'+(iconOf(a.emoji)||esc(a.emoji||a.name.slice(0,1)))+'</div>'+
+        '<div><div class="name">'+esc(a.name)+'</div>'+
+        (a.desc?'<div class="desc">'+esc(a.desc)+'</div>':'')+
+        (!a.url?'<div class="unset">URL未設定</div>':'')+
+        ((canEdit&&editing&&!previewAs&&!a.builtin)?'<div class="scopetag">'+esc(scopeLabel(a.scope))+(a.hidden?' / 非表示':'')+'</div>':'')+
+        '</div>'+rows;
+      card.onclick=function(){ if(editing&&canEdit&&!previewAs&&!a.builtin){openEdit(a);return;} openApp(a); };
+      card.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();card.onclick();}};
+      var q1=card.querySelector(".ed"); if(q1)q1.onclick=function(e){e.stopPropagation();openEdit(a);};
+      var q2=card.querySelector(".del"); if(q2)q2.onclick=function(e){e.stopPropagation();delCard(a);};
+      var q3=card.querySelector(".up"); if(q3)q3.onclick=function(e){e.stopPropagation();move(a,-1);};
+      var q4=card.querySelector(".dn"); if(q4)q4.onclick=function(e){e.stopPropagation();move(a,1);};
+      grid.appendChild(card);
+    });
+    if(canEdit&&!previewAs){
+      var add=document.createElement("div");
+      add.className="card addcard"; add.setAttribute("role","button"); add.tabIndex=0;
+      add.innerHTML='<div class="tile" style="background:var(--bg);color:var(--muted)">＋</div><div class="name">アプリを追加</div>';
+      add.onclick=function(){openEdit(null);};
+      add.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();openEdit(null);}};
+      grid.appendChild(add);
+    }
+    if(!list.length){var e=document.createElement("div");e.className="empty";e.textContent=query?("「"+query+"」に一致するアプリはありません"):"表示できるアプリがありません";grid.appendChild(e);}
+  }
+
+  /* ===== 編集フォーム ===== */
+  function buildPickers(){
+    var pe=$("#fEmoji"); pe.innerHTML="";
+    EMOJIS.forEach(function(em){
+      var b=document.createElement("button"); b.type="button";
+      b.className="pe"+(em===fEmoji?" on":""); b.title=em;
+      b.innerHTML=iconOf(em,"bico")||em;
+      b.onclick=function(){fEmoji=em;buildPickers();};
+      pe.appendChild(b);
+    });
+    var pc=$("#fColor"); pc.innerHTML="";
+    COLORS.forEach(function(c){
+      var b=document.createElement("button"); b.type="button";
+      b.className="pc"+(c.k===fColor?" on":""); b.style.background=c.bg; b.title=c.k;
+      b.onclick=function(){fColor=c.k;buildPickers();};
+      pc.appendChild(b);
+    });
+  }
+  function buildScope(sel){
+    var wrap=$("#fScope"); wrap.innerHTML="";
+    var uwrap=$("#fScopeUsers"); uwrap.innerHTML="";
+    var opts=[{v:"*",label:"全員"},{v:"owner",label:"オーナーのみ"}].concat(stores.map(function(s){return {v:s.key,label:s.name+"院"};}));
+    opts.forEach(function(o){
+      var lab=document.createElement("label"); lab.className="scopeopt";
+      var inp=document.createElement("input"); inp.type=(o.v==="*"||o.v==="owner")?"radio":"checkbox"; inp.name=(o.v==="*"||o.v==="owner")?"scopeMode":"scopeStore"; inp.value=o.v;
+      lab.appendChild(inp); lab.appendChild(document.createTextNode(o.label));
+      inp.onchange=function(){
+        if(o.v==="*"||o.v==="owner"){ // 全員/オーナーのみ を選んだら院と個人のチェックを外す
+          clearChecks('input[name=scopeStore]'); clearChecks('input[name=scopeUser]');
+        }else if(inp.checked){        // 院を選んだら 全員/オーナーのみ を外す
+          clearChecks('input[name=scopeMode]');
+        }
+        syncScopeUi();
+      };
+      wrap.appendChild(lab);
+    });
+    // 個人指定(スタッフ→オーナーの順。自分自身も選べる)
+    people.forEach(function(u){
+      var lab=document.createElement("label"); lab.className="scopeopt";
+      var inp=document.createElement("input"); inp.type="checkbox"; inp.name="scopeUser"; inp.value=u.email;
+      var who=(u.name||u.email)+(u.role==="owner"?"（オーナー）":"");
+      lab.appendChild(inp); lab.appendChild(document.createTextNode(who));
+      inp.onchange=function(){ if(inp.checked) clearChecks('input[name=scopeMode]'); syncScopeUi(); };
+      uwrap.appendChild(lab);
+    });
+    if(!people.length) uwrap.innerHTML='<div class="hint">利用者がまだ登録されていません</div>';
+    // 初期選択
+    var sc=String(sel||"*");
+    if(sc==="*"||sc==="owner"){ var r=wrap.querySelector('input[value="'+sc+'"]'); if(r)r.checked=true; }
+    else {
+      sc.split(",").forEach(function(k){
+        k=k.trim();
+        if(k.indexOf("u:")===0){ var y=uwrap.querySelector('input[name=scopeUser][value="'+k.slice(2)+'"]'); if(y)y.checked=true; }
+        else { var x=wrap.querySelector('input[name=scopeStore][value="'+k+'"]'); if(x)x.checked=true; }
+      });
+    }
+    syncScopeUi();
+  }
+  function clearChecks(sel){
+    Array.prototype.forEach.call(document.querySelectorAll('#fScope '+sel+', #fScopeUsers '+sel),function(x){x.checked=false;});
+  }
+  function syncScopeUi(){
+    Array.prototype.forEach.call(document.querySelectorAll('#fScope .scopeopt, #fScopeUsers .scopeopt'),function(lab){
+      var inp=lab.querySelector("input"); if(inp) lab.className="scopeopt"+(inp.checked?" on":"");
+    });
+  }
+  function readScope(){
+    var mode=document.querySelector('#fScope input[name=scopeMode]:checked');
+    var st=Array.prototype.filter.call(document.querySelectorAll('#fScope input[name=scopeStore]'),function(x){return x.checked;}).map(function(x){return x.value;});
+    var us=Array.prototype.filter.call(document.querySelectorAll('#fScopeUsers input[name=scopeUser]'),function(x){return x.checked;}).map(function(x){return "u:"+x.value;});
+    var all=st.concat(us);
+    if(all.length) return all.join(",");
+    return mode?mode.value:"*";
+  }
+  function refreshCatList(){
+    var dl=$("#catlist"); dl.innerHTML="";
+    cats().forEach(function(c){var o=document.createElement("option");o.value=c;dl.appendChild(o);});
+  }
+  function openEdit(a){
+    if(!canEdit)return;
+    editId=a?a.id:null;
+    $("#editTitle").textContent=a?"アプリを編集":"アプリを追加";
+    $("#fName").value=a?a.name:"";
+    $("#fUrl").value=a?(a.url||""):"";
+    $("#fCat").value=a?(a.cat||""):"";
+    $("#fDesc").value=a?(a.desc||""):"";
+    $("#fHidden").checked=a?!!a.hidden:false;
+    $("#fHiddenWrap").style.display=a?"":"none";
+    fEmoji=(a&&a.emoji)?a.emoji:EMOJIS[0];
+    fColor=(a&&a.color)?a.color:COLORS[0].k;
+    buildPickers(); buildScope(a?a.scope:"*"); refreshCatList();
+    $("#editOv").classList.add("show");
+    setTimeout(function(){$("#fName").focus();},60);
+  }
+  function closeEdit(){ $("#editOv").classList.remove("show"); editId=null; }
+  function saveEdit(){
+    if(busy)return;
+    var name=$("#fName").value.trim();
+    if(!name){toast("アプリ名を入力してください",true);$("#fName").focus();return;}
+    var body={id:editId,name:name,url:$("#fUrl").value.trim(),cat:$("#fCat").value.trim(),
+      desc:$("#fDesc").value.trim(),emoji:fEmoji,color:fColor,scope:readScope(),hidden:$("#fHidden").checked};
+    var wasEdit=!!editId;   // closeEdit()でeditIdが消えるので先に控える
+    busy=true; $("#editSave").disabled=true;
+    api("/api/cards",{method:"POST",body:JSON.stringify(body)}).then(function(){
+      closeEdit(); toast(wasEdit?"保存しました":"追加しました"); return reload();
+    }).catch(function(e){ toast(e.message||"保存できませんでした",true); })
+      .then(function(){ busy=false; $("#editSave").disabled=false; });
+  }
+  function delCard(a){
+    if(!canEdit||busy)return;
+    if(!confirm("「"+a.name+"」を削除しますか？\n(消さずに隠したいときは 編集 →「一時的に非表示にする」)"))return;
+    busy=true;
+    api("/api/cards",{method:"DELETE",body:JSON.stringify({id:a.id})}).then(function(){
+      toast("削除しました"); return reload();
+    }).catch(function(e){ toast(e.message||"削除できませんでした",true); })
+      .then(function(){ busy=false; });
+  }
+  function move(a,dir){
+    if(!canEdit||busy)return;
+    var ids=movableIds();
+    var i=ids.indexOf(a.id);
+    if(i<0)return;
+    var j=i+dir;
+    if(j<0||j>=ids.length)return;
+    ids[i]=ids[j]; ids[j]=a.id;
+    // 先に画面へ反映(待たせない)。失敗したら再取得で元に戻る
+    var byId={}; apps.forEach(function(x){byId[x.id]=x;});
+    apps=apps.filter(function(x){return x.builtin;}).concat(ids.map(function(id){return byId[id];}));
+    render();
+    busy=true;
+    api("/api/cards/reorder",{method:"POST",body:JSON.stringify({ids:ids})})
+      .catch(function(e){ toast(e.message||"並び替えを保存できませんでした",true); return reload(); })
+      .then(function(){ busy=false; });
+  }
+
+  /* ===== プレビュー(スタッフの画面を確認) ===== */
+  function buildPreviewButtons(){
+    var wrap=$("#pvSel"); if(!wrap)return;
+    wrap.innerHTML="";
+    var others=people.filter(function(u){return u.email!==String(me.email).toLowerCase();});
+    if(!others.length){ wrap.innerHTML='<div class="hint">ほかの利用者がまだ登録されていません</div>'; return; }
+    others.forEach(function(u){
+      var b=document.createElement("button"); b.type="button"; b.className="pvbtn";
+      var where=u.role==="owner"?"オーナー":u.stores.map(function(k){
+        for(var i=0;i<stores.length;i++) if(stores[i].key===k) return stores[i].name;
+        return k;
+      }).join("・");
+      b.textContent=(u.name||u.email)+(where?"（"+where+"）":"");
+      b.onclick=function(){ startPreview(u.email); };
+      wrap.appendChild(b);
+    });
+  }
+  function startPreview(email){
+    previewAs=email;
+    document.body.classList.add("previewing");
+    reload().then(function(){
+      if(previewOf) $("#pvName").textContent=(previewOf.name||previewOf.email);
+    });
+  }
+  function endPreview(){
+    previewAs=""; previewOf=null;
+    document.body.classList.remove("previewing");
+    reload();
+  }
+
+  /* ===== 読み込み ===== */
+  function reload(){
+    var q=previewAs?("?as="+encodeURIComponent(previewAs)):"";
+    return api("/api/cards"+q).then(function(j){
+      apps=j.cards||[]; canEdit=!!j.canEdit; stores=j.stores||[];
+      if(j.people) people=j.people;
+      previewOf=j.previewOf||null;
+      $("#editBtn").style.display=(canEdit||previewAs)?"":"none";
+      if(!canEdit&&editing&&!previewAs){editing=false;document.body.classList.remove("editing");}
+      buildPreviewButtons();
+      render();
+    }).catch(function(e){
+      if(previewAs){ toast(e.message||"プレビューできませんでした",true); endPreview(); return; }
+      throw e;
+    });
+  }
+  var logged=false;   /* 「入口を開いた」を記録済みか(更新ボタンでの二重記録よけ) */
+  function boot(spin){
+    var rb=$("#refreshBtn"); if(spin&&rb)rb.classList.add("spin");
+    return api("/api/me").then(function(j){
+      me=j.user;
+      $("#whoMail").textContent=me.name||me.email;
+      $("#whoRole").textContent=me.role==="owner"?"オーナー":"スタッフ";
+      $("#sub").textContent="";   // 読み込み完了。社名の下に文言を足すと3行になるため空にする
+      /* boot() は更新ボタンからも呼ばれる。ここで毎回記録すると、
+         更新を5回押しただけで「入口を6回開いた」と残ってしまう。
+         記録するのは本当に画面を開いた最初の1回だけにする */
+      if(!logged){ logged=hit("entrance","open"); }
+      if(me.role==="owner")$("#logBtn").style.display="";
+      return reload();
+    }).catch(function(e){
+      grid.innerHTML='<div class="empty">読み込みに失敗しました: '+esc(e.message||e)+'<br><button class="btn" style="margin-top:12px" onclick="location.reload()">再読み込み</button></div>';
+    }).then(function(){ if(rb)rb.classList.remove("spin"); });
+  }
+
+  $("#q").addEventListener("input",function(){query=this.value;render();});
+  $("#refreshBtn").onclick=function(){boot(true);};
+  $("#editBtn").onclick=function(){
+    if(previewAs){ endPreview(); return; }   // プレビュー中に押したら元に戻す
+    editing=!editing;
+    document.body.classList.toggle("editing",editing);
+    $("#editBtn").classList.toggle("on",editing);
+    render();
+  };
+  $("#pvEnd").onclick=endPreview;
+  $("#editCancel").onclick=closeEdit;
+  $("#editSave").onclick=saveEdit;
+  $("#editOv").addEventListener("click",function(e){ if(e.target===this)closeEdit(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&$("#editOv").classList.contains("show"))closeEdit(); });
+  /* 利用ログ(オーナーのみ) */
+  var logOv=$("#logOv");
+  var APPJA={entrance:"入口",yoyaku:"キャンセル管理",shukei:"集計アプリ",card:"カード"};
+  /* ログの at はJSTで記録されている。ここでUTCの日付を使うと、
+     JSTの0時〜9時に開いたとき当日ぶんが丸ごと範囲から外れて
+     「今日は誰も使っていない」ように見えてしまう。必ずJSTで作る */
+  function ymdJst(ms){ return new Date(ms+9*3600000).toISOString().slice(0,10); }
+  var lgStores={};   /* 院キー→院名。サーバーから受け取る(院名をここに直書きしない) */
+  var WD=["日","月","火","水","木","金","土"];
+  /* "2026-08-30" → "8月30日（土）"。曜日は閲覧者のタイムゾーンに左右されないようUTCで計算する */
+  function fmtDay(ymd){ var d=new Date(ymd+"T00:00:00Z"); if(isNaN(d.getTime()))return ymd; return (d.getUTCMonth()+1)+"月"+d.getUTCDate()+"日（"+WD[d.getUTCDay()]+"）"; }
+  function hostOf(u){ try{ return new URL(u).host; }catch(e){ return ""; } }
+  /* 1行の「内容」を人が読める文にする。detail の形は記録側の約束:
+       yoyaku … 院キー("omiya") / 復帰は "復帰 omiya"
+       card   … "カード名 | URL"
+       entrance/shukei … 空 / 復帰は "復帰" */
+  function describe(r){
+    var d=String(r.detail||"");
+    var chip='<span class="logapp">'+esc(APPJA[r.app]||r.app)+'</span>';
+    if(r.app==="card"){
+      var i=d.indexOf(" | "); var nm=i>=0?d.slice(0,i):d, url=i>=0?d.slice(i+3):"";
+      /* 外部URLだけドメインを添える。入口内のパス(/yoyaku/ 等)は見ても意味がないので出さない */
+      var link=(url&&url.charAt(0)!=="/")?' <a class="loglink" href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(hostOf(url)||url)+'</a>':"";
+      return chip+esc(nm||"(名前なし)")+" を押した"+link;
+    }
+    var back=false, store=d;
+    if(d.indexOf("復帰")===0){ back=true; store=d.slice(2).trim(); }
+    var text=(r.app==="yoyaku"&&store)?esc(lgStores[store]||store)+" を開いた":"開いた";
+    return chip+text+(back?'<span class="logtag">30分以上あけて再表示</span>':"");
+  }
+  function lgQuery(){
+    var p=[];
+    if($("#lgFrom").value)p.push("from="+$("#lgFrom").value);
+    if($("#lgTo").value)p.push("to="+$("#lgTo").value);
+    if($("#lgApp").value)p.push("app="+$("#lgApp").value);
+    if($("#lgWho").value)p.push("email="+encodeURIComponent($("#lgWho").value));
+    return p.join("&");
+  }
+  function lgNote(t){ $("#lgBody").innerHTML='<tr><td colspan="3" class="lognote">'+esc(t)+'</td></tr>'; }
+  function lgLoad(){
+    var f=$("#lgFrom").value, t=$("#lgTo").value;
+    if(f&&t&&f>t){ $("#lgSum").innerHTML=""; $("#lgArch").textContent=""; $("#lgArch").className="logarch"; lgNote("開始日が終了日より後になっています"); return; }
+    lgNote("読み込み中…");
+    api("/api/access-logs?"+lgQuery()).then(function(j){
+      lgStores=j.stores||{};
+      /* だれが: 候補を差し替えつつ、選んでいた人は維持する */
+      var who=$("#lgWho"), cur=who.value;
+      who.innerHTML='<option value="">すべて</option>'+(j.people||[]).map(function(p){
+        return '<option value="'+esc(p.email)+'">'+esc(p.name||p.email)+'（'+p.n+'）</option>';
+      }).join("");
+      who.value=cur;
+      /* サマリ */
+      var sum=['<span class="c">該当 <b>'+j.matched+'</b> 件</span>'];
+      ["entrance","yoyaku","shukei","card"].forEach(function(a){ var n=(j.byApp||{})[a]; if(n)sum.push('<span class="c">'+esc(APPJA[a])+' <b>'+n+'</b></span>'); });
+      if((j.people||[]).length)sum.push('<span class="c">この期間の利用者 <b>'+j.people.length+'</b> 人</span>');
+      $("#lgSum").innerHTML=sum.join("");
+      /* 退避の状態 */
+      var ar=$("#lgArch"), cls="", txt;
+      if(!j.archiveConfigured){ cls="warn"; txt="⚠ スプレッドシートへの退避が未設定です。設定するまで古い記録も消しません。"; }
+      else if(j.archiveStatus&&j.archiveStatus.ok===false){ cls="warn"; txt="⚠ 前回の退避が失敗しました（"+(j.archiveStatus.at||"")+"）: "+(j.archiveStatus.error||""); }
+      else if(j.archiveStatus){ cls="ok"; txt="✓ スプレッドシートへ退避済み（最終 "+j.archiveStatus.at+"）"; }
+      else { txt="スプレッドシートへの退避はまだ実行されていません（1日1回、深夜に実行）"; }
+      if(j.pendingArchive)txt+="　次回退避待ち "+j.pendingArchive+"件";
+      txt+="　／　この画面には直近"+j.keepDays+"日ぶん（全"+j.totalRows+"件）を保持";
+      ar.textContent=txt; ar.className="logarch "+cls;
+      /* 一覧: 日付ごとにまとめ、行は時刻だけにする */
+      if(!j.logs.length){ lgNote("この条件の記録はありません"); return; }
+      var html="", day="";
+      j.logs.forEach(function(r){
+        var d=String(r.at).slice(0,10);
+        if(d!==day){ day=d; html+='<tr class="logday"><td colspan="3">'+esc(fmtDay(d))+'</td></tr>'; }
+        html+='<tr><td class="logtime">'+esc(String(r.at).slice(11,16))+'</td>'
+          +'<td class="logwho" title="'+esc(r.email)+'">'+esc(r.name||r.email)+'</td>'
+          +'<td>'+describe(r)+'</td></tr>';
+      });
+      if(j.matched>j.logs.length) html+='<tr><td colspan="3" class="lognote">新しい '+j.logs.length+' 件だけ表示しています（該当 '+j.matched+' 件）。期間や条件を絞るか、CSV出力で全件を取り出せます。</td></tr>';
+      $("#lgBody").innerHTML=html;
+    }).catch(function(e){
+      $("#lgSum").innerHTML=""; var ar=$("#lgArch"); ar.textContent="読み込みに失敗しました: "+(e.message||e); ar.className="logarch warn";
+      $("#lgBody").innerHTML="";
+    });
+  }
+  /* 期間のクイック選択。押した範囲を反映し、手で日付を触ったら選択状態を外す */
+  function lgRange(days){
+    $("#lgFrom").value=ymdJst(Date.now()-(days-1)*86400000);
+    $("#lgTo").value=ymdJst(Date.now());
+    [].forEach.call(document.querySelectorAll("#logOv .qb"),function(b){ b.classList.toggle("on",Number(b.getAttribute("data-days"))===days); });
+  }
+  [].forEach.call(document.querySelectorAll("#logOv .qb"),function(b){ b.onclick=function(){ lgRange(Number(b.getAttribute("data-days"))); lgLoad(); }; });
+  ["#lgFrom","#lgTo"].forEach(function(s){ $(s).addEventListener("change",function(){ [].forEach.call(document.querySelectorAll("#logOv .qb"),function(b){b.classList.remove("on");}); lgLoad(); }); });
+  ["#lgApp","#lgWho"].forEach(function(s){ $(s).addEventListener("change",lgLoad); });
+  $("#logBtn").onclick=function(){
+    if(!$("#lgFrom").value) lgRange(7);   /* 既定は今日を含む直近7日 */
+    logOv.classList.add("show"); lgLoad();
+  };
+  $("#lgGo").onclick=lgLoad;
+  $("#lgCsv").onclick=function(){ location.href="/api/access-logs.csv?"+lgQuery(); };
+  $("#lgClose").onclick=function(){logOv.classList.remove("show");};
+  logOv.addEventListener("click",function(e){if(e.target===this)logOv.classList.remove("show");});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&logOv.classList.contains("show"))logOv.classList.remove("show");});
+
+  // スマホに追加(QR)。コピーは失敗したらURLをボタンに出す(手動コピーの逃げ道)
+  var qrOv=$("#qrOv"), ENTRANCE_URL="https://app.kotobuki-linus-app.com/";
+  $("#qrBtn").onclick=function(){qrOv.classList.add("show");};
+  $("#qrClose").onclick=function(){qrOv.classList.remove("show");};
+  $("#qrCopy").onclick=function(){var b=this;try{navigator.clipboard.writeText(ENTRANCE_URL).then(function(){b.textContent="コピーしました";setTimeout(function(){b.textContent="URLをコピー";},1600);});}catch(e){b.textContent=ENTRANCE_URL;}};
+  qrOv.addEventListener("click",function(e){if(e.target===this)qrOv.classList.remove("show");});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&qrOv.classList.contains("show"))qrOv.classList.remove("show");});
+  boot(false);
+})();
+</script>
+<style>
+  body{padding-top:34px}
+  .demo-bar{position:fixed;left:0;right:0;top:0;height:34px;z-index:1000;background:#7c2d12;color:#fff;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:12.5px;box-shadow:0 1px 6px rgba(0,0,0,.3)}
+  .demo-bar b{background:#fff;color:#7c2d12;border-radius:999px;padding:1px 9px;font-size:11px;letter-spacing:.06em}
+  .demo-bar .sp{flex:1}
+  .demo-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:1001;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+  #qrBtn{display:none !important}
+  .logout{display:none !important}
+</style>
+<div class="demo-bar" role="note"><b>DEMO</b><span>サンプル画面（データはすべて架空です）</span><span class="sp"></span><span>カードの「キャンセル管理」を押すと予約管理画面へ</span></div>
+<script id="demo-post">
+(function(){
+  function demoToast(m){var t=document.createElement('div');t.className='demo-toast';t.textContent=m;document.body.appendChild(t);setTimeout(function(){t.remove();},2600);}
+  // 外部アプリのカードは開かず、デモである旨を出す
+  window.open=function(){demoToast('デモ版のため外部アプリは開きません');return null;};
+  var csv=document.getElementById('lgCsv'); if(csv) csv.onclick=function(){demoToast('デモ版のためCSV出力は動作しません');};
+})();
+</script>
+</body>
+</html>
