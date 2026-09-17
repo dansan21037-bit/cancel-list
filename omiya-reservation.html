@@ -3438,7 +3438,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         if (isCancelled) {
           samedayCol = `<td data-label="🟠当日" style="text-align:center;color:var(--color-neutral-muted)" title="既にキャンセル済みのため対象外">—</td>`;
         } else if (r.movedToSameday) {
-          samedayCol = `<td data-label="🟠当日" style="text-align:center"><span class="noshow-checked-label" style="color:var(--color-caution-strong)">✓ 登録済</span></td>`;
+          // 登録済みもチェック付きで表示し、外せば取り消せるようにする(無断の欄と同じ操作感)
+          samedayCol = `<td data-label="🟠当日" style="text-align:center"><label class="tap-check"><input type="checkbox" class="sameday-check" checked onchange="unmarkSameday('${r.id}', this)" title="当日キャンセルに登録済み。チェックを外すと登録を取り消します"></label></td>`;
         } else {
           samedayCol = `<td data-label="🟠当日" style="text-align:center"><label class="tap-check"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}', this)" title="当日キャンセルに登録（電話キャンセル等）"></label></td>`;
         }
@@ -4450,8 +4451,10 @@ function moveToNoshow(reservationId, checkbox) {
 
 // ── 予約 → 無断キャンセル の取り消し(チェックを外す) ────────────────────
 // 誤ってチェックした場合に戻せるようにする。無断キャンセル一覧の該当行を消し、予約のフラグも戻す。
-// 無断チェックで予約不可リストに「自動登録」された分は、自動同期では消えない(無断由来は触らない設計)ため、
-// その人に他の無断キャンセルが残らない場合に限って一緒に取り消す。どちらも「元に戻す」で復元できる。
+// 予約不可リストは「チェックを外したら元に戻す」運用方針に合わせ、その人に他の無断キャンセルが残らない場合、
+// 自動登録・スタッフの手動登録・判断済み(予約不可/免除)を問わず一緒に取り消す。
+// 他の無断キャンセルが残っている場合は、登録の根拠が残っているので触らない。
+// 確認文に消える登録の内容を出し、「元に戻す」で元の登録ごと復元できる。
 function unmarkNoshow(reservationId, checkbox) {
   const r = reservations.find(x => x.id === reservationId);
   if (!r) { if (checkbox) checkbox.checked = true; return; }
@@ -4462,32 +4465,47 @@ function unmarkNoshow(reservationId, checkbox) {
   const targetIds = new Set(targets.map(n => n.id));
   const remaining = noshows.filter(n => !targetIds.has(n.id) && matchCustomer(n, r).hit);
   const block = findBlockEntry(r);
-  const autoBlock = (block && remaining.length === 0 && block.status === 'blocked'
-    && block.source === 'noshow' && block.note === '無断キャンセルのため自動登録') ? block : null;
+  const dropBlock = (block && remaining.length === 0) ? block : null;
   let msg = `「${r.name}」（${r.datetime}）の無断キャンセル登録を取り消しますか？`;
   const noted = targets.find(n => String(n.note || '').trim());
   if (noted) msg += `\n\n📝 無断キャンセル一覧の備考「${noted.note}」も消えます。`;
-  if (autoBlock) msg += `\n\n🚷 この登録で自動的に入った「予約不可」も取り消します。`;
-  else if (block && block.status === 'blocked') msg += `\n\n🚷 予約不可リストの登録はそのまま残ります（他の無断キャンセルやスタッフの判断による登録のため）。`;
+  if (dropBlock) msg += `\n\n🚷 予約不可リストの登録（${blockEntryLabel(dropBlock)}）も取り消します。`;
+  else if (block) msg += `\n\n🚷 予約不可リストの登録はそのまま残ります（他にも無断キャンセルが${remaining.length}件あるため）。`;
   if (!confirm(msg)) { if (checkbox) checkbox.checked = true; return; }
   const noshowCopies = JSON.parse(JSON.stringify(targets));
-  const blockCopy = autoBlock ? JSON.parse(JSON.stringify(autoBlock)) : null;
+  const blockCopy = dropBlock ? JSON.parse(JSON.stringify(dropBlock)) : null;
+  const blockIdsBefore = new Set(blocklist.map(b => b.id));
   noshows = noshows.filter(n => !targetIds.has(n.id));
-  if (autoBlock) blocklist = blocklist.filter(b => b !== autoBlock);
+  if (dropBlock) blocklist = blocklist.filter(b => b !== dropBlock);
   r.movedToNoshow = false;
   saveData(); render();
-  showUndoToast(`「${r.name}」の無断キャンセル登録を取り消しました`, function() {
+  // 当日キャンセルの回数などを根拠に、保存時の自動同期が登録し直すことがある。その場合は結果を伝える
+  const after = dropBlock ? findBlockEntry(r) : null;
+  showUndoToast(`「${r.name}」の無断キャンセル登録を取り消しました${after ? '（予約不可リストは「' + blockEntryLabel(after) + '」になりました）' : ''}`, function() {
     noshowCopies.forEach(c => {
       // 取り消し待ちの間に追加された新規レコードと数値idが衝突したら採番し直す(deleteRecordと同じ)
       if (noshows.some(x => x.id === c.id)) c.id = noshows.length > 0 ? Math.max(...noshows.map(n => Number(n.id) || 0)) + 1 : 1;
       noshows.push(c);
     });
-    if (blockCopy && !blocklist.some(b => b.id === blockCopy.id)) blocklist.push(blockCopy);
+    restoreBlockEntry(blockCopy, blockIdsBefore, r);
     const orig = reservations.find(x => x.id === reservationId);
     if (orig) orig.movedToNoshow = true;
     saveData(); render();
     showToast(`「${r.name}」の無断キャンセル登録を元に戻しました ✓`, 'success');
   });
+}
+// 予約不可リストの登録を、確認文で読める一言にする(状態と備考)
+function blockEntryLabel(b) {
+  const st = b.status === 'blocked' ? '予約不可' : b.status === 'pending' ? '確認待ち' : b.status === 'exempt' ? '免除' : String(b.status || '');
+  const note = String(b.note || '').trim();
+  return st + (note ? '・' + note : '');
+}
+// 取り消しの「元に戻す」で予約不可の登録を復元する。
+// 取り消し後に自動同期が作り直した同じ人の登録は、元の登録(スタッフの判断や備考を含む)に置き換えて二重にしない。
+function restoreBlockEntry(blockCopy, blockIdsBefore, person) {
+  if (!blockCopy) return;
+  blocklist = blocklist.filter(b => blockIdsBefore.has(b.id) || !matchCustomer(b, person).hit);
+  if (!blocklist.some(b => b.id === blockCopy.id)) blocklist.push(blockCopy);
 }
 
 // ── 予約 → 当日キャンセル（電話キャンセル等をチェックで登録） ────────────
@@ -4522,6 +4540,48 @@ function moveToSameday(reservationId, checkbox) {
   showToast(`「${r.name}」を当日キャンセルに登録しました（${countAfter}回目）`, 'success');
   // 続けて理由を聞く(お客様の事情によっては予約不可の回数に数えないため)
   setTimeout(() => openReasonModal(newId, '', 'manual', r.name || '', '', ''), 350);
+}
+
+// ── 予約 → 当日キャンセル の取り消し(チェックを外す) ────────────────────
+// 誤ってチェックした場合に戻せるようにする。当日キャンセル(手動)の該当行を消し、予約のフラグも戻す。
+// 予約不可リストは無断の取り消しと同じ方針: 取り消した後に登録の根拠(無断キャンセル、または基準回数以上の
+// 当日キャンセル)が残らなければ、自動登録・スタッフの手動登録・判断済みを問わず一緒に取り消す。根拠が残るなら触らない。
+function unmarkSameday(reservationId, checkbox) {
+  const r = reservations.find(x => x.id === reservationId);
+  if (!r) { if (checkbox) checkbox.checked = true; return; }
+  const d = (r.datetime || '').substring(0, 10);
+  // 予約から登録した行(fromReservationId)を優先。それが無い古いデータは電話番号+日付で照合
+  let targets = samedayManual.filter(s => s.fromReservationId != null && String(s.fromReservationId) === String(r.id));
+  if (!targets.length && r.phone && d) targets = samedayManual.filter(s => !s.fromReservationId && s.phone === r.phone && s.date === d);
+  const targetIds = new Set(targets.map(s => s.id));
+  // 取り消した後に残る根拠を数える(当日キャンセルの一覧は samedayManual から作られるので、一時的に外して数える)
+  const savedManual = samedayManual;
+  samedayManual = samedayManual.filter(s => !targetIds.has(s.id));
+  const sdLeft = countOf(getSamedayCountedCounts(), r);
+  samedayManual = savedManual;
+  const nsLeft = noshows.filter(n => matchCustomer(n, r).hit).length;
+  const block = findBlockEntry(r);
+  const dropBlock = (block && nsLeft === 0 && sdLeft < SAMEDAY_BLOCK_THRESHOLD) ? block : null;
+  let msg = `「${r.name}」（${r.datetime}）の当日キャンセル登録を取り消しますか？`;
+  if (targets.some(s => s.reason)) msg += `\n\n📝 選んだキャンセル理由も一緒に消えます。`;
+  if (dropBlock) msg += `\n\n🚷 予約不可リストの登録（${blockEntryLabel(dropBlock)}）も取り消します。`;
+  else if (block) msg += `\n\n🚷 予約不可リストの登録はそのまま残ります（${nsLeft ? '無断キャンセルが' + nsLeft + '件' : '当日キャンセルが' + sdLeft + '回'}あるため）。`;
+  if (!confirm(msg)) { if (checkbox) checkbox.checked = true; return; }
+  const copies = JSON.parse(JSON.stringify(targets));
+  const blockCopy = dropBlock ? JSON.parse(JSON.stringify(dropBlock)) : null;
+  const blockIdsBefore = new Set(blocklist.map(b => b.id));
+  samedayManual = samedayManual.filter(s => !targetIds.has(s.id));
+  if (dropBlock) blocklist = blocklist.filter(b => b !== dropBlock);
+  r.movedToSameday = false;
+  saveData(); render();
+  showUndoToast(`「${r.name}」の当日キャンセル登録を取り消しました${dropBlock ? '（予約不可リストの登録も取り消し）' : ''}`, function() {
+    copies.forEach(c => { if (!samedayManual.some(s => s.id === c.id)) samedayManual.push(c); });
+    restoreBlockEntry(blockCopy, blockIdsBefore, r);
+    const orig = reservations.find(x => x.id === reservationId);
+    if (orig) orig.movedToSameday = true;
+    saveData(); render();
+    showToast(`「${r.name}」の当日キャンセル登録を元に戻しました ✓`, 'success');
+  });
 }
 
 // ── Noshow CRUD ─────────────────────────────────────────────────────────
@@ -4900,7 +4960,9 @@ function openRowDetailSheet(tabId, id) {
           <label class="rds-check-row"><input type="checkbox" class="remind-check" ${r.remindMail ? 'checked' : ''} onchange="toggleRemind('${r.id}','mail',this);openRowDetailSheet('${tabId}','${r.id}')"> ✉️メールリマインド 実施済み</label>`;
       }
       if (!cancelled) {
-        if (!r.movedToSameday) actionsHtml += `<label class="rds-check-row"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🟠当日キャンセルに登録</label>`;
+        actionsHtml += r.movedToSameday
+          ? `<label class="rds-check-row"><input type="checkbox" class="sameday-check" checked onchange="unmarkSameday('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🟠当日キャンセルに登録済み（外すと取り消し）</label>`
+          : `<label class="rds-check-row"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🟠当日キャンセルに登録</label>`;
         actionsHtml += r.movedToNoshow
           ? `<label class="rds-check-row"><input type="checkbox" class="noshow-check" checked onchange="unmarkNoshow('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🚫無断キャンセルに登録済み（外すと取り消し）</label>`
           : `<label class="rds-check-row"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🚫無断キャンセルに登録</label>`;
