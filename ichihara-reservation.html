@@ -3450,7 +3450,8 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
         if (isCancelled) {
           noshowCol = `<td data-label="🚫無断" style="text-align:center;color:var(--color-neutral-muted)" title="既にキャンセル済み(事前連絡あり)のため対象外">—</td>`;
         } else if (alreadyMoved) {
-          noshowCol = `<td data-label="🚫無断" style="text-align:center"><span class="noshow-checked-label">✓ 登録済</span></td>`;
+          // 登録済みもチェック付きで表示し、外せば取り消せるようにする(誤チェックを戻す手段が無かった)
+          noshowCol = `<td data-label="🚫無断" style="text-align:center"><label class="tap-check"><input type="checkbox" class="noshow-check" checked onchange="unmarkNoshow('${r.id}', this)" title="無断キャンセルに登録済み。チェックを外すと登録を取り消します"></label></td>`;
         } else {
           noshowCol = `<td data-label="🚫無断" style="text-align:center"><label class="tap-check"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}', this)" title="無断キャンセルに登録"></label></td>`;
         }
@@ -4447,6 +4448,48 @@ function moveToNoshow(reservationId, checkbox) {
   showToast(`「${r.name}」を無断キャンセルリストに登録しました（${countAfter}回目）`, 'success');
 }
 
+// ── 予約 → 無断キャンセル の取り消し(チェックを外す) ────────────────────
+// 誤ってチェックした場合に戻せるようにする。無断キャンセル一覧の該当行を消し、予約のフラグも戻す。
+// 無断チェックで予約不可リストに「自動登録」された分は、自動同期では消えない(無断由来は触らない設計)ため、
+// その人に他の無断キャンセルが残らない場合に限って一緒に取り消す。どちらも「元に戻す」で復元できる。
+function unmarkNoshow(reservationId, checkbox) {
+  const r = reservations.find(x => x.id === reservationId);
+  if (!r) { if (checkbox) checkbox.checked = true; return; }
+  const d = (r.datetime || '').substring(0, 10);
+  // 予約から登録した行(fromReservationId)を優先。それが無い古いデータは電話番号+日付で照合(deleteRecordと同じ規則)
+  let targets = noshows.filter(n => n.fromReservationId != null && String(n.fromReservationId) === String(r.id));
+  if (!targets.length && r.phone && d) targets = noshows.filter(n => !n.fromReservationId && n.phone === r.phone && n.date === d);
+  const targetIds = new Set(targets.map(n => n.id));
+  const remaining = noshows.filter(n => !targetIds.has(n.id) && matchCustomer(n, r).hit);
+  const block = findBlockEntry(r);
+  const autoBlock = (block && remaining.length === 0 && block.status === 'blocked'
+    && block.source === 'noshow' && block.note === '無断キャンセルのため自動登録') ? block : null;
+  let msg = `「${r.name}」（${r.datetime}）の無断キャンセル登録を取り消しますか？`;
+  const noted = targets.find(n => String(n.note || '').trim());
+  if (noted) msg += `\n\n📝 無断キャンセル一覧の備考「${noted.note}」も消えます。`;
+  if (autoBlock) msg += `\n\n🚷 この登録で自動的に入った「予約不可」も取り消します。`;
+  else if (block && block.status === 'blocked') msg += `\n\n🚷 予約不可リストの登録はそのまま残ります（他の無断キャンセルやスタッフの判断による登録のため）。`;
+  if (!confirm(msg)) { if (checkbox) checkbox.checked = true; return; }
+  const noshowCopies = JSON.parse(JSON.stringify(targets));
+  const blockCopy = autoBlock ? JSON.parse(JSON.stringify(autoBlock)) : null;
+  noshows = noshows.filter(n => !targetIds.has(n.id));
+  if (autoBlock) blocklist = blocklist.filter(b => b !== autoBlock);
+  r.movedToNoshow = false;
+  saveData(); render();
+  showUndoToast(`「${r.name}」の無断キャンセル登録を取り消しました`, function() {
+    noshowCopies.forEach(c => {
+      // 取り消し待ちの間に追加された新規レコードと数値idが衝突したら採番し直す(deleteRecordと同じ)
+      if (noshows.some(x => x.id === c.id)) c.id = noshows.length > 0 ? Math.max(...noshows.map(n => Number(n.id) || 0)) + 1 : 1;
+      noshows.push(c);
+    });
+    if (blockCopy && !blocklist.some(b => b.id === blockCopy.id)) blocklist.push(blockCopy);
+    const orig = reservations.find(x => x.id === reservationId);
+    if (orig) orig.movedToNoshow = true;
+    saveData(); render();
+    showToast(`「${r.name}」の無断キャンセル登録を元に戻しました ✓`, 'success');
+  });
+}
+
 // ── 予約 → 当日キャンセル（電話キャンセル等をチェックで登録） ────────────
 function moveToSameday(reservationId, checkbox) {
   const r = reservations.find(x => x.id === reservationId);
@@ -4858,7 +4901,9 @@ function openRowDetailSheet(tabId, id) {
       }
       if (!cancelled) {
         if (!r.movedToSameday) actionsHtml += `<label class="rds-check-row"><input type="checkbox" class="sameday-check" onchange="moveToSameday('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🟠当日キャンセルに登録</label>`;
-        if (!r.movedToNoshow) actionsHtml += `<label class="rds-check-row"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🚫無断キャンセルに登録</label>`;
+        actionsHtml += r.movedToNoshow
+          ? `<label class="rds-check-row"><input type="checkbox" class="noshow-check" checked onchange="unmarkNoshow('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🚫無断キャンセルに登録済み（外すと取り消し）</label>`
+          : `<label class="rds-check-row"><input type="checkbox" class="noshow-check" onchange="moveToNoshow('${r.id}',this);openRowDetailSheet('${tabId}','${r.id}')"> 🚫無断キャンセルに登録</label>`;
       }
     }
   } else if (tabId === 'noshow') {
