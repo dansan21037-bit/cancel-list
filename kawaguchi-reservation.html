@@ -1174,7 +1174,7 @@
       <table class="stats-table"><thead><tr>
         <th>月</th>
         <th>予約件数<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">重複除く</span></th>
-        <th title="通常キャンセルと当日キャンセルの合計(振替は含めない)">キャンセル<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">通常+当日</span></th>
+        <th title="キャンセルメールのうち振替を除いた件数(通常+当日)。当日キャンセル列は手動登録分も含むため、通常+当日と一致しないことがあります">キャンセル<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">通常+当日(メール)</span></th>
         <th title="前日までに連絡があった通常のキャンセル(当日・無断は別の列)">通常</th>
         <th title="時間変更のための取り直し。キャンセル数・率には含めない">🔀振替</th>
         <th>当日キャンセル</th>
@@ -1183,6 +1183,7 @@
         <th>無断率</th>
       </tr></thead><tbody id="stats-tbody"></tbody></table>
     </div>
+    <div class="stats-note" id="statsTableNote" style="margin:0 2px 8px"></div>
     <div class="table-footer"><span id="rowCount-stats">0ヶ月</span><span style="color:var(--color-accent-purple);font-weight:600;">川口院 - 月次レポート</span></div>
   </div></div>
 </div>
@@ -4142,6 +4143,13 @@ function renderStats() {
   const chronKeys = keys.slice().reverse(); // 昇順(古→新): 折れ線チャート用
 
   const totRes = resList.length, totNs = noshows.length, totSd = samedayList.length;
+  // 当日キャンセルは「メール由来」と「手動登録」の合算。手動登録分はキャンセルメールが無いので totCan には入らない
+  const totSdMail = totCan - totCanNormal;
+  const totSdManual = Math.max(0, totSd - totSdMail);
+  const noteEl = document.getElementById('statsTableNote');
+  if (noteEl) noteEl.textContent = totSdManual > 0
+    ? `「キャンセル」列はキャンセルメール(振替を除く)の件数です。「当日キャンセル」列には手動登録の${totSdManual}件も含むため、「通常」+「当日キャンセル」は「キャンセル」より多くなります。`
+    : '';
   const dupExcluded = reservations.length - resList.length;   // 二重予約として数えなかった件数
   const grand = totRes + totCan;
   const canRate = grand > 0 ? ((totCan / grand) * 100).toFixed(1) : '0.0';
@@ -4161,9 +4169,9 @@ function renderStats() {
 
   document.getElementById('statsSummary').innerHTML = `
     <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div>${dupExcluded > 0 ? `<div class="sub">二重予約${dupExcluded}件を除く</div>` : ''}${deltaRes}</div>
-    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)／内訳 通常${totCanNormal}・当日${totSd}</div>${deltaCan}</div>
+    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)／内訳 通常${totCanNormal}・当日${totSdMail}(メール分)</div>${deltaCan}</div>
     <div class="stats-summary-card orange" style="border-left-color:var(--color-neutral)"><div class="label">📩 通常キャンセル 累計</div><div class="value">${totCanNormal}</div><div class="sub">率 ${cnRate}%(当日・無断・振替を除く)</div>${deltaCn}</div>
-    <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div>${deltaSd}</div>
+    <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%${totSdManual > 0 ? `(手動登録${totSdManual}件を含む)` : ''}</div>${deltaSd}</div>
     <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div>${deltaNs}</div>
     <div class="stats-summary-card purple"><div class="label">📊 集計期間</div><div class="value">${keys.length}<span style="font-size:13px;font-weight:600">ヶ月</span></div><div class="sub">${keys.length ? ymShort(chronKeys[0]) + ' 〜 ' + ymShort(keys[0]) : '—'}</div></div>`;
 
