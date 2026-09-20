@@ -1004,7 +1004,7 @@
 
 <div class="tab-bar">
   <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト <span class="tab-badge" id="stat-reservations">0</span><span class="tab-sub" id="statResUniq"></span></button>
-  <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール） <span class="tab-badge" id="stat-cancellations">0</span></button>
+  <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール） <span class="tab-badge" id="stat-cancellations">0</span><span class="tab-sub" id="statCanNormal"></span></button>
   <button class="tab" data-tab="sameday" onclick="switchTab('sameday')">🟠 当日キャンセル <span class="tab-badge" id="stat-sameday">0</span></button>
   <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル <span class="tab-badge" id="stat-noshow">0</span></button>
   <button class="tab" data-tab="blocklist" onclick="switchTab('blocklist')">🚷 予約不可 <span class="tab-badge" id="stat-blocklist" title="予約不可 / 確認待ち">0</span></button>
@@ -1174,7 +1174,8 @@
       <table class="stats-table"><thead><tr>
         <th>月</th>
         <th>予約件数<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">重複除く</span></th>
-        <th>キャンセル</th>
+        <th title="通常キャンセルと当日キャンセルの合計(振替は含めない)">キャンセル<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">通常+当日</span></th>
+        <th title="前日までに連絡があった通常のキャンセル(当日・無断は別の列)">通常</th>
         <th title="時間変更のための取り直し。キャンセル数・率には含めない">🔀振替</th>
         <th>当日キャンセル</th>
         <th>無断キャンセル</th>
@@ -3282,6 +3283,13 @@ function render() {
     const sub = document.getElementById('statResUniq');
     if (sub) sub.textContent = dup ? `重複除く ${u}件` : ''; }
   document.getElementById('stat-cancellations').textContent = cancellations.length;
+  // 当日キャンセル・振替を除いた「通常キャンセル」の件数をタイルに併記する
+  { const fkSet = getFurikaeSet();
+    let cn = 0;
+    cancellations.forEach(c => { const k = getCancelKubun(c, fkSet); if (k !== 'furikae' && k !== 'sameday') cn++; });
+    document.getElementById('stat-cancellations').title = `通常キャンセル ${cn}件（当日・振替を除く）`;
+    const sub = document.getElementById('statCanNormal');
+    if (sub) sub.textContent = (cn < cancellations.length) ? `通常 ${cn}件` : ''; }
   document.getElementById('stat-noshow').textContent = noshows.length;
   document.getElementById('stat-sameday').textContent = getSamedayList().length;
   const blBadge = document.getElementById('stat-blocklist');
@@ -4113,7 +4121,8 @@ function renderStats() {
   const add = (key, field, dt) => {
     const ym = (dt||'').substring(0,7);
     if (!/^\d{4}-\d{2}$/.test(ym)) return;
-    if (!months[ym]) months[ym] = { res:0, can:0, ns:0, sd:0, fk:0 };
+    // cn = 通常キャンセル(事前連絡あり)。can(=通常+当日)から当日を引いた残り
+    if (!months[ym]) months[ym] = { res:0, can:0, cn:0, ns:0, sd:0, fk:0 };
     months[ym][field]++;
   };
   // 統計は「実際に来る予定の数」に近づけるため、二重予約(同じ人が同じ日に2件以上)を1件に数える
@@ -4124,7 +4133,7 @@ function renderStats() {
   cancellations.forEach(r => {
     const kubun = getCancelKubun(r, furikaeSet);
     if (kubun === 'furikae') { add(r, 'fk', r.datetime); totFk++; }
-    else { add(r, 'can', r.datetime); totCan++; if (kubun !== 'sameday') totCanNormal++; }
+    else { add(r, 'can', r.datetime); totCan++; if (kubun !== 'sameday') { add(r, 'cn', r.datetime); totCanNormal++; } }
   });
   noshows.forEach(r => add(r, 'ns', r.date));
   const samedayList = getSamedayList();
@@ -4136,6 +4145,7 @@ function renderStats() {
   const dupExcluded = reservations.length - resList.length;   // 二重予約として数えなかった件数
   const grand = totRes + totCan;
   const canRate = grand > 0 ? ((totCan / grand) * 100).toFixed(1) : '0.0';
+  const cnRate = grand > 0 ? ((totCanNormal / grand) * 100).toFixed(1) : '0.0';
   const nsRate = grand > 0 ? ((totNs / grand) * 100).toFixed(1) : '0.0';
   const sdRate = grand > 0 ? ((totSd / grand) * 100).toFixed(1) : '0.0';
 
@@ -4145,12 +4155,14 @@ function renderStats() {
   const prevM = latestKey ? months[prevYmKey(latestKey)] : null;
   const deltaRes = latestM ? deltaBadgeHTML('res', latestM.res, prevM ? prevM.res : null) : '';
   const deltaCan = latestM ? deltaBadgeHTML('can', latestM.can, prevM ? prevM.can : null) : '';
+  const deltaCn  = latestM ? deltaBadgeHTML('can', latestM.cn,  prevM ? prevM.cn  : null) : '';
   const deltaSd  = latestM ? deltaBadgeHTML('sd',  latestM.sd,  prevM ? prevM.sd  : null) : '';
   const deltaNs  = latestM ? deltaBadgeHTML('ns',  latestM.ns,  prevM ? prevM.ns  : null) : '';
 
   document.getElementById('statsSummary').innerHTML = `
     <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div>${dupExcluded > 0 ? `<div class="sub">二重予約${dupExcluded}件を除く</div>` : ''}${deltaRes}</div>
-    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div>${deltaCan}</div>
+    <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)／内訳 通常${totCanNormal}・当日${totSd}</div>${deltaCan}</div>
+    <div class="stats-summary-card orange" style="border-left-color:var(--color-neutral)"><div class="label">📩 通常キャンセル 累計</div><div class="value">${totCanNormal}</div><div class="sub">率 ${cnRate}%(当日・無断・振替を除く)</div>${deltaCn}</div>
     <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div>${deltaSd}</div>
     <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div>${deltaNs}</div>
     <div class="stats-summary-card purple"><div class="label">📊 集計期間</div><div class="value">${keys.length}<span style="font-size:13px;font-weight:600">ヶ月</span></div><div class="sub">${keys.length ? ymShort(chronKeys[0]) + ' 〜 ' + ymShort(keys[0]) : '—'}</div></div>`;
@@ -4180,7 +4192,7 @@ function renderStats() {
   const maxRes = Math.max(1, ...keys.map(k => months[k].res));
   const tbody = document.getElementById('stats-tbody');
   if (keys.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--color-neutral-muted);padding:40px">データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--color-neutral-muted);padding:40px">データがありません</td></tr>`;
   } else {
     const nowYm3 = todayStr().substring(0, 7);
     // 率のバーは「その院の中で高い月/低い月」が分かればよいので、その列の最大率を基準にする。
@@ -4188,8 +4200,8 @@ function renderStats() {
     const rateOf = (k, field) => { const m = months[k]; const b = m.res + m.can; return b > 0 ? m[field] / b * 100 : 0; };
     const maxCr = Math.max(1, ...keys.map(k => rateOf(k, 'can')));
     const maxNr = Math.max(1, ...keys.map(k => rateOf(k, 'ns')));
-    const sum = { res: 0, can: 0, fk: 0, sd: 0, ns: 0 };
-    keys.forEach(k => { const m = months[k]; sum.res += m.res; sum.can += m.can; sum.fk += m.fk; sum.sd += m.sd; sum.ns += m.ns; });
+    const sum = { res: 0, can: 0, cn: 0, fk: 0, sd: 0, ns: 0 };
+    keys.forEach(k => { const m = months[k]; sum.res += m.res; sum.can += m.can; sum.cn += m.cn; sum.fk += m.fk; sum.sd += m.sd; sum.ns += m.ns; });
     const rateCell = (label, val, max, color) =>
       `<td data-label="${label}" class="num" title="バーの長さはこの列の中での相対値です（この期間の最大 ${max.toFixed(1)}%）"><span class="rate-cell"><span>${val.toFixed(1)}%</span>` +
       `<span class="rate-bar"><i style="width:${Math.min(100, Math.round(val / max * 100))}%;background:${color}"></i></span></span></td>`;
@@ -4210,6 +4222,7 @@ function renderStats() {
         <td data-label="月" style="font-weight:700;color:var(--color-text)">${ym}${tag}</td>
         <td data-label="予約" class="num">${m.res}<div class="stats-bar-visual"><div class="stats-bar-fill" style="width:${barW}%"></div></div></td>
         <td data-label="キャンセル" class="num" style="color:var(--color-caution)">${m.can}${rowDelta}</td>
+        <td data-label="通常" class="num" style="color:var(--color-neutral)">${m.cn}</td>
         <td data-label="振替" class="num" style="color:var(--color-info)">${m.fk}</td>
         <td data-label="当日" class="num" style="color:var(--color-caution-strong)">${m.sd}</td>
         <td data-label="無断" class="num" style="color:var(--color-danger)">${m.ns}</td>
@@ -4225,6 +4238,7 @@ function renderStats() {
       <td data-label="月">合計（${keys.length}ヶ月）</td>
       <td data-label="予約" class="num">${sum.res}</td>
       <td data-label="キャンセル" class="num">${sum.can}</td>
+      <td data-label="通常" class="num">${sum.cn}</td>
       <td data-label="振替" class="num">${sum.fk}</td>
       <td data-label="当日" class="num">${sum.sd}</td>
       <td data-label="無断" class="num">${sum.ns}</td>
