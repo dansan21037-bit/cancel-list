@@ -226,6 +226,8 @@
   .badge-c4 { background: var(--color-danger-tint);  color: var(--color-danger-text); }
   /* リピーターは「良い客」を示す良好色(旧: 危険色の赤だったのを是正) */
   .badge-repeat { background: var(--color-positive); color: #fff; font-size: 12px; padding: 2px 6px; border-radius: 8px; white-space: nowrap; vertical-align: middle; }
+  /* タブに出す「二重予約を除いた件数」。件数より控えめにする */
+  .tab-sub { font-size: 10.5px; font-weight: 600; color: var(--color-neutral); margin-left: 5px; white-space: nowrap; }
   .noshow-check { width: 20px; height: 20px; cursor: pointer; accent-color: var(--color-danger); }
   .sameday-check { width: 20px; height: 20px; cursor: pointer; accent-color: var(--color-caution-strong); }
   .noshow-check:disabled { cursor: default; opacity: 0.6; }
@@ -1001,7 +1003,7 @@
 </div>
 
 <div class="tab-bar">
-  <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト <span class="tab-badge" id="stat-reservations">0</span></button>
+  <button class="tab active" data-tab="reservations" onclick="switchTab('reservations')">📋 予約者リスト <span class="tab-badge" id="stat-reservations">0</span><span class="tab-sub" id="statResUniq"></span></button>
   <button class="tab" data-tab="cancellations" onclick="switchTab('cancellations')">✉️ キャンセル（メール） <span class="tab-badge" id="stat-cancellations">0</span></button>
   <button class="tab" data-tab="sameday" onclick="switchTab('sameday')">🟠 当日キャンセル <span class="tab-badge" id="stat-sameday">0</span></button>
   <button class="tab" data-tab="noshow" onclick="switchTab('noshow')">🚫 無断キャンセル <span class="tab-badge" id="stat-noshow">0</span></button>
@@ -1171,7 +1173,7 @@
     <div class="table-container"><div class="table-scroll">
       <table class="stats-table"><thead><tr>
         <th>月</th>
-        <th>予約件数</th>
+        <th>予約件数<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">重複除く</span></th>
         <th>キャンセル</th>
         <th title="時間変更のための取り直し。キャンセル数・率には含めない">🔀振替</th>
         <th>当日キャンセル</th>
@@ -1201,7 +1203,7 @@
 
     <div class="legend-section">
       <h3>📋 予約者リスト</h3>
-      <div class="legend-row"><span class="badge badge-repeat">再2</span><span class="legend-desc">リピーター（再来）。キャンセル済みを除く実予約が2回以上ある人。<strong>電話番号がある予約は電話番号で、電話番号が無い予約（HPB経由）は氏名だけで</strong>数えます（HPBの場合は同姓同名の別人が混ざる可能性があります）。クリックするとその人だけ検索できます</span></div>
+      <div class="legend-row"><span class="badge badge-repeat">再2</span><span class="legend-desc">リピーター（再来）。キャンセル済みを除く実予約が2回以上ある人。<strong>電話番号で照合できる予約だけ</strong>数えます（HPB経由は通知に電話番号が載らないため、氏名が同じでも再来とは表示しません）。クリックするとその人だけ検索できます</span></div>
       <div class="legend-row"><span class="badge-noshow-warn">⚠️無断2</span><span class="legend-desc">この人は過去に無断キャンセルが2回ある(要注意)</span></div>
       <div class="legend-row"><span class="badge-sameday-warn">🟠当日2</span><span class="legend-desc">この人は過去に当日キャンセルが2回ある(振替は含まない)</span></div>
       <div class="legend-row"><span class="badge-dup">🔁重複?</span><span class="legend-desc">同じ日・同じ名前・同じ電話番号の予約が他にもある。二重登録の可能性</span></div>
@@ -2134,21 +2136,24 @@ function renderBlocklistTable(q, dateFrom, dateTo) {
 function getSamedayCountMap() { return getSamedayCounts(); }
 
 // ── 同日・同名の重複検出 ────────────────────────────────────────────────
-// 🔁重複?(同日・同氏名・同電話)を1件に数えたときの件数。
-// 電話番号が無い予約は照合できないので、そのまま1件ずつ数える(👥同名?は別人の可能性があるため除外しない)。
-function countUniqueReservations(records) {
+// 二重予約(同じ人が同じ日に2件以上)を1件に数えるための代表レコードを返す。
+// 電話番号がある予約は「日付＋氏名＋電話」で1件に。電話番号が無い予約(HPB通知には載らない)は
+// 「日付＋氏名」で1件にまとめる。同じ日に同姓同名の別人が来ることは実務上ほぼ無いため、
+// 数えすぎ(二重予約を2件と数える)より、まとめる方を選んでいる。
+// 電話番号が違う同姓同名は別人として別々に数える。
+function uniqueReservations(records) {
   const seen = new Set();
-  let n = 0;
+  const out = [];
   (records || []).forEach(r => {
     const d = (r.datetime || r.date || '').substring(0, 10);
     const nm = normName(r.name);
-    const ph = normPhone(r.phone);
-    const k = (d && nm && ph) ? d + '|' + nm + '|' + ph : null;
+    const k = (d && nm) ? d + '|' + nm + '|' + normPhone(r.phone) : null;
     if (k) { if (seen.has(k)) return; seen.add(k); }
-    n++;
+    out.push(r);
   });
-  return n;
+  return out;
 }
+function countUniqueReservations(records) { return uniqueReservations(records).length; }
 // 同じ「日付＋正規化氏名」で2件以上ある組を検出（スペース有無/全半角の違いは吸収）
 function buildDupGroups(records) {
   const map = {};
@@ -3270,8 +3275,12 @@ function render() {
   renderCautionBanner();
   updateQuickFilterChips();
   document.getElementById('stat-reservations').textContent = reservations.length;
+  // 二重予約を1件に数えた実質の件数。タイルに併記し、重複が無いときは出さない
   { const u = countUniqueReservations(reservations);
-    document.getElementById('stat-reservations').title = (u < reservations.length) ? `重複(🔁)を1件に数えると ${u}件` : ''; }
+    const dup = u < reservations.length;
+    document.getElementById('stat-reservations').title = dup ? `二重予約を1件に数えると ${u}件` : '';
+    const sub = document.getElementById('statResUniq');
+    if (sub) sub.textContent = dup ? `重複除く ${u}件` : ''; }
   document.getElementById('stat-cancellations').textContent = cancellations.length;
   document.getElementById('stat-noshow').textContent = noshows.length;
   document.getElementById('stat-sameday').textContent = getSamedayList().length;
@@ -3338,14 +3347,11 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
   // リピーター検出: 予約リスト内のみで同じ電話番号/名前が2回以上ある人。
   // キャンセル済み予約(時間変更の残骸)を数えると「変更しただけで再2」になるため除外する
   const repeatCounts = {};
-  const repeatByName = {};
   if (tabId === 'reservations') {
     for (const rec of reservations) {
       if (isReservationCancelled(rec)) continue;
       const ph = normPhone(rec.phone);
       if (ph) repeatCounts[ph] = (repeatCounts[ph] || 0) + 1;
-      const nm = normName(rec.name);
-      if (nm) repeatByName[nm] = (repeatByName[nm] || 0) + 1;
     }
   }
   if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; }
@@ -3425,9 +3431,10 @@ function renderEmailTable(data, tabId, q, dateFrom, dateTo) {
       // リピーターバッジ（予約リストのみ）
       let repeatBadge = '';
       if (isResTab) {
+        // 電話番号で照合できる予約だけ数える。HPB経由の通知には電話番号が載らず、
+        // 氏名だけの一致では同姓同名の別人を「再来」と誤表示してしまうため出さない。
         let repCnt = 0, searchKey = '';
         if (pn) { repCnt = repeatCounts[pn] || 0; searchKey = r.phone; }
-        else if (nn) { repCnt = repeatByName[nn] || 0; searchKey = r.name; }
         if (repCnt >= 2) {
           repeatBadge = ` <span class="badge badge-repeat" style="cursor:pointer" data-search-key="${esc(searchKey||'')}" onclick="searchByBadge(this)">再${repCnt}</span>`;
         }
@@ -4109,7 +4116,9 @@ function renderStats() {
     if (!months[ym]) months[ym] = { res:0, can:0, ns:0, sd:0, fk:0 };
     months[ym][field]++;
   };
-  reservations.forEach(r => add(r, 'res', r.datetime));
+  // 統計は「実際に来る予定の数」に近づけるため、二重予約(同じ人が同じ日に2件以上)を1件に数える
+  const resList = uniqueReservations(reservations);
+  resList.forEach(r => add(r, 'res', r.datetime));
   const furikaeSet = getFurikaeSet();
   let totCan = 0, totFk = 0, totCanNormal = 0;
   cancellations.forEach(r => {
@@ -4123,7 +4132,8 @@ function renderStats() {
   const keys = Object.keys(months).sort().reverse();
   const chronKeys = keys.slice().reverse(); // 昇順(古→新): 折れ線チャート用
 
-  const totRes = reservations.length, totNs = noshows.length, totSd = samedayList.length;
+  const totRes = resList.length, totNs = noshows.length, totSd = samedayList.length;
+  const dupExcluded = reservations.length - resList.length;   // 二重予約として数えなかった件数
   const grand = totRes + totCan;
   const canRate = grand > 0 ? ((totCan / grand) * 100).toFixed(1) : '0.0';
   const nsRate = grand > 0 ? ((totNs / grand) * 100).toFixed(1) : '0.0';
@@ -4139,7 +4149,7 @@ function renderStats() {
   const deltaNs  = latestM ? deltaBadgeHTML('ns',  latestM.ns,  prevM ? prevM.ns  : null) : '';
 
   document.getElementById('statsSummary').innerHTML = `
-    <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div>${deltaRes}</div>
+    <div class="stats-summary-card"><div class="label">📋 予約 累計</div><div class="value">${totRes}</div>${dupExcluded > 0 ? `<div class="sub">二重予約${dupExcluded}件を除く</div>` : ''}${deltaRes}</div>
     <div class="stats-summary-card orange"><div class="label">✉️ キャンセル 累計</div><div class="value">${totCan}</div><div class="sub">率 ${canRate}%(振替${totFk}件を除く)</div>${deltaCan}</div>
     <div class="stats-summary-card" style="border-left-color:var(--color-caution-strong)"><div class="label">🟠 当日キャンセル 累計</div><div class="value">${totSd}</div><div class="sub">率 ${sdRate}%</div>${deltaSd}</div>
     <div class="stats-summary-card red"><div class="label">🚫 無断キャンセル 累計</div><div class="value">${totNs}</div><div class="sub">率 ${nsRate}%</div>${deltaNs}</div>
@@ -4153,7 +4163,7 @@ function renderStats() {
       `<div class="stats-trend-head">
         <div class="stats-trend-title">📈 月ごとの予約件数とキャンセル件数</div>
         <div class="stats-legend">
-          <span><i style="background:var(--color-info);opacity:.34"></i>予約件数</span>
+          <span><i style="background:var(--color-info);opacity:.34"></i>予約件数(重複除く)</span>
           <span><i style="background:var(--color-caution)"></i>キャンセル件数</span>
         </div>
       </div>${buildMonthlyChartSVG(chronKeys, months)}`
