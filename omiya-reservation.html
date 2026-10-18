@@ -192,10 +192,10 @@
   tbody tr:nth-child(even):not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename):not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red):not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
     background: var(--color-zebra-tint);
   }
-  /* 状態色を持つ行(row-*)はhover時も自身の色を維持させる(:not()で除外) */
-  tbody tr:hover:not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename)
-    :not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red)
-    :not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
+  /* 状態色を持つ行(row-*)はhover時も自身の色を維持させる(:not()で除外)。
+     ★:not() の並びの途中で改行してはいけない。改行(空白)は「子孫」の意味になり、行の中の部品(再来などの印)まで
+       背景が塗りつぶされて白字が読めなくなっていた(2026-10-19 修正)。行そのもの(tr)の色だけを変える */
+  tbody tr:hover:not(.row-past):not(.row-cancelled):not(.row-dup):not(.row-samename):not(.row-warn-noshow):not(.row-cancel-3):not(.row-cancel-4):not(.row-orange):not(.row-red):not(.row-sameday-2):not(.row-sameday-3):not(.row-blocked):not(.row-blockpending) {
     background: var(--color-neutral-bg) !important;
   }
   /* 行ホバーで軽く浮き上がらせる(デスクトップのみ。カード表示ではhoverの概念が薄いため対象外) */
@@ -292,7 +292,7 @@
   .empty-state small { color: var(--color-neutral-strong); }
   .table-footer {
     padding: 10px 14px; background: #f7fafc; border-top: 1px solid #e2e8f0;
-    font-size: 13px; color: #718096; display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--color-neutral-strong); display: flex; justify-content: space-between; align-items: center;
   }
   .modal-backdrop {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -963,6 +963,85 @@
     .remind-check:checked, .noshow-check:checked, .sameday-check:checked { animation: none !important; }
     body:not(.force-card) tbody tr:hover { transform: none; }
   }
+
+  /* ============================================================
+     見やすさの手直し(2026-10-19。クラウド版の予約管理と同じ手直し＋現行版だけにある上のタブの分)
+     ・文字の色: 補足 #718096(白地で4.0:1)と、過去の予約の行などの薄い灰 #A0AEC0(2.3:1)を濃くする。
+       過去の行は今の予約より淡いまま(読めるうえで区別できる濃さ)
+     ・塗りの上の白字: 淡い塗りのボタン(削除 #FC8181=2.4:1・メール取得 #9F7AEA=3.3:1 など)を濃い塗りに。
+       ダーク表示では意味色が明るい色に変わるので、その塗りの上の文字は濃い色に反転する(予約不可の印と同じやり方)
+     ・小さすぎた字(9〜11px)を12px以上に / 明るい表示の入力欄の枠を3:1以上に / 本文はUDゴシック
+     色は明るい表示・ダーク表示とも計算で確認した(文字4.5:1・枠3:1以上)
+     ============================================================ */
+  :root {
+    --color-caution: #b34d1c; --color-positive: #2b7a4f;   /* 文字にも白字の塗りにも使う(どちらも5.0:1以上) */
+    --color-neutral-strong: #5f6b7a; --color-neutral-muted: #646c79;
+    --color-caution-strong: #8a5a00;   /* 文字にも白字の塗りにも使う(白地で5.9:1、白字で5.9:1) */
+    --color-input-border: #788491;
+    --font-ui: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  }
+  body.dark-mode { --color-neutral-muted: #8e99a8; }
+  body { font-family: var(--font-ui); }
+  /* 淡い塗りのボタン → 白字が読める濃い塗り(明暗共通) */
+  .btn-success { background: #2f7d4f; }  .btn-success:hover { background: #276a43; }
+  .btn-danger { background: #c53030; }   .btn-danger:hover { background: #a92a2a; }
+  .btn-mail { background: #6b46c1; }     .btn-mail:hover { background: #5a3aa6; }
+  .btn-import { background: #c05621; }   .btn-import:hover { background: #a54a1c; }
+  .btn-google { background: #1a73e8; }
+  .search-clear { background: var(--color-neutral-strong); }
+  .src-hpb { background: #c2410c; }
+  .search-icon { color: var(--color-neutral-strong); }
+  /* ダーク表示: 明るい意味色で塗った印・選択中の絞り込みの上は濃い文字 */
+  body.dark-mode .badge-repeat, body.dark-mode .badge-noshow-warn, body.dark-mode .badge-sameday-warn,
+  body.dark-mode .badge-dup, body.dark-mode .badge-samename,
+  body.dark-mode .quick-chip.chip-active, body.dark-mode .quick-chip.chip-active-warn,
+  body.dark-mode .row-detail-close:hover { color: #1a202c; }
+  /* 明るい表示の入力欄の枠(白地で3.8:1)。ダーク表示は既存の枠(#CBD5E0)のまま */
+  .search-input, .date-filter input[type="date"], input, select, textarea { border-color: var(--color-input-border); }
+  body.dark-mode .search-input, body.dark-mode .date-filter input[type="date"] { border-color: var(--color-neutral); }
+  /* 小さすぎた字(9〜11px)を12px以上に */
+  th .sort-btn, .noshow-checked-label, .name-cell .name-email, .date-cell .date-full, .src-hpb, .hpb-nocontact,
+  .tag-furikae, .tag-kubun-sameday, .tag-kubun-normal, .tag-blocked, .tag-blockpending, .tag-blockexempt,
+  .reason-chip, .reason-pick-note, .remind-pill, .tag-auto, .tag-manual, .stats-summary-card .sub, .stats-delta,
+  .heatmap-sub-title, .heatmap-grid, .reason-bar-hint, .stats-legend, .stats-note, .hm-scale, .donut-center i,
+  .stats-month-tag, .tab-sub, .mobile-bottom-nav .bottom-nav-item { font-size: 12px; }
+  /* 表の見出しの並べ替えの印(↕): 灰の地に補足の灰で4.4:1 → 一段濃い灰(6.3:1)。マウスを載せたとき・選択中は元の青のまま */
+  th .sort-btn { color: var(--color-neutral); }
+  /* 表の下の「大宮院 - 予約者リスト」など: 色をそのリストの色で直書きしていて、ダーク表示では院の色(紺など)が暗い地に沈む(1.1:1) */
+  body.dark-mode .table-footer > span:last-child { color: var(--color-info-text) !important; }
+  @media (max-width: 600px) {
+    /* 日付の範囲: UDゴシックは日付の字幅が少し広く、狭い画面ではみ出すので、縮める・折り返せるように */
+    .date-filter { flex-wrap: wrap; max-width: 100%; }
+    .date-filter input[type="date"] { flex: 1 1 130px; min-width: 0; }
+    /* 12pxにした日付の詳細・メールは、320pxの画面だとはみ出すので折り返す */
+    .date-cell .date-full, .name-cell .name-email { white-space: normal; overflow-wrap: anywhere; }
+    .heatmap-grid { font-size: 12px; }
+  }
+  @media (max-width: 768px) {
+    /* 曜日×時間帯のヒートマップ: スマホ用の指定が7列のままで、7曜日＋「計」の8つが1つずつずれて崩れていた → 8列。
+       マスは画面の幅に合わせて縮める(統計の枠が画面からはみ出していた) */
+    .heatmap-grid { grid-template-columns: 34px repeat(8, minmax(0, 1fr)); gap: 2px; }
+    .heatmap-grid .hm-cell { min-width: 0; }
+    .stats-visuals { grid-template-columns: minmax(0, 1fr); }
+    .stats-panel-box { min-width: 0; }
+    /* 予約不可の「きっかけ」(無断◯回 / 当日◯回)は折り返さない指定(直書き)で、320pxの画面だとはみ出していた */
+    #panel-blocklist td[data-label="きっかけ"] { white-space: normal !important; }
+  }
+
+  /* ── 現行版だけにある上のタブ ── */
+  /* タブの「重複除く N件」: 10.5px の #4A5568 で、選択中のタブ(紺などの塗り)の上では読めなかった → タブの文字と同じ色の12px */
+  .tab-sub { color: inherit; }
+  /* 選択中のタブの件数の丸: 半透明の白の丸に白字で、赤・橙の塗りの上だと3:1前後 → 半透明の黒の丸に白字 */
+  .tab.active .tab-badge { background: rgba(0,0,0,0.22); color: #fff; }
+  /* ダーク表示の選択中のタブ: 「body.dark-mode .tab」が .tab.active より強く、選択中も灰色の字のまま(1.1〜1.4:1)、
+     予約者リスト・予約不可は地も未選択と同じ灰色になっていた → 明るい塗りに濃い字
+     (予約者リスト・予約不可は明るい灰、ほかはそのタブの意味色。どれも濃い字で5:1以上) */
+  body.dark-mode .tab.active { background: var(--color-neutral); border-color: var(--color-neutral); color: #1a202c; }
+  body.dark-mode .tab.active[data-tab="cancellations"] { background: var(--color-caution); border-color: var(--color-caution); }
+  body.dark-mode .tab.active[data-tab="noshow"] { background: var(--color-danger); border-color: var(--color-danger); }
+  body.dark-mode .tab.active[data-tab="sameday"] { background: var(--color-caution-strong); border-color: var(--color-caution-strong); }
+  body.dark-mode .tab.active[data-tab="stats"] { background: var(--color-accent-purple); border-color: var(--color-accent-purple); }
+  body.dark-mode .tab.active .tab-badge { background: rgba(255,255,255,0.45); color: #1a202c; }
 </style>
 </head>
 <body>
@@ -1173,8 +1252,8 @@
     <div class="table-container"><div class="table-scroll">
       <table class="stats-table"><thead><tr>
         <th>月</th>
-        <th>予約件数<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">重複除く</span></th>
-        <th title="キャンセルメールのうち振替を除いた件数(通常+当日)。当日キャンセル列は手動登録分も含むため、通常+当日と一致しないことがあります">キャンセル<br><span style="font-weight:500;font-size:10.5px;color:var(--color-neutral)">通常+当日(メール)</span></th>
+        <th>予約件数<br><span style="font-weight:500;font-size:12px;color:var(--color-neutral)">重複除く</span></th>
+        <th title="キャンセルメールのうち振替を除いた件数(通常+当日)。当日キャンセル列は手動登録分も含むため、通常+当日と一致しないことがあります">キャンセル<br><span style="font-weight:500;font-size:12px;color:var(--color-neutral)">通常+当日(メール)</span></th>
         <th title="前日までに連絡があった通常のキャンセル(当日・無断は別の列)">通常</th>
         <th title="時間変更のための取り直し。キャンセル数・率には含めない">🔀振替</th>
         <th>当日キャンセル</th>
@@ -1775,7 +1854,7 @@ function reasonChipHTML(r) {
   const tip = d ? (d.counts ? '自己都合: 予約不可の回数に数えます' : 'やむを得ない事情: 予約不可の回数に数えません')
                 : '未設定(カウント対象)。クリックして理由を選んでください';
   const noteLine = (d && r.reasonNote)
-    ? `<div style="font-size:11px;color:var(--color-neutral-strong);margin-top:3px">${esc(r.reasonNote)}</div>` : '';
+    ? `<div style="font-size:12px;color:var(--color-neutral-strong);margin-top:3px">${esc(r.reasonNote)}</div>` : '';
   // id/srcIdはインポート由来だと引用符を含み得るのでonclick文字列に直接埋めない。全てdata属性経由で渡す
   return `<button type="button" class="reason-chip ${cls}" title="${tip}" ` +
     `data-pid="${esc(String(r.id || ''))}" data-psrcid="${esc(String(r.srcId || ''))}" ` +
@@ -2106,7 +2185,7 @@ function renderBlocklistTable(q, dateFrom, dateTo) {
                 : b.status === 'pending' ? `<span class="tag-blockpending">⏳ 確認待ち</span>`
                 : `<span class="tag-blockexempt">✅ 免除</span>`;
       const srcLabel = b.source === 'noshow' ? '🚫 無断キャンセル' : (b.source === 'sameday' ? '🟠 当日キャンセル' : '✍️ 手動登録');
-      const hist = `<span style="font-size:11px;color:var(--color-neutral-strong)">無断${countOf(nsCounts, b)}回 / 当日${countOf(samedayCounted, b)}回(実カウント)</span>`;
+      const hist = `<span style="font-size:12px;color:var(--color-neutral-strong)">無断${countOf(nsCounts, b)}回 / 当日${countOf(samedayCounted, b)}回(実カウント)</span>`;
       let actions = '';
       if (b.status === 'pending') {
         actions = `<button class="btn btn-danger btn-sm" onclick="blockSetBlocked('${b.id}')" title="予約不可にする">🚷 不可</button>
@@ -3886,6 +3965,16 @@ function resolveHexVar(varName) {
   const num = parseInt(h, 16);
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
 }
+// ヒートマップのマスの文字色。半透明の色をカードの地に重ねた明るさから、黒と白の読みやすい方を選ぶ
+// (固定の文字色だと、濃いマスや、ダーク表示の明るいマスで読めなくなっていた。黒/白なら最低でも4.58:1)
+function heatTextColor(rgb, alpha) {
+  const bg = resolveHexVar('--color-surface') || { r: 255, g: 255, b: 255 };
+  const c = rgb || { r: 197, g: 48, b: 48 };
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const mix = k => c[k] * alpha + bg[k] * (1 - alpha);
+  const L = 0.2126 * lin(mix('r')) + 0.7152 * lin(mix('g')) + 0.0722 * lin(mix('b'));
+  return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? '#000000' : '#ffffff';
+}
 function rgbaStr(rgb, alpha) {
   return rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})` : `rgba(197,48,48,${alpha})`;
 }
@@ -3986,7 +4075,7 @@ function buildOneHeatmapHTML(items, colorVarName) {
   const rgb = resolveHexVar(colorVarName);
   const cell = v => v === 0
     ? `<div class="hm-cell hm-zero" style="background:var(--color-neutral-bg)">0</div>`
-    : `<div class="hm-cell" style="background:${rgbaStr(rgb, 0.15 + 0.65 * (v / max))}">${v}</div>`;
+    : `<div class="hm-cell" style="background:${rgbaStr(rgb, 0.15 + 0.65 * (v / max))};color:${heatTextColor(rgb, 0.15 + 0.65 * (v / max))}">${v}</div>`;
   let html = `<div class="heatmap-grid"><div></div>`;
   dayLabel.forEach(d => html += `<div class="hm-head">${d}</div>`);
   html += `<div class="hm-head">計</div>`;
@@ -5255,6 +5344,7 @@ function applyDarkMode() {
   const m = localStorage.getItem('darkMode_omiya') || 'auto';
   const isDark = (m === 'dark') || (m === 'auto' && darkMediaQuery && darkMediaQuery.matches);
   document.body.classList.toggle('dark-mode', isDark);
+  if (typeof activeTab !== 'undefined' && activeTab === 'stats' && typeof renderStats === 'function') { try { renderStats(); } catch (e) {} }
   const b = document.getElementById('darkBtn');
   if (b) b.textContent = '🌙 ' + (DARK_LABEL[m] || '自動');
 }
